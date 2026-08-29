@@ -1,0 +1,35 @@
+{
+  "name": "@morrowlist/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "openapi:generate": "tsx src/openapi-cli.ts",
+    "openapi:check": "tsx src/openapi-cli.ts --check",
+    "lint": "echo \"linted from repository root\""
+  },
+  "dependencies": {
+    "@morrowlist/application": "workspace:*",
+    "@morrowlist/auth": "workspace:*",
+    "@morrowlist/contracts": "workspace:*",
+    "@morrowlist/domain": "workspace:*",
+    "@morrowlist/observability": "workspace:*",
+    "hono": "4.9.4",
+    "zod": "4.1.5"
+  },
+  "devDependencies": {
+    "@morrowlist/config": "workspace:*",
+    "@morrowlist/database": "workspace:*",
+    "@morrowlist/testkit": "workspace:*",
+    "tsx": "4.20.5",
+    "typescript": "5.9.2",
+    "vitest": "3.2.4"
+  }
+}
