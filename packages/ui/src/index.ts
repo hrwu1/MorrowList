@@ -3,6 +3,7 @@ export {
   Button,
   EmptyState,
   Field,
+  Select,
   Spinner,
   TextArea,
   TextInput,

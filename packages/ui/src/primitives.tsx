@@ -87,6 +87,23 @@ export function TextInput({ invalid, className = "", ...rest }: TextInputProps) 
   );
 }
 
+/**
+ * A native select. Custom listbox widgets have to re-implement typeahead, keyboard
+ * behaviour, and mobile pickers, and usually get part of it wrong (spec 14); the platform
+ * control is already correct everywhere.
+ */
+export function Select({
+  className = "",
+  children,
+  ...rest
+}: ComponentPropsWithRef<"select">) {
+  return (
+    <select className={`ml-input ml-select ${className}`.trim()} {...rest}>
+      {children}
+    </select>
+  );
+}
+
 export function TextArea({
   className = "",
   ...rest
