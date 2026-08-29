@@ -3,6 +3,7 @@ import type { Database } from "@morrowlist/database";
 import { uuidv7 } from "@morrowlist/domain";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { bearer } from "better-auth/plugins";
 
 import { authSchema } from "./schema.js";
 
@@ -69,6 +70,10 @@ export function createAuth(options: CreateAuthOptions): AuthInstance {
       requireEmailVerification: false,
     },
     socialProviders,
+    // Lets a non-browser client present its session token as `Authorization: Bearer …`,
+    // which is what the CLI does today. Workspace-scoped API keys with their own scopes
+    // and revocation replace this for the CLI in AUTH-005; the transport does not change.
+    plugins: [bearer()],
     session: {
       expiresIn: 60 * 60 * 24 * 30,
       updateAge: 60 * 60 * 24,

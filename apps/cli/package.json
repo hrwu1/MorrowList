@@ -1,0 +1,26 @@
+{
+  "name": "@morrowlist/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": { "morrow": "./dist/index.js" },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "echo \"linted from repository root\""
+  },
+  "dependencies": {
+    "@morrowlist/api-client": "workspace:*",
+    "@morrowlist/contracts": "workspace:*",
+    "commander": "14.0.0"
+  },
+  "devDependencies": {
+    "@morrowlist/config": "workspace:*",
+    "tsup": "8.5.0",
+    "tsx": "4.20.5",
+    "typescript": "5.9.2",
+    "vitest": "3.2.4"
+  }
+}
