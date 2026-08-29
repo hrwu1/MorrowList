@@ -228,9 +228,15 @@ describe("task endpoints", () => {
     const afterDelete = await (await request("/api/v1/tasks")).json();
     expect(afterDelete.data).toHaveLength(0);
 
+    // Trash is reachable as its own list rather than as an option on the normal one.
+    const trash = await (await request("/api/v1/tasks?deleted=true")).json();
+    expect(trash.data.map((t: { title: string }) => t.title)).toEqual(["Mistake"]);
+
     await jsonRequest(`/api/v1/tasks/${created.data.id}/restore`, "POST");
     const afterRestore = await (await request("/api/v1/tasks")).json();
     expect(afterRestore.data).toHaveLength(1);
+    const emptyTrash = await (await request("/api/v1/tasks?deleted=true")).json();
+    expect(emptyTrash.data).toHaveLength(0);
   });
 
   it("maps a version conflict to 409 with the actual version", async () => {

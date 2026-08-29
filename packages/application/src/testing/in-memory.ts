@@ -82,7 +82,9 @@ function taskRepository(data: InMemoryData): TaskRepository {
         (task) => task.workspaceId === filter.workspaceId,
       );
 
-      if (!filter.includeDeleted) items = items.filter((t) => t.deletedAt === null);
+      items = items.filter((t) =>
+        filter.deletedOnly ? t.deletedAt !== null : t.deletedAt === null,
+      );
       if (filter.inboxOnly) items = items.filter((t) => t.projectId === null);
       if (filter.projectId)
         items = items.filter((t) => t.projectId === filter.projectId);

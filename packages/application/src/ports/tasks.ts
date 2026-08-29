@@ -11,8 +11,12 @@ export interface TaskFilter {
   /** True selects Inbox tasks only: those with no project (spec 9.1). */
   readonly inboxOnly?: boolean | undefined;
   readonly isCompleted?: boolean | undefined;
-  /** Include soft-deleted tasks. Off by default so Trash stays out of normal views. */
-  readonly includeDeleted?: boolean | undefined;
+  /**
+   * Select soft-deleted tasks instead of live ones — the Trash view (spec 9.7). Off by
+   * default, because a deleted task is excluded from every normal view (spec 8.2
+   * invariant 10). There is deliberately no "both" option: no view shows a mix.
+   */
+  readonly deletedOnly?: boolean | undefined;
   readonly includeSubtasks?: boolean | undefined;
   readonly due?: "overdue" | "today" | "future" | "none" | undefined;
   /** The workspace's local date, for evaluating the `due` filter (spec 12.3). */

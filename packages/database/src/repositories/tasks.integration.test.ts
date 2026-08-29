@@ -318,6 +318,49 @@ describe("completion", () => {
   });
 });
 
+describe("trash", () => {
+  it("partitions deleted tasks out of normal lists and into the Trash list", async () => {
+    // The split is a SQL predicate on deleted_at; an in-memory double cannot prove the
+    // generated WHERE clause is the one that runs.
+    const kept = await service.create(context, { workspaceId, title: "Kept" });
+    const removed = await service.create(context, { workspaceId, title: "Removed" });
+    await service.delete(context, workspaceId, removed.id);
+
+    const live = await service.list(context, {
+      workspaceId,
+      limit: 50,
+      includeSubtasks: true,
+      sort: "rank",
+      order: "asc",
+    } as never);
+    const trash = await service.list(context, {
+      workspaceId,
+      limit: 50,
+      includeSubtasks: true,
+      deleted: true,
+      sort: "rank",
+      order: "asc",
+    } as never);
+
+    expect(live.data.map((task) => task.id)).toEqual([kept.id]);
+    expect(trash.data.map((task) => task.id)).toEqual([removed.id]);
+    expect(trash.data[0]?.deletedAt).toBe(NOW.toISOString());
+
+    const restored = await service.restore(context, workspaceId, removed.id);
+    expect(restored.deletedAt).toBeNull();
+
+    const afterRestore = await service.list(context, {
+      workspaceId,
+      limit: 50,
+      includeSubtasks: true,
+      deleted: true,
+      sort: "rank",
+      order: "asc",
+    } as never);
+    expect(afterRestore.data).toHaveLength(0);
+  });
+});
+
 describe("workspace isolation", () => {
   it("does not return a task belonging to another workspace", async () => {
     const otherUserId = uuidv7();

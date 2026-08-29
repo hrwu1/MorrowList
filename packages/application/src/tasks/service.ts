@@ -183,6 +183,7 @@ export class TaskService {
           priority: query.priority,
           inboxOnly: query.inbox,
           isCompleted: query.isCompleted,
+          deletedOnly: query.deleted,
           includeSubtasks: query.includeSubtasks,
           due: query.due,
           today: this.workspaceToday(workspace.timezone),

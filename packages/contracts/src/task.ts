@@ -123,6 +123,12 @@ export const listTasksQuerySchema = paginationQuerySchema.extend({
   includeSubtasks: z.stringbool().default(true),
   /** Inbox tasks only: no project (spec 9.1). */
   inbox: z.stringbool().optional(),
+  /**
+   * Trash (spec 9.7). Soft-deleted tasks are excluded from every other view (spec 8.2
+   * invariant 10), so this selects them instead of widening a normal list: `true` returns
+   * only deleted tasks.
+   */
+  deleted: z.stringbool().optional(),
   sort: z
     .enum(["rank", "createdAt", "dueDate", "priority", "updatedAt"])
     .default("rank"),

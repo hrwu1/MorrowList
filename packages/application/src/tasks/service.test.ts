@@ -380,6 +380,42 @@ describe("TaskService.list", () => {
     expect(completed.data.map((t) => t.title)).toEqual(["Done soon"]);
   });
 
+  it("hides deleted tasks by default and lists only them for Trash", async () => {
+    // Trash is a separate view, not a widened list: a deleted task must never appear
+    // beside live ones (spec 8.2 invariant 10, 9.7).
+    const trashed = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Thrown away",
+    });
+    await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Kept",
+    });
+    await service.delete(seeded.context, seeded.workspace.id, trashed.id);
+
+    const live = await service.list(seeded.context, listQuery());
+    const trash = await service.list(seeded.context, listQuery({ deleted: true }));
+
+    expect(live.data.map((t) => t.title)).toEqual(["Kept"]);
+    expect(trash.data.map((t) => t.title)).toEqual(["Thrown away"]);
+    expect(trash.data[0]?.deletedAt).not.toBeNull();
+  });
+
+  it("returns a restored task to the normal list", async () => {
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Deleted by mistake",
+    });
+    await service.delete(seeded.context, seeded.workspace.id, task.id);
+    await service.restore(seeded.context, seeded.workspace.id, task.id);
+
+    const live = await service.list(seeded.context, listQuery());
+    const trash = await service.list(seeded.context, listQuery({ deleted: true }));
+
+    expect(live.data.map((t) => t.title)).toEqual(["Deleted by mistake"]);
+    expect(trash.data).toHaveLength(0);
+  });
+
   it("paginates with an opaque cursor", async () => {
     for (let i = 0; i < 5; i++) {
       await service.create(seeded.context, {

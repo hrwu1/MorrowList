@@ -74,7 +74,9 @@ export function createTaskRepository(db: Database): TaskRepository {
     async list(filter: TaskFilter, cursor: Cursor): Promise<Page<Task>> {
       const conditions = [eq(tasks.workspaceId, filter.workspaceId)];
 
-      if (!filter.includeDeleted) conditions.push(isNull(tasks.deletedAt));
+      conditions.push(
+        filter.deletedOnly ? isNotNull(tasks.deletedAt) : isNull(tasks.deletedAt),
+      );
       if (filter.inboxOnly) conditions.push(isNull(tasks.projectId));
       if (filter.projectId) conditions.push(eq(tasks.projectId, filter.projectId));
       if (filter.statusId) conditions.push(eq(tasks.statusId, filter.statusId));
