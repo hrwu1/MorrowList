@@ -1,0 +1,38 @@
+{
+  "name": "morrowlist",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @morrowlist/database db:generate",
+    "db:migrate": "pnpm --filter @morrowlist/database db:migrate",
+    "db:seed": "pnpm --filter @morrowlist/database db:seed",
+    "openapi:generate": "pnpm --filter @morrowlist/api openapi:generate",
+    "openapi:check": "pnpm --filter @morrowlist/api openapi:check"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "eslint": "9.34.0",
+    "prettier": "3.6.2",
+    "turbo": "2.5.6",
+    "typescript": "5.9.2",
+    "vitest": "3.2.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "unrs-resolver"
+    ]
+  }
+}

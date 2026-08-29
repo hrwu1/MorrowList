@@ -1,0 +1,34 @@
+{
+  "name": "@morrowlist/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./env": { "types": "./dist/env.d.ts", "default": "./dist/env.js" },
+    "./tsconfig/base.json": "./tsconfig/base.json",
+    "./tsconfig/library.json": "./tsconfig/library.json",
+    "./tsconfig/next.json": "./tsconfig/next.json",
+    "./eslint": "./eslint/index.js",
+    "./vitest": "./vitest/index.js"
+  },
+  "files": ["dist", "tsconfig", "eslint", "vitest"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "echo \"linted from repository root\""
+  },
+  "dependencies": {
+    "zod": "4.1.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.34.0",
+    "eslint-plugin-import-x": "4.16.1",
+    "typescript": "5.9.2",
+    "typescript-eslint": "8.41.0",
+    "vitest": "3.2.4"
+  }
+}

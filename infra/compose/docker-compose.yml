@@ -1,0 +1,24 @@
+# Parity environment for contributors who prefer containers (spec FND-004).
+# The database version must match the production target, PostgreSQL 18.
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: morrowlist-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: morrowlist
+    ports:
+      - "5432:5432"
+    volumes:
+      - morrowlist-pgdata:/var/lib/postgresql/data
+      - ./init/01-create-test-database.sql:/docker-entrypoint-initdb.d/01-create-test-database.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d morrowlist"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  morrowlist-pgdata:

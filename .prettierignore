@@ -1,0 +1,6 @@
+dist
+.next
+coverage
+pnpm-lock.yaml
+docs/api/openapi.json
+packages/database/drizzle
