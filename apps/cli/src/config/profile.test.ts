@@ -49,7 +49,10 @@ describe("resolveProfile", () => {
     const resolved = resolveProfile(
       config,
       { baseUrl: "http://flag.example/api/v1", apiKey: "from-flag" },
-      { MORROW_BASE_URL: "http://env.example/api/v1", MORROW_API_KEY: "from-env" } as NodeJS.ProcessEnv,
+      {
+        MORROW_BASE_URL: "http://env.example/api/v1",
+        MORROW_API_KEY: "from-env",
+      } as NodeJS.ProcessEnv,
     );
 
     expect(resolved.baseUrl).toBe("http://flag.example/api/v1");

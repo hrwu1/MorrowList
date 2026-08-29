@@ -1,12 +1,7 @@
 import type { Project, Workspace } from "@morrowlist/application";
 import type { ActorKind, Task, WorkflowStatus } from "@morrowlist/domain";
 
-import type {
-  projects,
-  tasks,
-  workflowStatuses,
-  workspaces,
-} from "../schema/index.js";
+import type { projects, tasks, workflowStatuses, workspaces } from "../schema/index.js";
 
 /**
  * Row-to-entity mapping. Kept in one place so a column rename cannot silently change the

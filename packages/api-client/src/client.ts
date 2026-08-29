@@ -157,10 +157,7 @@ export class ApiClient {
     return response.data;
   }
 
-  private queryString(
-    query: Record<string, unknown>,
-    options: RequestOptions,
-  ): string {
+  private queryString(query: Record<string, unknown>, options: RequestOptions): string {
     const params = new URLSearchParams();
     const workspaceId = options.workspaceId ?? this.options.workspaceId;
     if (workspaceId) params.set("workspaceId", workspaceId);

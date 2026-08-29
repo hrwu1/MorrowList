@@ -40,9 +40,13 @@ export const tasks = pgTable(
     dueDate: date("due_date"),
     dueTime: time("due_time"),
     dueTimezone: varchar("due_timezone", { length: 100 }),
-    parentTaskId: uuid("parent_task_id").references((): any => tasks.id, {
-      onDelete: "set null",
-    }),
+    // Drizzle cannot infer a self-referencing foreign key: the callback's return type
+    // depends on the table being declared. The annotation breaks that cycle.
+    parentTaskId: uuid("parent_task_id").references(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (): any => tasks.id,
+      { onDelete: "set null" },
+    ),
     // COLLATE "C" is applied in the migration; see domain/shared/rank.ts for why.
     rank: varchar("rank", { length: 64 }).notNull(),
     // The COLLATE "C" clause itself lives in migration 0001; Drizzle does not model

@@ -87,8 +87,16 @@ export function TextInput({ invalid, className = "", ...rest }: TextInputProps) 
   );
 }
 
-export function TextArea({ className = "", ...rest }: ComponentPropsWithRef<"textarea">) {
-  return <textarea className={`ml-input ml-input--multiline ${className}`.trim()} {...rest} />;
+export function TextArea({
+  className = "",
+  ...rest
+}: ComponentPropsWithRef<"textarea">) {
+  return (
+    <textarea
+      className={`ml-input ml-input--multiline ${className}`.trim()}
+      {...rest}
+    />
+  );
 }
 
 export interface EmptyStateProps {

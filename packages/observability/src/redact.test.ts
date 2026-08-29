@@ -20,7 +20,10 @@ describe("redact", () => {
   });
 
   it("omits task content by default", () => {
-    const result = redact({ taskId: "t1", title: "Buy a gift" }) as Record<string, unknown>;
+    const result = redact({ taskId: "t1", title: "Buy a gift" }) as Record<
+      string,
+      unknown
+    >;
 
     expect(result.taskId).toBe("t1");
     expect(result.title).toBe(REDACTED);

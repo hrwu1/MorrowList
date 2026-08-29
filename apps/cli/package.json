@@ -3,7 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "bin": { "morrow": "./dist/index.js" },
+  "bin": {
+    "morrow": "./dist/index.js"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsx src/index.ts",

@@ -37,7 +37,9 @@ export function decodeCursor(cursor: string, secret: string): CursorPayload {
   }
 
   try {
-    const parsed = JSON.parse(Buffer.from(body, "base64url").toString()) as CursorPayload;
+    const parsed = JSON.parse(
+      Buffer.from(body, "base64url").toString(),
+    ) as CursorPayload;
     if (typeof parsed.k !== "string" || typeof parsed.i !== "string") {
       throw new Error("shape");
     }

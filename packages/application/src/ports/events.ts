@@ -23,7 +23,9 @@ export interface ActivityEventInput {
   readonly createdAt: Date;
 }
 
-export interface ActivityEvent extends ActivityEventInput {}
+/** A stored activity row. Identical in shape to the input today; named separately so a
+ *  read-side field such as a resolved actor name can be added without touching writers. */
+export type ActivityEvent = ActivityEventInput;
 
 export interface ActivityRepository {
   append(event: ActivityEventInput): Promise<void>;
@@ -53,5 +55,8 @@ export interface OutboxEventInput {
 export interface OutboxRepository {
   enqueue(event: OutboxEventInput): Promise<void>;
   /** Inspection support for the MVP; external delivery is deferred (spec 18.2). */
-  listUnpublished(workspaceId: string, limit?: number): Promise<readonly OutboxEventInput[]>;
+  listUnpublished(
+    workspaceId: string,
+    limit?: number,
+  ): Promise<readonly OutboxEventInput[]>;
 }

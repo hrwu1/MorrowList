@@ -6,15 +6,26 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-    "./env": { "types": "./dist/env.d.ts", "default": "./dist/env.js" },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./env": {
+      "types": "./dist/env.d.ts",
+      "default": "./dist/env.js"
+    },
     "./tsconfig/base.json": "./tsconfig/base.json",
     "./tsconfig/library.json": "./tsconfig/library.json",
     "./tsconfig/next.json": "./tsconfig/next.json",
     "./eslint": "./eslint/index.js",
     "./vitest": "./vitest/index.js"
   },
-  "files": ["dist", "tsconfig", "eslint", "vitest"],
+  "files": [
+    "dist",
+    "tsconfig",
+    "eslint",
+    "vitest"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

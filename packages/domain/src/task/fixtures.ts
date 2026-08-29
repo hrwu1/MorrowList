@@ -1,6 +1,6 @@
+import type { StatusCategory, WorkflowStatus } from "../project/status.js";
 import type { ActorRef } from "../shared/actor.js";
 import { fixedClock, type Clock } from "../shared/clock.js";
-import type { StatusCategory, WorkflowStatus } from "../project/status.js";
 
 import type { PolicyContext } from "./policies.js";
 

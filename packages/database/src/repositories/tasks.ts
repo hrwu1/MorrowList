@@ -7,7 +7,18 @@ import type {
   TaskRepository,
 } from "@morrowlist/application";
 import type { Task } from "@morrowlist/domain";
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  sql,
+} from "drizzle-orm";
 
 import type { Database } from "../client.js";
 import { tasks, workspaceTaskCounters } from "../schema/index.js";
@@ -247,7 +258,9 @@ export function createTaskCounterRepository(db: Database): TaskCounterRepository
 
       const raw = result.rows[0]?.next_number;
       if (raw === undefined) {
-        throw new Error(`failed to allocate a task number for workspace ${workspaceId}`);
+        throw new Error(
+          `failed to allocate a task number for workspace ${workspaceId}`,
+        );
       }
       // `next_number` is the value *after* the increment, so the allocated number is one
       // less. The insert branch seeds 2 and therefore allocates 1.

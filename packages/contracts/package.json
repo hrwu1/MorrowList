@@ -5,15 +5,24 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
-  "files": ["dist"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "lint": "echo \"linted from repository root\""
   },
-  "dependencies": { "zod": "4.1.5" },
+  "dependencies": {
+    "zod": "4.1.5"
+  },
   "devDependencies": {
     "@morrowlist/config": "workspace:*",
     "typescript": "5.9.2",

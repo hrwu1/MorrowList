@@ -13,7 +13,11 @@ export interface ApiDependencies {
   readonly logger: Logger;
   readonly metrics?: Metrics;
   /** Readiness probe backing `GET /ready` (spec FND-006). */
-  readonly checkHealth: () => Promise<{ ok: boolean; latencyMs: number; error?: string }>;
+  readonly checkHealth: () => Promise<{
+    ok: boolean;
+    latencyMs: number;
+    error?: string;
+  }>;
 }
 
 /** Per-request values attached by middleware and read by routes. */

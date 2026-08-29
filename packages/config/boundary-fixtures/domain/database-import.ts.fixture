@@ -1,0 +1,5 @@
+// INVALID ON PURPOSE. See ../README.md.
+// The domain is the innermost layer and imports no other workspace package (spec 16.2).
+import { createDatabase } from "@morrowlist/database";
+
+export const db = createDatabase;

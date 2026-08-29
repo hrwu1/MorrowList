@@ -1,5 +1,5 @@
-import { DomainError, ValidationError } from "../shared/errors.js";
 import { isActive, isTerminal, type WorkflowStatus } from "../project/status.js";
+import { DomainError, ValidationError } from "../shared/errors.js";
 
 import type { Task } from "./task.js";
 
@@ -75,11 +75,10 @@ export function assertStatusBelongsToProject(
     );
   }
   if (!isActive(status)) {
-    throw new DomainError(
-      "TASK_INVALID_STATUS",
-      "The selected status is archived.",
-      { projectId, statusId: status.id },
-    );
+    throw new DomainError("TASK_INVALID_STATUS", "The selected status is archived.", {
+      projectId,
+      statusId: status.id,
+    });
   }
 }
 
@@ -101,10 +100,10 @@ export function assertCompletionConsistency(
     );
   }
   if (!inTerminalStatus && task.completedAt !== null) {
-    throw new ValidationError(
-      "A completed task must be in a Done status.",
-      { taskId: task.id, statusId: status.id },
-    );
+    throw new ValidationError("A completed task must be in a Done status.", {
+      taskId: task.id,
+      statusId: status.id,
+    });
   }
 }
 

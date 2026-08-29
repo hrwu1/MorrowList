@@ -1,7 +1,4 @@
-import type {
-  ActivityRepository,
-  OutboxRepository,
-} from "@morrowlist/application";
+import type { ActivityRepository, OutboxRepository } from "@morrowlist/application";
 import { and, desc, eq, isNull } from "drizzle-orm";
 
 import type { Database } from "../client.js";

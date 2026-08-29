@@ -396,10 +396,18 @@
     text-transform: capitalize;
     font-weight: 550;
   }
-  .task-row__priority[data-priority="low"] { color: var(--priority-low); }
-  .task-row__priority[data-priority="medium"] { color: var(--priority-medium); }
-  .task-row__priority[data-priority="high"] { color: var(--priority-high); }
-  .task-row__priority[data-priority="urgent"] { color: var(--priority-urgent); }
+  .task-row__priority[data-priority="low"] {
+    color: var(--priority-low);
+  }
+  .task-row__priority[data-priority="medium"] {
+    color: var(--priority-medium);
+  }
+  .task-row__priority[data-priority="high"] {
+    color: var(--priority-high);
+  }
+  .task-row__priority[data-priority="urgent"] {
+    color: var(--priority-urgent);
+  }
 
   .auth-shell {
     min-height: 100dvh;

@@ -4,6 +4,7 @@ import type {
   TaskDto,
   UpdateTaskRequest,
 } from "@morrowlist/contracts";
+import { TASK_EVENTS } from "@morrowlist/contracts";
 import {
   DomainError,
   assertExpectedVersion,
@@ -25,7 +26,6 @@ import {
   type Task,
   type WorkflowStatus,
 } from "@morrowlist/domain";
-import { TASK_EVENTS } from "@morrowlist/contracts";
 
 import type {
   Page,
@@ -161,7 +161,10 @@ export class TaskService {
   async list(
     context: ActorContext,
     query: ListTasksQuery & WorkspaceScopedRequest,
-  ): Promise<{ data: TaskDto[]; page: { nextCursor: string | null; hasMore: boolean } }> {
+  ): Promise<{
+    data: TaskDto[];
+    page: { nextCursor: string | null; hasMore: boolean };
+  }> {
     assertWorkspaceAccess(context, query.workspaceId);
     assertScope(context, SCOPES.tasksRead);
 
@@ -260,11 +263,10 @@ export class TaskService {
         const doneStatus = task.projectId
           ? await this.resolveDoneStatus(tx, task)
           : undefined;
-        return completeTask(
-          task,
-          doneStatus ? { doneStatus } : {},
-          { actor: actorRef(context), clock: this.clock },
-        );
+        return completeTask(task, doneStatus ? { doneStatus } : {}, {
+          actor: actorRef(context),
+          clock: this.clock,
+        });
       },
     });
   }
@@ -327,7 +329,8 @@ export class TaskService {
       {
         eventType: TASK_EVENTS.deleted,
         summarize: () => "Moved task to Trash",
-        apply: (task) => deleteTask(task, { actor: actorRef(context), clock: this.clock }),
+        apply: (task) =>
+          deleteTask(task, { actor: actorRef(context), clock: this.clock }),
       },
       { allowDeleted: true },
     );
@@ -350,7 +353,8 @@ export class TaskService {
       {
         eventType: TASK_EVENTS.restored,
         summarize: () => "Restored task from Trash",
-        apply: (task) => restoreTask(task, { actor: actorRef(context), clock: this.clock }),
+        apply: (task) =>
+          restoreTask(task, { actor: actorRef(context), clock: this.clock }),
       },
       { allowDeleted: true },
     );

@@ -1,3 +1,5 @@
+import type { Task, WorkflowStatus } from "@morrowlist/domain";
+
 import type {
   ActivityEvent,
   ActivityEventInput,
@@ -21,7 +23,6 @@ import type {
   WorkspaceRepository,
   WorkspaceRole,
 } from "../ports/index.js";
-import type { Task, WorkflowStatus } from "@morrowlist/domain";
 
 /**
  * In-memory adapters for the application ports.
@@ -83,7 +84,8 @@ function taskRepository(data: InMemoryData): TaskRepository {
 
       if (!filter.includeDeleted) items = items.filter((t) => t.deletedAt === null);
       if (filter.inboxOnly) items = items.filter((t) => t.projectId === null);
-      if (filter.projectId) items = items.filter((t) => t.projectId === filter.projectId);
+      if (filter.projectId)
+        items = items.filter((t) => t.projectId === filter.projectId);
       if (filter.statusId) items = items.filter((t) => t.statusId === filter.statusId);
       if (filter.parentTaskId) {
         items = items.filter((t) => t.parentTaskId === filter.parentTaskId);
@@ -351,7 +353,7 @@ export interface InMemoryUnitOfWork extends UnitOfWork {
 export function createInMemoryUnitOfWork(
   seed: InMemoryData = emptyData(),
 ): InMemoryUnitOfWork {
-  let data = seed;
+  const data = seed;
   let pendingFailure: Error | null = null;
 
   const snapshot = (source: InMemoryData): InMemoryData => ({

@@ -5,9 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 import { authClient } from "@/lib/auth-client";
 
-const LINKS = [
-  { href: "/inbox", label: "Inbox" },
-] as const;
+const LINKS = [{ href: "/inbox", label: "Inbox" }] as const;
 
 /**
  * Primary navigation (spec 7.2). Only the views this slice implements are listed; adding

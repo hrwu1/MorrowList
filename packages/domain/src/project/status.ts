@@ -55,7 +55,12 @@ export const DEFAULT_WORKFLOW: readonly {
 }[] = [
   { name: "Backlog", category: "backlog", colorToken: "slate", isDefault: false },
   { name: "Ready", category: "ready", colorToken: "blue", isDefault: true },
-  { name: "In Progress", category: "in_progress", colorToken: "amber", isDefault: false },
+  {
+    name: "In Progress",
+    category: "in_progress",
+    colorToken: "amber",
+    isDefault: false,
+  },
   { name: "Blocked", category: "blocked", colorToken: "red", isDefault: false },
   { name: "In Review", category: "review", colorToken: "violet", isDefault: false },
   { name: "Done", category: "done", colorToken: "green", isDefault: false },

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { InboxPage } from "@/features/tasks/components/inbox-page";
 import { getContainer } from "@/lib/server";

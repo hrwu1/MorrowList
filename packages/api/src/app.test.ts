@@ -198,9 +198,11 @@ describe("task endpoints", () => {
   });
 
   it("completes and reopens a task", async () => {
-    const created = await (await jsonRequest("/api/v1/tasks", "POST", {
-      title: "Call the bank",
-    })).json();
+    const created = await (
+      await jsonRequest("/api/v1/tasks", "POST", {
+        title: "Call the bank",
+      })
+    ).json();
 
     const completed = await (
       await jsonRequest(`/api/v1/tasks/${created.data.id}/complete`, "POST")
@@ -214,9 +216,11 @@ describe("task endpoints", () => {
   });
 
   it("soft deletes and restores a task", async () => {
-    const created = await (await jsonRequest("/api/v1/tasks", "POST", {
-      title: "Mistake",
-    })).json();
+    const created = await (
+      await jsonRequest("/api/v1/tasks", "POST", {
+        title: "Mistake",
+      })
+    ).json();
 
     const deleted = await jsonRequest(`/api/v1/tasks/${created.data.id}`, "DELETE");
     expect(deleted.status).toBe(200);
@@ -230,9 +234,11 @@ describe("task endpoints", () => {
   });
 
   it("maps a version conflict to 409 with the actual version", async () => {
-    const created = await (await jsonRequest("/api/v1/tasks", "POST", {
-      title: "Draft",
-    })).json();
+    const created = await (
+      await jsonRequest("/api/v1/tasks", "POST", {
+        title: "Draft",
+      })
+    ).json();
     await jsonRequest(`/api/v1/tasks/${created.data.id}`, "PATCH", {
       title: "Second",
     });

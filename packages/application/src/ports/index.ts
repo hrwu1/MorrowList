@@ -7,7 +7,11 @@ export type {
   TaskFilter,
   TaskRepository,
 } from "./tasks.js";
-export type { Project, ProjectRepository, WorkflowStatusRepository } from "./projects.js";
+export type {
+  Project,
+  ProjectRepository,
+  WorkflowStatusRepository,
+} from "./projects.js";
 export type {
   Workspace,
   WorkspaceMembership,

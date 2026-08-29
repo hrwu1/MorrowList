@@ -21,6 +21,8 @@ const config: NextConfig = {
   // config resolves. Running it again here would resolve from apps/web and fail.
   eslint: { ignoreDuringBuilds: true },
   poweredByHeader: false,
+  // The e2e suite drives the dev server over 127.0.0.1 rather than localhost.
+  allowedDevOrigins: ["127.0.0.1"],
 };
 
 export default config;

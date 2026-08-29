@@ -1,7 +1,11 @@
+import { isActive, isTerminal, type WorkflowStatus } from "../project/status.js";
 import type { ActorRef } from "../shared/actor.js";
 import type { Clock } from "../shared/clock.js";
-import { DomainError, ValidationError, VersionConflictError } from "../shared/errors.js";
-import { isActive, isTerminal, type WorkflowStatus } from "../project/status.js";
+import {
+  DomainError,
+  ValidationError,
+  VersionConflictError,
+} from "../shared/errors.js";
 
 import {
   assertCompletionConsistency,
@@ -186,9 +190,7 @@ export function moveTask(
     lastActiveStatusId: enteringTerminal
       ? (task.statusId ?? task.lastActiveStatusId)
       : null,
-    completedAt: enteringTerminal
-      ? (task.completedAt ?? context.clock.now())
-      : null,
+    completedAt: enteringTerminal ? (task.completedAt ?? context.clock.now()) : null,
   };
 
   const result = touch(next, task, context);
@@ -346,11 +348,7 @@ export function resolveReopenStatus(
 export function deleteTask(task: Task, context: PolicyContext): Task {
   if (isDeleted(task)) return task;
   const now = context.clock.now();
-  return touch(
-    { ...task, deletedAt: now, deletedBy: context.actor },
-    task,
-    context,
-  );
+  return touch({ ...task, deletedAt: now, deletedBy: context.actor }, task, context);
 }
 
 export function restoreTask(task: Task, context: PolicyContext): Task {

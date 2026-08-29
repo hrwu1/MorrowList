@@ -129,7 +129,9 @@ function midpoint(lower: string, upper: string | null): string {
     let shared = 0;
     while ((lower[shared] ?? SMALLEST_DIGIT) === upper[shared]) shared++;
     if (shared > 0) {
-      return upper.slice(0, shared) + midpoint(lower.slice(shared), upper.slice(shared));
+      return (
+        upper.slice(0, shared) + midpoint(lower.slice(shared), upper.slice(shared))
+      );
     }
   }
 
@@ -208,7 +210,9 @@ export function rankBetween(before: string | null, after: string | null): string
   if (incremented === null) {
     throw new InvalidRankError("rank space exhausted above; rebalance required");
   }
-  return incremented < after ? incremented : beforeInteger + midpoint(beforeFraction, null);
+  return incremented < after
+    ? incremented
+    : beforeInteger + midpoint(beforeFraction, null);
 }
 
 /**

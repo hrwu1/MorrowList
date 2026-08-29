@@ -95,10 +95,7 @@ function TaskRow({ task, onComplete, onDelete, busy }: TaskRowProps) {
             <time dateTime={task.dueDate}>Due {task.dueDate}</time>
           ) : null}
           {task.priority !== "none" ? (
-            <span
-              className="task-row__priority"
-              data-priority={task.priority}
-            >
+            <span className="task-row__priority" data-priority={task.priority}>
               {/* Priority is never conveyed by colour alone (spec 14). */}
               {task.priority}
             </span>

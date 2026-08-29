@@ -65,7 +65,9 @@ export const authAccounts = pgTable(
     refreshToken: text("refresh_token"),
     idToken: text("id_token"),
     accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
-    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { withTimezone: true }),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
+      withTimezone: true,
+    }),
     scope: text("scope"),
     /** Hashed by Better Auth; never a plaintext credential. */
     password: text("password"),

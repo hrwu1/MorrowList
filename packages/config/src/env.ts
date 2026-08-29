@@ -57,7 +57,8 @@ export const serverEnvSchema = z
       ctx.addIssue({
         code: "custom",
         path: ["AUTH_SECRET"],
-        message: "AUTH_SECRET is required in production; generate with `openssl rand -base64 32`",
+        message:
+          "AUTH_SECRET is required in production; generate with `openssl rand -base64 32`",
       });
     }
     if (env.AUTH_SECRET && env.AUTH_SECRET.length < 32) {

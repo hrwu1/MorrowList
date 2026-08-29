@@ -1,4 +1,9 @@
-export { ACTOR_KINDS, isActorKind, type ActorKind, type ActorRef } from "./shared/actor.js";
+export {
+  ACTOR_KINDS,
+  isActorKind,
+  type ActorKind,
+  type ActorRef,
+} from "./shared/actor.js";
 export { fixedClock, systemClock, type Clock } from "./shared/clock.js";
 export {
   DomainError,

@@ -1,5 +1,3 @@
-import type { Project, Workspace, WorkspaceMembership } from "../ports/index.js";
-import type { ActorContext } from "../shared/actor-context.js";
 import {
   DEFAULT_WORKFLOW,
   INITIAL_RANK,
@@ -7,6 +5,9 @@ import {
   uuidv7,
   type WorkflowStatus,
 } from "@morrowlist/domain";
+
+import type { Project, Workspace, WorkspaceMembership } from "../ports/index.js";
+import type { ActorContext } from "../shared/actor-context.js";
 
 import type { InMemoryData } from "./in-memory.js";
 
@@ -69,9 +70,7 @@ export function buildDefaultWorkflow(projectId: string): WorkflowStatus[] {
   });
 }
 
-export function buildActorContext(
-  overrides: Partial<ActorContext> = {},
-): ActorContext {
+export function buildActorContext(overrides: Partial<ActorContext> = {}): ActorContext {
   const userId = overrides.userId ?? overrides.actorId ?? uuidv7();
   return {
     actorKind: overrides.actorKind ?? "user",

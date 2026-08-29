@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { fixedClock } from "../shared/clock.js";
-import { DomainError, ValidationError, VersionConflictError } from "../shared/errors.js";
+import {
+  DomainError,
+  ValidationError,
+  VersionConflictError,
+} from "../shared/errors.js";
 
 import { TEST_INSTANT, testContext, testStatus } from "./fixtures.js";
 import {
@@ -47,7 +51,10 @@ describe("createTask", () => {
   });
 
   it("trims and normalizes the title", () => {
-    const task = createTask({ ...baseInput, title: "  Write the brief  " }, testContext());
+    const task = createTask(
+      { ...baseInput, title: "  Write the brief  " },
+      testContext(),
+    );
 
     expect(task.title).toBe("Write the brief");
   });
@@ -85,7 +92,10 @@ describe("createTask", () => {
     const done = testStatus({ category: "done", id: "status-done" });
 
     expect(() =>
-      createTask({ ...baseInput, project: { id: "project-1", status: done } }, testContext()),
+      createTask(
+        { ...baseInput, project: { id: "project-1", status: done } },
+        testContext(),
+      ),
     ).toThrow(/cannot be created directly in a Done status/);
   });
 
@@ -102,7 +112,11 @@ describe("createTask", () => {
 
   it("drops a due timezone when there is no due time", () => {
     const task = createTask(
-      { ...baseInput, dueDate: toPlainDate("2026-09-01"), dueTimezone: "Europe/Berlin" },
+      {
+        ...baseInput,
+        dueDate: toPlainDate("2026-09-01"),
+        dueTimezone: "Europe/Berlin",
+      },
       testContext(),
     );
 
@@ -240,7 +254,9 @@ describe("completeTask", () => {
       testContext(),
     );
 
-    expect(() => completeTask(task, {}, testContext())).toThrow(/no active Done status/);
+    expect(() => completeTask(task, {}, testContext())).toThrow(
+      /no active Done status/,
+    );
   });
 
   it("refuses a non-terminal status as the completion destination", () => {
@@ -299,7 +315,11 @@ describe("reopenTask", () => {
       id: "status-wip",
       archivedAt: TEST_INSTANT,
     });
-    const ready = testStatus({ category: "ready", id: "status-ready", isDefault: true });
+    const ready = testStatus({
+      category: "ready",
+      id: "status-ready",
+      isDefault: true,
+    });
     const completed: Task = {
       ...inboxTask(),
       projectId: "project-1",

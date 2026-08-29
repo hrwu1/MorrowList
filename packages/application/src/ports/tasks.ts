@@ -17,7 +17,13 @@ export interface TaskFilter {
   readonly due?: "overdue" | "today" | "future" | "none" | undefined;
   /** The workspace's local date, for evaluating the `due` filter (spec 12.3). */
   readonly today?: string | undefined;
-  readonly sort?: "rank" | "createdAt" | "dueDate" | "priority" | "updatedAt" | undefined;
+  readonly sort?:
+    | "rank"
+    | "createdAt"
+    | "dueDate"
+    | "priority"
+    | "updatedAt"
+    | undefined;
   readonly order?: "asc" | "desc" | undefined;
 }
 
@@ -54,7 +60,10 @@ export interface TaskRepository {
   firstRankIn(scope: RankScope): Promise<string | null>;
   lastRankIn(scope: RankScope): Promise<string | null>;
   /** Ranks of two anchor tasks, used to place a task between neighbours (spec 24.2). */
-  ranksOf(workspaceId: string, taskIds: readonly string[]): Promise<Map<string, string>>;
+  ranksOf(
+    workspaceId: string,
+    taskIds: readonly string[],
+  ): Promise<Map<string, string>>;
   /** Ancestor chain of a task, nearest parent first, for cycle and depth checks. */
   ancestorIds(workspaceId: string, taskId: string): Promise<readonly string[]>;
 }

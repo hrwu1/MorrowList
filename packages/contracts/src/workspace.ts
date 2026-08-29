@@ -27,9 +27,7 @@ export const userSchema = z.object({
 export const meResponseSchema = z.object({
   data: z.object({
     user: userSchema,
-    workspaces: z.array(
-      workspaceSchema.extend({ role: workspaceRoleSchema }),
-    ),
+    workspaces: z.array(workspaceSchema.extend({ role: workspaceRoleSchema })),
     defaultWorkspaceId: uuidSchema,
     capabilities: z.object({
       actorKind: z.enum(["user", "api_key"]),
@@ -44,7 +42,10 @@ export const updateWorkspaceRequestSchema = z
     taskKeyPrefix: z
       .string()
       .trim()
-      .regex(/^[A-Za-z][A-Za-z0-9]{0,9}$/, "must start with a letter, max 10 characters")
+      .regex(
+        /^[A-Za-z][A-Za-z0-9]{0,9}$/,
+        "must start with a letter, max 10 characters",
+      )
       .optional(),
     timezone: timezoneSchema.optional(),
   })

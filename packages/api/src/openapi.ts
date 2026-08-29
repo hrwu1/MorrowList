@@ -39,7 +39,10 @@ function jsonContent(schema: object) {
 
 /** Errors every authenticated endpoint can return (spec 20.2). */
 const commonErrors = {
-  "401": { description: "Authentication required", ...jsonContent(ref("ErrorResponse")) },
+  "401": {
+    description: "Authentication required",
+    ...jsonContent(ref("ErrorResponse")),
+  },
   "403": { description: "Forbidden", ...jsonContent(ref("ErrorResponse")) },
   "422": { description: "Validation failed", ...jsonContent(ref("ErrorResponse")) },
   "500": { description: "Internal error", ...jsonContent(ref("ErrorResponse")) },
@@ -126,10 +129,7 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
       "/tasks": {
         get: {
           summary: "List tasks",
-          parameters: [
-            workspaceIdParam,
-            ...queryParameters(listTasksQuerySchema),
-          ],
+          parameters: [workspaceIdParam, ...queryParameters(listTasksQuerySchema)],
           responses: {
             "200": { description: "A page of tasks", ...jsonContent(ref("TaskList")) },
             ...commonErrors,

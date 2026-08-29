@@ -49,9 +49,9 @@ describe("updateTaskRequestSchema", () => {
 
   it("rejects an empty patch", () => {
     expect(updateTaskRequestSchema.safeParse({}).success).toBe(false);
-    expect(
-      updateTaskRequestSchema.safeParse({ expectedVersion: 3 }).success,
-    ).toBe(false);
+    expect(updateTaskRequestSchema.safeParse({ expectedVersion: 3 }).success).toBe(
+      false,
+    );
   });
 });
 

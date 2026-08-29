@@ -1,0 +1,5 @@
+// INVALID ON PURPOSE. See ../README.md.
+// The domain must stay framework-free (spec 16.2).
+import { Hono } from "hono";
+
+export const app = new Hono();

@@ -1,3 +1,7 @@
+import { fixedClock, uuidv7 } from "@morrowlist/domain";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { SCOPES, type ActorContext } from "../shared/actor-context.js";
 import {
   buildActorContext,
   createInMemoryUnitOfWork,
@@ -7,10 +11,6 @@ import {
   type InMemoryUnitOfWork,
   type SeededWorkspace,
 } from "../testing/index.js";
-import { fixedClock, uuidv7 } from "@morrowlist/domain";
-import { beforeEach, describe, expect, it } from "vitest";
-
-import { SCOPES, type ActorContext } from "../shared/actor-context.js";
 
 import { TaskService } from "./service.js";
 
@@ -189,9 +189,9 @@ describe("TaskService authorization", () => {
       }),
     ).rejects.toMatchObject({ code: "AUTH_FORBIDDEN" });
 
-    await expect(
-      service.list(readOnlyKey, listQuery()),
-    ).resolves.toMatchObject({ data: [] });
+    await expect(service.list(readOnlyKey, listQuery())).resolves.toMatchObject({
+      data: [],
+    });
   });
 });
 

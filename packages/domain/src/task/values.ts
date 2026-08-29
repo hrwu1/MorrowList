@@ -40,7 +40,10 @@ export type PlainTime = string & { readonly __brand: "PlainTime" };
 
 export function toPlainDate(value: string, field = "dueDate"): PlainDate {
   if (!DATE_PATTERN.test(value)) {
-    throw new ValidationError("Date must be formatted as YYYY-MM-DD.", { field, value });
+    throw new ValidationError("Date must be formatted as YYYY-MM-DD.", {
+      field,
+      value,
+    });
   }
   const [year, month, day] = value.split("-").map(Number) as [number, number, number];
   const parsed = new Date(Date.UTC(year, month - 1, day));

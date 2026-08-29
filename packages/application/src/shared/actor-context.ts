@@ -40,9 +40,13 @@ export function assertScope(context: ActorContext, scope: string): void {
   // restricted to the scopes granted at creation time (spec 22.4).
   if (context.actorKind === "user") return;
   if (!context.scopes.has(scope)) {
-    throw new DomainError("AUTH_FORBIDDEN", "This credential lacks the required scope.", {
-      requiredScope: scope,
-    });
+    throw new DomainError(
+      "AUTH_FORBIDDEN",
+      "This credential lacks the required scope.",
+      {
+        requiredScope: scope,
+      },
+    );
   }
 }
 

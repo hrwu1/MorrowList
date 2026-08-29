@@ -1,10 +1,11 @@
+import { fixedClock, uuidv7 } from "@morrowlist/domain";
+import { beforeEach, describe, expect, it } from "vitest";
+
 import {
   createInMemoryUnitOfWork,
   emptyData,
   type InMemoryUnitOfWork,
 } from "../testing/index.js";
-import { fixedClock, uuidv7 } from "@morrowlist/domain";
-import { beforeEach, describe, expect, it } from "vitest";
 
 import { bootstrapUser, defaultPrefix, slugify } from "./bootstrap.js";
 

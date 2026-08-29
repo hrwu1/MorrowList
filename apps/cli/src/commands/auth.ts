@@ -137,9 +137,7 @@ export function authCommand(): Command {
           }
           process.exit(exitCodeFor(error.code));
         }
-        printError(
-          `error: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        printError(`error: ${error instanceof Error ? error.message : String(error)}`);
         process.exit(EXIT.network);
       }
     });

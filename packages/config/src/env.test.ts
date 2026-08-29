@@ -19,7 +19,10 @@ describe("parseServerEnv", () => {
 
   it("rejects a non-postgres database URL", () => {
     expect(() =>
-      parseServerEnv({ ...base, DATABASE_URL: "mysql://localhost/db" } as NodeJS.ProcessEnv),
+      parseServerEnv({
+        ...base,
+        DATABASE_URL: "mysql://localhost/db",
+      } as NodeJS.ProcessEnv),
     ).toThrow(EnvironmentValidationError);
   });
 

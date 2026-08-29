@@ -201,11 +201,7 @@ describe("rank ordering", () => {
       order: "asc",
     } as never);
 
-    expect(listed.data.map((task) => task.id)).toEqual([
-      first.id,
-      second.id,
-      third.id,
-    ]);
+    expect(listed.data.map((task) => task.id)).toEqual([first.id, second.id, third.id]);
   });
 
   it("places a task between two neighbours", async () => {
@@ -349,11 +345,11 @@ describe("workspace isolation", () => {
       title: "Confidential roadmap",
     });
 
-    await expect(
-      service.get(context, workspaceId, secret.id),
-    ).rejects.toMatchObject({ code: "TASK_NOT_FOUND" });
-    await expect(
-      service.get(context, other.id, secret.id),
-    ).rejects.toMatchObject({ code: "WORKSPACE_NOT_FOUND" });
+    await expect(service.get(context, workspaceId, secret.id)).rejects.toMatchObject({
+      code: "TASK_NOT_FOUND",
+    });
+    await expect(service.get(context, other.id, secret.id)).rejects.toMatchObject({
+      code: "WORKSPACE_NOT_FOUND",
+    });
   });
 });

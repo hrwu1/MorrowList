@@ -29,8 +29,7 @@ export const DEFAULT_BASE_URL = "http://localhost:3000/api/v1";
 export function configPath(): string {
   const override = process.env.MORROW_CONFIG;
   if (override) return override;
-  const base =
-    process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config");
+  const base = process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config");
   return join(base, "morrowlist", "config.json");
 }
 
@@ -83,7 +82,8 @@ export function resolveProfile(
 
   return {
     name,
-    baseUrl: options.baseUrl ?? env.MORROW_BASE_URL ?? stored.baseUrl ?? DEFAULT_BASE_URL,
+    baseUrl:
+      options.baseUrl ?? env.MORROW_BASE_URL ?? stored.baseUrl ?? DEFAULT_BASE_URL,
     ...(apiKey ? { apiKey } : {}),
     ...(workspaceId ? { workspaceId } : {}),
   };
@@ -92,7 +92,5 @@ export function resolveProfile(
 /** Never print a key in full; enough to identify it, not enough to use it. */
 export function redactKey(apiKey: string | undefined): string {
   if (!apiKey) return "(not set)";
-  return apiKey.length <= 8
-    ? "****"
-    : `${apiKey.slice(0, 4)}…${apiKey.slice(-4)}`;
+  return apiKey.length <= 8 ? "****" : `${apiKey.slice(0, 4)}…${apiKey.slice(-4)}`;
 }

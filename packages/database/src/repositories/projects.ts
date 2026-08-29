@@ -65,18 +65,14 @@ export function createProjectRepository(db: Database): ProjectRepository {
           version: project.version,
           updatedAt: project.updatedAt,
         })
-        .where(
-          and(eq(projects.id, project.id), eq(projects.version, previousVersion)),
-        )
+        .where(and(eq(projects.id, project.id), eq(projects.version, previousVersion)))
         .returning({ id: projects.id });
       return result.length === 1;
     },
   };
 }
 
-export function createWorkflowStatusRepository(
-  db: Database,
-): WorkflowStatusRepository {
+export function createWorkflowStatusRepository(db: Database): WorkflowStatusRepository {
   const toRow = (status: WorkflowStatus, now: Date) => ({
     id: status.id,
     projectId: status.projectId,

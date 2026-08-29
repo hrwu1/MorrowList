@@ -21,11 +21,18 @@ const FRAMEWORK_MODULES = [
   "pg",
 ];
 
-/** @type {{ area: string, files: string[], forbid: { group: string[], message: string }[] }[]} */
+/**
+ * @type {{
+ *   area: string,
+ *   files: string[],
+ *   exclude?: string[],
+ *   forbid: { group: string[], message: string }[],
+ * }[]}
+ */
 export const boundaries = [
   {
     area: "domain",
-    files: ["packages/domain/**/*.ts"],
+    files: ["packages/domain/src/**/*.ts"],
     forbid: [
       {
         group: FRAMEWORK_MODULES,
@@ -41,7 +48,7 @@ export const boundaries = [
   },
   {
     area: "application",
-    files: ["packages/application/**/*.ts"],
+    files: ["packages/application/src/**/*.ts"],
     forbid: [
       {
         group: FRAMEWORK_MODULES,
@@ -67,7 +74,7 @@ export const boundaries = [
   },
   {
     area: "contracts",
-    files: ["packages/contracts/**/*.ts"],
+    files: ["packages/contracts/src/**/*.ts"],
     forbid: [
       {
         group: FRAMEWORK_MODULES,
@@ -83,7 +90,11 @@ export const boundaries = [
   },
   {
     area: "web",
+    // `lib/server.ts` is the composition root (spec 16.1): it is the single file allowed
+    // to construct the database adapter and wire it into the application layer. Every
+    // other file in the app reaches data through the API.
     files: ["apps/web/**/*.ts", "apps/web/**/*.tsx"],
+    exclude: ["apps/web/lib/server.ts"],
     forbid: [
       {
         group: [
@@ -100,7 +111,7 @@ export const boundaries = [
   },
   {
     area: "cli",
-    files: ["apps/cli/**/*.ts"],
+    files: ["apps/cli/src/**/*.ts"],
     forbid: [
       {
         group: [
@@ -119,7 +130,7 @@ export const boundaries = [
   },
   {
     area: "ui",
-    files: ["packages/ui/**/*.ts", "packages/ui/**/*.tsx"],
+    files: ["packages/ui/src/**/*.ts", "packages/ui/src/**/*.tsx"],
     forbid: [
       {
         group: [

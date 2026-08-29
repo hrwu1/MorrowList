@@ -123,7 +123,9 @@ export const listTasksQuerySchema = paginationQuerySchema.extend({
   includeSubtasks: z.stringbool().default(true),
   /** Inbox tasks only: no project (spec 9.1). */
   inbox: z.stringbool().optional(),
-  sort: z.enum(["rank", "createdAt", "dueDate", "priority", "updatedAt"]).default("rank"),
+  sort: z
+    .enum(["rank", "createdAt", "dueDate", "priority", "updatedAt"])
+    .default("rank"),
   order: z.enum(["asc", "desc"]).default("asc"),
 });
 
