@@ -66,9 +66,9 @@ export async function bootstrapUser(
       role: "owner",
       joinedAt: now,
     });
-    // Allocating once here materialises the counter row so the first task creation does
-    // not race two concurrent inserts for the same workspace.
-    await tx.taskCounters.allocate(workspace.id);
+    // Materialise the counter without consuming a number: the workspace's first task
+    // must be number 1, not 2.
+    await tx.taskCounters.ensure(workspace.id);
 
     const context: ActorContext = {
       actorKind: "user",

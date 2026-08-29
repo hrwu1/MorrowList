@@ -44,7 +44,8 @@ describe("bootstrapUser", () => {
         joinedAt: NOW,
       },
     ]);
-    expect(unitOfWork.data.counters.get(result.workspace.id)).toBeDefined();
+    // The counter is materialised but unconsumed, so the first task will be number 1.
+    expect(unitOfWork.data.counters.get(result.workspace.id)).toBe(1);
   });
 
   it("is idempotent when the callback is retried", async () => {

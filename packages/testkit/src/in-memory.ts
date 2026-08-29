@@ -197,6 +197,10 @@ function taskRepository(data: InMemoryData): TaskRepository {
 
 function counterRepository(data: InMemoryData): TaskCounterRepository {
   return {
+    async ensure(workspaceId) {
+      if (!data.counters.has(workspaceId)) data.counters.set(workspaceId, 1);
+    },
+
     async allocate(workspaceId) {
       const next = data.counters.get(workspaceId) ?? 1;
       data.counters.set(workspaceId, next + 1);

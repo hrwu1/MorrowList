@@ -1,0 +1,47 @@
+{
+  "name": "@morrowlist/database",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./schema": {
+      "types": "./dist/schema/index.d.ts",
+      "default": "./dist/schema/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "drizzle"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "db:generate": "pnpm build && drizzle-kit generate",
+    "db:migrate": "tsx src/migrate-cli.ts",
+    "db:seed": "tsx src/seed-cli.ts",
+    "lint": "echo \"linted from repository root\""
+  },
+  "dependencies": {
+    "@morrowlist/application": "workspace:*",
+    "@morrowlist/config": "workspace:*",
+    "@morrowlist/domain": "workspace:*",
+    "drizzle-orm": "0.44.5",
+    "pg": "8.16.3"
+  },
+  "devDependencies": {
+    "@morrowlist/testkit": "workspace:*",
+    "@types/pg": "8.15.5",
+    "drizzle-kit": "0.31.4",
+    "tsx": "4.20.5",
+    "typescript": "5.9.2",
+    "vitest": "3.2.4"
+  }
+}

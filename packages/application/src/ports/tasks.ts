@@ -61,6 +61,11 @@ export interface TaskRepository {
 
 export interface TaskCounterRepository {
   /**
+   * Materialise the counter row for a new workspace without consuming a number, so the
+   * workspace's first task is number 1.
+   */
+  ensure(workspaceId: string): Promise<void>;
+  /**
    * Allocate the next task number for a workspace inside the current transaction.
    * Implementations must serialise concurrent callers with row locking or an atomic
    * upsert so two tasks never share a number (spec 18.2).

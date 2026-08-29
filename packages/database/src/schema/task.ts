@@ -1,0 +1,112 @@
+import { sql } from "drizzle-orm";
+import {
+  bigint,
+  check,
+  date,
+  index,
+  integer,
+  pgTable,
+  text,
+  time,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from "drizzle-orm/pg-core";
+
+import { actorKindEnum, priorityEnum } from "./enums.js";
+import { projects, workflowStatuses } from "./project.js";
+import { workspaces } from "./workspace.js";
+
+/** The canonical task table (spec 18.2). Every projection reads from here. */
+
+export const tasks = pgTable(
+  "tasks",
+  {
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    taskNumber: bigint("task_number", { mode: "number" }).notNull(),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    statusId: uuid("status_id").references(() => workflowStatuses.id, {
+      onDelete: "set null",
+    }),
+    title: varchar("title", { length: 500 }).notNull(),
+    descriptionMd: text("description_md"),
+    priority: priorityEnum("priority").notNull().default("none"),
+    dueDate: date("due_date"),
+    dueTime: time("due_time"),
+    dueTimezone: varchar("due_timezone", { length: 100 }),
+    parentTaskId: uuid("parent_task_id").references((): any => tasks.id, {
+      onDelete: "set null",
+    }),
+    // COLLATE "C" is applied in the migration; see domain/shared/rank.ts for why.
+    rank: varchar("rank", { length: 64 }).notNull(),
+    // The COLLATE "C" clause itself lives in migration 0001; Drizzle does not model
+    // column collation, so the migration is the source of truth for it.
+    lastActiveStatusId: uuid("last_active_status_id"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    version: integer("version").notNull().default(1),
+    createdByActorKind: actorKindEnum("created_by_actor_kind").notNull(),
+    createdByActorId: varchar("created_by_actor_id", { length: 200 }).notNull(),
+    lastActorKind: actorKindEnum("last_actor_kind").notNull(),
+    lastActorId: varchar("last_actor_id", { length: 200 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedByActorKind: actorKindEnum("deleted_by_actor_kind"),
+    deletedByActorId: varchar("deleted_by_actor_id", { length: 200 }),
+  },
+  (table) => [
+    uniqueIndex("tasks_workspace_number_key").on(table.workspaceId, table.taskNumber),
+    index("tasks_workspace_state_idx").on(
+      table.workspaceId,
+      table.deletedAt,
+      table.completedAt,
+    ),
+    index("tasks_board_idx").on(table.projectId, table.statusId, table.rank),
+    index("tasks_due_idx").on(table.workspaceId, table.dueDate),
+    index("tasks_parent_idx").on(table.parentTaskId),
+    // Invariant 3: a due time cannot exist without a due date (spec 8.2).
+    check(
+      "tasks_due_time_requires_date",
+      sql`${table.dueTime} IS NULL OR ${table.dueDate} IS NOT NULL`,
+    ),
+    // Invariant 1: an Inbox task has no workflow status (spec 8.2).
+    check(
+      "tasks_inbox_has_no_status",
+      sql`${table.projectId} IS NOT NULL OR ${table.statusId} IS NULL`,
+    ),
+    // Invariant 4: a task cannot be its own parent (spec 8.2).
+    check(
+      "tasks_no_self_parent",
+      sql`${table.parentTaskId} IS NULL OR ${table.parentTaskId} <> ${table.id}`,
+    ),
+    check("tasks_version_positive", sql`${table.version} >= 1`),
+  ],
+);
+
+/**
+ * My Day is a dated relation rather than a field copied onto the task, so choosing a day
+ * never rewrites the task and history is preserved (spec 8.1, ADR-001).
+ */
+export const taskDayPlans = pgTable(
+  "task_day_plans",
+  {
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    planDate: date("plan_date").notNull(),
+    source: varchar("source", { length: 30 }).notNull().default("manual"),
+    createdByActorKind: actorKindEnum("created_by_actor_kind").notNull(),
+    createdByActorId: varchar("created_by_actor_id", { length: 200 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("task_day_plans_pk").on(table.taskId, table.planDate),
+    index("task_day_plans_date_idx").on(table.planDate, table.taskId),
+  ],
+);
