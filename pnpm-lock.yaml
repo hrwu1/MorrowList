@@ -27,6 +27,31 @@ importers:
         specifier: 3.2.4
         version: 3.2.4(@types/node@24.3.0)
 
+  packages/application:
+    dependencies:
+      '@morrowlist/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@morrowlist/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@morrowlist/observability':
+        specifier: workspace:*
+        version: link:../observability
+    devDependencies:
+      '@morrowlist/config':
+        specifier: workspace:*
+        version: link:../config
+      '@morrowlist/testkit':
+        specifier: workspace:*
+        version: link:../testkit
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@24.3.0)
+
   packages/config:
     dependencies:
       zod:
@@ -49,7 +74,54 @@ importers:
         specifier: 3.2.4
         version: 3.2.4(@types/node@24.3.0)
 
+  packages/contracts:
+    dependencies:
+      zod:
+        specifier: 4.1.5
+        version: 4.1.5
+    devDependencies:
+      '@morrowlist/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@24.3.0)
+
   packages/domain:
+    devDependencies:
+      '@morrowlist/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@24.3.0)
+
+  packages/observability:
+    devDependencies:
+      '@morrowlist/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@24.3.0)
+
+  packages/testkit:
+    dependencies:
+      '@morrowlist/application':
+        specifier: workspace:*
+        version: link:../application
+      '@morrowlist/domain':
+        specifier: workspace:*
+        version: link:../domain
     devDependencies:
       '@morrowlist/config':
         specifier: workspace:*
