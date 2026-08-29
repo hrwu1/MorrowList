@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
     }
   },
   "files": [
@@ -28,7 +32,6 @@
   "devDependencies": {
     "@morrowlist/config": "workspace:*",
     "typescript": "5.9.2",
-    "vitest": "3.2.4",
-    "@morrowlist/testkit": "workspace:*"
+    "vitest": "3.2.4"
   }
 }

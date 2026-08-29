@@ -12,6 +12,13 @@ export function meRoutes(deps: ApiDependencies) {
       throw new ApiError("AUTH_FORBIDDEN", "This credential is not tied to a user.");
     }
 
+    // The identity fields come from the auth provider, not from ActorContext: the actor
+    // carries a display name for audit attribution, which is not an email address.
+    const user = await deps.auth.resolveUser(c.req.raw.headers);
+    if (!user) {
+      throw new ApiError("AUTH_REQUIRED", "Sign in to continue.");
+    }
+
     const workspaces = await deps.unitOfWork.execute((tx) =>
       tx.workspaces.listForUser(userId),
     );
@@ -23,9 +30,9 @@ export function meRoutes(deps: ApiDependencies) {
     return c.json({
       data: {
         user: {
-          id: userId,
-          email: actor.actorDisplayName ?? "",
-          name: actor.actorDisplayName ?? null,
+          id: user.id,
+          email: user.email,
+          name: user.name,
         },
         workspaces: workspaces.map((workspace) => ({
           id: workspace.id,

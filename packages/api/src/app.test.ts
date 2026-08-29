@@ -144,6 +144,10 @@ describe("authentication", () => {
 
     expect(response.status).toBe(200);
     const body = await response.json();
+    expect(body.data.user).toMatchObject({
+      email: "alex@example.com",
+      name: "Alex",
+    });
     expect(body.data.workspaces).toHaveLength(1);
     expect(body.data.workspaces[0].role).toBe("owner");
     expect(body.data.defaultWorkspaceId).toBe(body.data.workspaces[0].id);

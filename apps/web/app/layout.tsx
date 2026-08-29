@@ -1,0 +1,39 @@
+import type { Metadata, Viewport } from "next";
+import type { ReactNode } from "react";
+
+import { Providers } from "@/components/providers";
+
+import "./globals.css";
+
+/** Application shell (FND-007). */
+
+export const metadata: Metadata = {
+  title: { default: "MorrowList", template: "%s · MorrowList" },
+  description:
+    "One canonical task model, shown as a list, a plan for today, or a board.",
+  // The task list is private; search engines must never index a signed-in view.
+  robots: { index: false, follow: false },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fdfcfb" },
+    { media: "(prefers-color-scheme: dark)", color: "#1c1b1a" },
+  ],
+};
+
+export default function RootLayout({ children }: { readonly children: ReactNode }) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        {/* Keyboard users must be able to bypass the navigation (spec 14). */}
+        <a className="ml-skip-link" href="#main">
+          Skip to main content
+        </a>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
+}

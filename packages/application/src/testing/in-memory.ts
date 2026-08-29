@@ -20,7 +20,7 @@ import type {
   WorkspaceMembership,
   WorkspaceRepository,
   WorkspaceRole,
-} from "@morrowlist/application";
+} from "../ports/index.js";
 import type { Task, WorkflowStatus } from "@morrowlist/domain";
 
 /**

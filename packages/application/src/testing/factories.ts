@@ -1,9 +1,5 @@
-import type {
-  ActorContext,
-  Project,
-  Workspace,
-  WorkspaceMembership,
-} from "@morrowlist/application";
+import type { Project, Workspace, WorkspaceMembership } from "../ports/index.js";
+import type { ActorContext } from "../shared/actor-context.js";
 import {
   DEFAULT_WORKFLOW,
   INITIAL_RANK,
