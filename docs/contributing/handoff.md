@@ -1,12 +1,16 @@
 # Project handoff
 
-State of the repository as of the end of Milestone M0 plus one vertical slice. Written so
-a contributor with no prior context can continue without re-deriving decisions.
+State of the repository as of the end of Milestone M0, one vertical slice, and Step 0
+(surface the model). Written so a contributor with no prior context can continue without
+re-deriving decisions.
 
 ## What exists
 
-Seven commits. M0 complete, plus a slice through every layer: sign up → capture into the
-Inbox → list → complete → reopen, working from both the browser and the `morrow` CLI.
+M0 complete, plus a slice through every layer: sign up → capture into the Inbox → list →
+complete → reopen, working from both the browser and the `morrow` CLI. On top of that,
+Step 0 surfaced the model in the UI: task detail with autosave and conflict handling
+(panel plus `/tasks/{idOrKey}`), priority and dates on capture and in row actions,
+Completed and Trash views, and filter/sort controls whose state lives in the URL.
 
 ```
 domain → application → {database, auth, api} → {web, cli}
@@ -18,7 +22,7 @@ fire), and by pnpm's strict `node_modules` layout.
 
 Implemented endpoints: `GET /health`, `/ready`, `/me`, `GET|POST /tasks`,
 `GET /tasks/{idOrKey}`, `PATCH /tasks/{id}`, `POST /tasks/{id}/complete|reopen|restore`,
-`DELETE /tasks/{id}`.
+`DELETE /tasks/{id}`. `GET /tasks?deleted=true` returns the Trash.
 
 Not implemented despite appearing in the spec: projects/statuses endpoints, Today/Upcoming
 /board/search/export projections, tags, relations, subtask endpoints,
@@ -31,7 +35,9 @@ API keys.
   LaunchAgent). No Docker on this machine.
 - `psql` needs `export PATH="/opt/homebrew/opt/postgresql@18/bin:$PATH"`.
 - Load env before running anything: `set -a && source ./.env && set +a`.
-- Databases: `morrowlist` (dev), `morrowlist_test` (integration harness).
+- Databases: `morrowlist` (dev), `morrowlist_test` (integration harness),
+  `morrowlist_e2e` (Playwright). Each suite refuses to run unless its own URL is set and
+  differs from `DATABASE_URL`.
 - Dev server: `pnpm --filter @morrowlist/web dev` → http://localhost:3000
 - Test account: `robin@example.com` / `correct-horse-battery-staple`
 
@@ -56,11 +62,23 @@ API keys.
 8. **Regenerate OpenAPI when contracts change**: `pnpm openapi:generate`, then commit.
    CI fails on drift.
 9. Vitest in `apps/web` excludes `e2e/`; Playwright owns that directory.
+10. **Workspace packages are consumed from `dist/`.** `next dev` transpiles the built
+    output, not the TypeScript source, so a change under `packages/` needs a build and a
+    dev-server restart before the browser sees it. An hour was lost to a "broken" filter
+    that was only a stale module.
+11. **Do not render Markdown through an HTML string.** `features/tasks/lib/markdown.ts`
+    parses to a tree and the renderer emits React elements, so raw HTML in a description
+    cannot execute. Swapping in a Markdown library that returns HTML would silently
+    delete that property (spec 8.1).
+12. **The task detail serialises its saves.** Two field edits in quick succession are both
+    dispatched before React re-renders, so the version to send comes from save responses
+    (`version` ref), not from the rendered task. Removing the queue reintroduces a race
+    that loses an edit with no error shown.
 
 ## Conventions
 
 - Update `.claude/plans/<task-slug>.md` before coding and commit it with the code.
-- One coherent, tested change per commit. Explain *why* in the body.
+- One coherent, tested change per commit. Explain _why_ in the body.
 - Commit trailers:
   `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`
   `Claude-Session: https://claude.ai/code/session_01GxZf3aH2z4qujvS7Dqn7ev`
@@ -76,4 +94,11 @@ API keys.
 - AUTH-005: CLI authenticates with session tokens; scoped API keys not built.
 - AUTH-006: timezone hardcoded to UTC at sign-up; no onboarding screen.
 - VIEW-008: no undo.
-- Playwright runs against the development database and has left junk workspaces in it.
+- `DELETE /tasks/{id}/permanent` is not implemented, so Trash offers restore only, and
+  the scheduled purge date spec 9.7 asks for has nowhere to come from.
+- The list endpoint cannot sort by `completedAt`, so Completed falls back to
+  `updatedAt desc` (spec 9.6 asks for completion time).
+- `GET /tasks/{idOrKey}` 404s on a soft-deleted task, so `/tasks/{key}` cannot open one
+  and Trash rows are not links to detail.
+- The development database still holds nine `E2E Tester` workspaces left by earlier runs.
+  Playwright no longer writes there, but the existing rows have not been cleaned out.
