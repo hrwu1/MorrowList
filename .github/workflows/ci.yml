@@ -103,6 +103,9 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/morrowlist
+      # The suite signs up real accounts, so it gets its own database and migrates and
+      # truncates it in Playwright's global setup.
+      E2E_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/morrowlist_e2e
       AUTH_SECRET: ci-only-secret-value-not-used-in-production
       APP_URL: http://127.0.0.1:3210
     steps:
@@ -114,7 +117,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm db:migrate
+      - name: Create the end-to-end database
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE morrowlist_e2e'
       - run: pnpm --filter @morrowlist/web test:e2e:install
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v4

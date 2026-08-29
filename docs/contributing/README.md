@@ -12,9 +12,18 @@ pnpm dev                      # http://localhost:3000
 ```
 
 For PostgreSQL either run `docker compose -f infra/compose/docker-compose.yml up -d`, or
-install it natively and create two databases: one for development and one for tests. The
-integration harness truncates every table, so it refuses to run when `TEST_DATABASE_URL`
-is unset or equal to `DATABASE_URL`.
+install it natively and create three databases: one for development, one for the
+integration suite, and one for the browser suite.
+
+```bash
+createdb morrowlist && createdb morrowlist_test && createdb morrowlist_e2e
+```
+
+Both test suites truncate every table, so each refuses to run unless its own URL is set
+and differs from `DATABASE_URL`: `TEST_DATABASE_URL` for `pnpm test:integration`, and
+`E2E_DATABASE_URL` for `pnpm test:e2e`. Playwright migrates and truncates that database
+in its global setup and starts its server against it, so a browser run never touches
+development data.
 
 Generate `AUTH_SECRET` with `openssl rand -base64 32`. There is no usable default; the
 application refuses to start in production without it.

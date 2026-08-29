@@ -5,6 +5,7 @@
   "globalPassThroughEnv": [
     "DATABASE_URL",
     "TEST_DATABASE_URL",
+    "E2E_DATABASE_URL",
     "APP_URL",
     "AUTH_SECRET",
     "LOG_LEVEL"

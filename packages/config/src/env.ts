@@ -30,6 +30,8 @@ export const serverEnvSchema = z
 
     DATABASE_URL: postgresUrl,
     TEST_DATABASE_URL: postgresUrl.optional(),
+    /** Database the Playwright suite drives. It is truncated, so it is never DATABASE_URL. */
+    E2E_DATABASE_URL: postgresUrl.optional(),
     DATABASE_POOL_MAX: z.coerce.number().int().positive().max(100).default(10),
 
     AUTH_SECRET: optionalString,

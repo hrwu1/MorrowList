@@ -93,8 +93,11 @@ export const boundaries = [
     // `lib/server.ts` is the composition root (spec 16.1): it is the single file allowed
     // to construct the database adapter and wire it into the application layer. Every
     // other file in the app reaches data through the API.
+    //
+    // `e2e/global-setup.ts` is harness code, not application code: it migrates and
+    // truncates the database the browser suite drives, before Next.js starts.
     files: ["apps/web/**/*.ts", "apps/web/**/*.tsx"],
-    exclude: ["apps/web/lib/server.ts"],
+    exclude: ["apps/web/lib/server.ts", "apps/web/e2e/global-setup.ts"],
     forbid: [
       {
         group: [
