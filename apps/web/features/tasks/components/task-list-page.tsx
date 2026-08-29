@@ -83,16 +83,23 @@ export function TaskListPage({
 
   const closePanel = useCallback(() => {
     const next = new URLSearchParams(searchParams.toString());
-    const closing = next.get("task");
     next.delete("task");
     navigate(next);
-    // Focus returns to the row that opened the panel (spec 14).
-    if (closing) {
-      requestAnimationFrame(() => {
-        document.getElementById(`task-link-${closing}`)?.focus();
-      });
-    }
   }, [navigate, searchParams]);
+
+  /**
+   * Focus returns to the row that opened the panel (spec 14). It has to happen in an
+   * effect rather than in the close handler: the browser resets focus to the body when
+   * the focused panel unmounts, and that unmount happens after the handler returns.
+   */
+  const lastOpen = useRef<string | null>(openTaskKey);
+  useEffect(() => {
+    const previous = lastOpen.current;
+    lastOpen.current = openTaskKey;
+    if (previous && !openTaskKey) {
+      document.getElementById(`task-link-${previous}`)?.focus();
+    }
+  }, [openTaskKey]);
 
   const tasks = data?.data ?? [];
 
