@@ -15,8 +15,8 @@ import {
 } from "../lib/task-view";
 
 import { QuickAdd } from "./quick-add";
-import { TaskDetail } from "./task-detail";
 import { TaskFilters } from "./task-filters";
+import { TaskPanel } from "./task-panel";
 import { TaskRow, TrashRow } from "./task-row";
 
 /**
@@ -151,43 +151,5 @@ export function TaskListPage({
 
       {openTaskKey ? <TaskPanel idOrKey={openTaskKey} onClose={closePanel} /> : null}
     </div>
-  );
-}
-
-/**
- * A non-modal side panel: the list stays visible and usable beside it, so it is a labelled
- * region rather than a dialog, and there is no focus trap. Escape still closes it, and
- * focus moves in on open and back out on close (spec 7.5, 14).
- */
-function TaskPanel({
-  idOrKey,
-  onClose,
-}: {
-  readonly idOrKey: string;
-  readonly onClose: () => void;
-}) {
-  const container = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    container.current?.focus();
-  }, [idOrKey]);
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
-
-  return (
-    <aside
-      className="task-panel"
-      ref={container}
-      tabIndex={-1}
-      aria-label={`Task details for ${idOrKey}`}
-    >
-      <TaskDetail idOrKey={idOrKey} variant="panel" onClose={onClose} />
-    </aside>
   );
 }

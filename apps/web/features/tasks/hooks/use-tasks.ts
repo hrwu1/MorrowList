@@ -112,7 +112,11 @@ export function useCreateTask() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (request: CreateTaskRequest) => apiClient.createTask(request),
-    onSuccess: () => invalidateLists(queryClient),
+    onSuccess: () => {
+      invalidateLists(queryClient);
+      // Project boards are another projection of the canonical task collection.
+      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+    },
   });
 }
 

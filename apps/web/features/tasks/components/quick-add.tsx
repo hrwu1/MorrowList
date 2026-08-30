@@ -17,7 +17,17 @@ import { DueDateInput, PrioritySelect } from "./task-fields";
  * keystroke. The field keeps focus after submitting so several thoughts can be captured
  * in a row.
  */
-export function QuickAdd() {
+export interface QuickAddProps {
+  readonly projectId?: string | undefined;
+  readonly statusId?: string | undefined;
+  readonly destinationLabel?: string | undefined;
+}
+
+export function QuickAdd({
+  projectId,
+  statusId,
+  destinationLabel,
+}: QuickAddProps = {}) {
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<Priority>("none");
   const [dueDate, setDueDate] = useState<string | null>(null);
@@ -52,6 +62,8 @@ export function QuickAdd() {
 
     const request: CreateTaskRequest = {
       title: trimmed,
+      ...(projectId ? { projectId } : {}),
+      ...(statusId ? { statusId } : {}),
       ...(priority === "none" ? {} : { priority }),
       ...(dueDate === null ? {} : { dueDate }),
     };
@@ -63,7 +75,7 @@ export function QuickAdd() {
       // carrying them into the next one silently mislabels it.
       setPriority("none");
       setDueDate(null);
-      setAnnouncement(`Added ${task.key} to your Inbox.`);
+      setAnnouncement(`Added ${task.key} to ${destinationLabel ?? "your Inbox"}.`);
       inputRef.current?.focus();
     } catch {
       // The error is rendered below from the mutation state.
@@ -81,7 +93,11 @@ export function QuickAdd() {
           ref={inputRef}
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          placeholder="Add a task and press Enter"
+          placeholder={
+            destinationLabel
+              ? `Add to ${destinationLabel} and press Enter`
+              : "Add a task and press Enter"
+          }
           maxLength={500}
           autoComplete="off"
         />

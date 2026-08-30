@@ -7,6 +7,7 @@ import { authClient } from "@/lib/auth-client";
 
 const LINKS = [
   { href: "/inbox", label: "Inbox" },
+  { href: "/projects", label: "Projects" },
   { href: "/completed", label: "Completed" },
   { href: "/trash", label: "Trash" },
 ] as const;
@@ -26,7 +27,9 @@ export function AppNav() {
       <nav aria-label="Primary">
         <ul className="app-nav__list">
           {LINKS.map((link) => {
-            const current = pathname === link.href;
+            const current =
+              pathname === link.href ||
+              (link.href === "/projects" && pathname.startsWith("/projects/"));
             return (
               <li key={link.href}>
                 <Link
