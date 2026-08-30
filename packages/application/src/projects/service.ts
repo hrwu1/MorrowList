@@ -88,9 +88,7 @@ export class ProjectService {
       });
       const name = normalizeProjectName(request.name);
       if (
-        existing.some(
-          (project) => project.name.toLowerCase() === name.toLowerCase(),
-        )
+        existing.some((project) => project.name.toLowerCase() === name.toLowerCase())
       ) {
         throw new ValidationError("A project with this name already exists.", {
           field: "name",
