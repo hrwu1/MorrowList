@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createApiApp, type ApiDependencies } from "@morrowlist/api";
-import { TaskService, bootstrapUser } from "@morrowlist/application";
+import { ProjectService, TaskService, bootstrapUser } from "@morrowlist/application";
 import { createAuth, createAuthPort, type AuthPort } from "@morrowlist/auth";
 import { parseServerEnv, type ServerEnv } from "@morrowlist/config/env";
 import {
@@ -72,6 +72,7 @@ export function getContainer(): Container {
   const dependencies: ApiDependencies = {
     auth,
     unitOfWork,
+    projectService: new ProjectService({ unitOfWork }),
     taskService: new TaskService({
       unitOfWork,
       // Cursors are signed with the application secret so a client cannot forge a page
