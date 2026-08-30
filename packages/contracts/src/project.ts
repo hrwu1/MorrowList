@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { paginated, statusCategorySchema, uuidSchema } from "./common.js";
+import { taskSchema } from "./task.js";
 
 /** Project and workflow status transport schemas (spec 20.3). */
 
@@ -39,11 +40,49 @@ export const createProjectRequestSchema = z.object({
   icon: z.string().max(80).nullish(),
 });
 
+export const PROJECT_BOARD_TASK_LIMIT = 500;
+
+/**
+ * A board is intentionally bounded: the UI receives one normalized projection rather
+ * than making one task request per status, and the response says when that projection
+ * was truncated instead of silently dropping work.
+ */
+export const projectBoardQuerySchema = z.object({
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(PROJECT_BOARD_TASK_LIMIT)
+    .default(PROJECT_BOARD_TASK_LIMIT),
+});
+
+export const projectDetailSchema = z.object({
+  project: projectSchema,
+  statuses: z.array(workflowStatusSchema),
+});
+
+export const projectBoardSchema = projectDetailSchema.extend({
+  tasks: z.array(taskSchema),
+});
+
 export const projectResponseSchema = z.object({
-  data: projectSchema.extend({ statuses: z.array(workflowStatusSchema) }),
+  data: projectDetailSchema,
 });
 export const projectListResponseSchema = paginated(projectSchema);
+export const projectBoardResponseSchema = z.object({
+  data: projectBoardSchema,
+  page: z.object({
+    hasMore: z.boolean(),
+    truncated: z.boolean(),
+  }),
+});
 
 export type ProjectDto = z.infer<typeof projectSchema>;
 export type WorkflowStatusDto = z.infer<typeof workflowStatusSchema>;
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
+export type ProjectBoardQuery = z.infer<typeof projectBoardQuerySchema>;
+export type ProjectDetailDto = z.infer<typeof projectDetailSchema>;
+export type ProjectBoardDto = z.infer<typeof projectBoardSchema>;
+export type ProjectResponse = z.infer<typeof projectResponseSchema>;
+export type ProjectListResponse = z.infer<typeof projectListResponseSchema>;
+export type ProjectBoardResponse = z.infer<typeof projectBoardResponseSchema>;

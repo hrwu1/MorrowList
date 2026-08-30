@@ -3,8 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   createTaskRequestSchema,
   listTasksQuerySchema,
+  moveTaskRequestSchema,
+  reorderTaskRequestSchema,
   updateTaskRequestSchema,
 } from "./task.js";
+
+const PROJECT_ID = "0198f0a0-0000-7000-8000-000000000000";
+const STATUS_ID = "0198f0a0-0000-7000-8000-000000000001";
+const TASK_ID = "0198f0a0-0000-7000-8000-000000000002";
 
 describe("createTaskRequestSchema", () => {
   it("accepts a title on its own", () => {
@@ -79,5 +85,32 @@ describe("listTasksQuerySchema", () => {
 
   it("caps the page size at 200", () => {
     expect(listTasksQuerySchema.safeParse({ limit: "201" }).success).toBe(false);
+  });
+});
+
+describe("task movement schemas", () => {
+  it("allows a project move with one or two distinct neighbours", () => {
+    expect(
+      moveTaskRequestSchema.parse({
+        projectId: PROJECT_ID,
+        statusId: STATUS_ID,
+        beforeTaskId: TASK_ID,
+      }),
+    ).toMatchObject({ projectId: PROJECT_ID, statusId: STATUS_ID });
+  });
+
+  it("rejects a status when moving to the Inbox", () => {
+    expect(
+      moveTaskRequestSchema.safeParse({ projectId: null, statusId: STATUS_ID }).success,
+    ).toBe(false);
+  });
+
+  it("rejects the same task as both neighbours", () => {
+    expect(
+      reorderTaskRequestSchema.safeParse({
+        beforeTaskId: TASK_ID,
+        afterTaskId: TASK_ID,
+      }).success,
+    ).toBe(false);
   });
 });

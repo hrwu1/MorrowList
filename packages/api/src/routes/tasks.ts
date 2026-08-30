@@ -2,6 +2,8 @@ import {
   completeTaskRequestSchema,
   createTaskRequestSchema,
   listTasksQuerySchema,
+  moveTaskRequestSchema,
+  reorderTaskRequestSchema,
   reopenTaskRequestSchema,
   updateTaskRequestSchema,
 } from "@morrowlist/contracts";
@@ -10,6 +12,8 @@ import { Hono } from "hono";
 import type { ApiDependencies, ApiEnv } from "../context.js";
 import { ApiError } from "../errors.js";
 import { parseJsonBody, parseQuery } from "../middleware/validate.js";
+
+import { requireWorkspace } from "./workspace.js";
 
 /**
  * Task endpoints (spec 20.3). Each route validates transport input, resolves the target
@@ -51,6 +55,30 @@ export function taskRoutes(deps: ApiDependencies) {
       const actor = c.get("actor");
       const body = await parseJsonBody(c, updateTaskRequestSchema);
       const task = await deps.taskService.update(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("id"),
+        body,
+      );
+      return c.json({ data: task });
+    })
+
+    .post("/tasks/:id/move", async (c) => {
+      const actor = c.get("actor");
+      const body = await parseJsonBody(c, moveTaskRequestSchema);
+      const task = await deps.taskService.move(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("id"),
+        body,
+      );
+      return c.json({ data: task });
+    })
+
+    .post("/tasks/:id/reorder", async (c) => {
+      const actor = c.get("actor");
+      const body = await parseJsonBody(c, reorderTaskRequestSchema);
+      const task = await deps.taskService.reorder(
         actor,
         requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
         c.req.param("id"),
@@ -104,24 +132,6 @@ export function taskRoutes(deps: ApiDependencies) {
       );
       return c.json({ data: task });
     });
-}
-
-/**
- * Resolve the target workspace. Omitting it uses the caller's only workspace, which keeps
- * the personal-first MVP simple (ADR-010) without hardcoding a single-workspace model.
- */
-function requireWorkspace(
-  requested: string | undefined,
-  available: readonly string[],
-): string {
-  if (requested) return requested;
-  const only = available[0];
-  if (available.length === 1 && only) return only;
-  throw new ApiError(
-    "VALIDATION_FAILED",
-    "workspaceId is required when the caller can reach more than one workspace.",
-    { field: "workspaceId" },
-  );
 }
 
 function expectedVersionFrom(raw: string | undefined): number | undefined {

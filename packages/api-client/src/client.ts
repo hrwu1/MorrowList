@@ -1,9 +1,17 @@
 import type {
+  CreateProjectRequest,
   CreateTaskRequest,
   ErrorCode,
   ErrorResponse,
   ListTasksQuery,
   MeResponse,
+  MoveTaskRequest,
+  ProjectBoardQuery,
+  ProjectBoardResponse,
+  ProjectDetailDto,
+  ProjectListResponse,
+  ProjectResponse,
+  ReorderTaskRequest,
   TaskDto,
   TaskListResponse,
   UpdateTaskRequest,
@@ -60,6 +68,54 @@ export class ApiClient {
     return body.data;
   }
 
+  async listProjects(options: RequestOptions = {}): Promise<ProjectListResponse> {
+    return this.send<ProjectListResponse>(
+      "GET",
+      `/projects${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+  }
+
+  async createProject(
+    body: CreateProjectRequest,
+    options: RequestOptions = {},
+  ): Promise<ProjectDetailDto> {
+    const response = await this.send<ProjectResponse>(
+      "POST",
+      `/projects${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async getProject(
+    projectId: string,
+    options: RequestOptions = {},
+  ): Promise<ProjectDetailDto> {
+    const response = await this.send<ProjectResponse>(
+      "GET",
+      `/projects/${encodeURIComponent(projectId)}${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+    return response.data;
+  }
+
+  async getProjectBoard(
+    projectId: string,
+    query: Partial<ProjectBoardQuery> = {},
+    options: RequestOptions = {},
+  ): Promise<ProjectBoardResponse> {
+    return this.send<ProjectBoardResponse>(
+      "GET",
+      `/projects/${encodeURIComponent(projectId)}/board${this.queryString(query, options)}`,
+      undefined,
+      options,
+    );
+  }
+
   async listTasks(
     query: Partial<ListTasksQuery> = {},
     options: RequestOptions = {},
@@ -103,6 +159,34 @@ export class ApiClient {
     const response = await this.send<{ data: TaskDto }>(
       "PATCH",
       `/tasks/${encodeURIComponent(id)}${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async moveTask(
+    id: string,
+    body: MoveTaskRequest,
+    options: RequestOptions = {},
+  ): Promise<TaskDto> {
+    const response = await this.send<{ data: TaskDto }>(
+      "POST",
+      `/tasks/${encodeURIComponent(id)}/move${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async reorderTask(
+    id: string,
+    body: ReorderTaskRequest,
+    options: RequestOptions = {},
+  ): Promise<TaskDto> {
+    const response = await this.send<{ data: TaskDto }>(
+      "POST",
+      `/tasks/${encodeURIComponent(id)}/reorder${this.queryString({}, options)}`,
       body,
       options,
     );

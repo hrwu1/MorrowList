@@ -1,4 +1,9 @@
-import type { ActorContext, TaskService, UnitOfWork } from "@morrowlist/application";
+import type {
+  ActorContext,
+  ProjectService,
+  TaskService,
+  UnitOfWork,
+} from "@morrowlist/application";
 import type { AuthPort } from "@morrowlist/auth";
 import type { Logger, Metrics } from "@morrowlist/observability";
 
@@ -9,6 +14,7 @@ import type { Logger, Metrics } from "@morrowlist/observability";
 export interface ApiDependencies {
   readonly auth: AuthPort;
   readonly unitOfWork: UnitOfWork;
+  readonly projectService: ProjectService;
   readonly taskService: TaskService;
   readonly logger: Logger;
   readonly metrics?: Metrics;

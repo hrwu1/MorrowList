@@ -1,4 +1,4 @@
-import { TaskService, bootstrapUser } from "@morrowlist/application";
+import { ProjectService, TaskService, bootstrapUser } from "@morrowlist/application";
 import type { AuthPort, AuthenticatedUser } from "@morrowlist/auth";
 import { fixedClock, uuidv7 } from "@morrowlist/domain";
 import { silentLogger } from "@morrowlist/observability";
@@ -61,6 +61,7 @@ beforeEach(async () => {
   const deps: ApiDependencies = {
     auth,
     unitOfWork,
+    projectService: new ProjectService({ unitOfWork, clock: fixedClock(NOW) }),
     taskService: new TaskService({
       unitOfWork,
       clock: fixedClock(NOW),
@@ -290,14 +291,20 @@ describe("task endpoints", () => {
 
     expect(response.status).toBe(422);
     await expect(response.json()).resolves.toMatchObject({
-      error: { code: "VALIDATION_FAILED", message: "Request body must be valid JSON." },
+      error: {
+        code: "VALIDATION_FAILED",
+        message: "Request body must be valid JSON.",
+      },
     });
   });
 
   it("rejects an oversized body before parsing it", async () => {
     const response = await request("/api/v1/tasks", {
       method: "POST",
-      headers: { "content-type": "application/json", "content-length": "2000000" },
+      headers: {
+        "content-type": "application/json",
+        "content-length": "2000000",
+      },
       body: JSON.stringify({ title: "x" }),
     });
 
@@ -323,6 +330,123 @@ describe("task endpoints", () => {
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "WORKSPACE_NOT_FOUND" },
+    });
+  });
+});
+
+describe("project and board endpoints", () => {
+  it("creates, lists, and gets a project with its ordered default workflow", async () => {
+    const createdResponse = await jsonRequest("/api/v1/projects", "POST", {
+      name: "Research launch",
+      colorToken: "blue",
+    });
+    expect(createdResponse.status).toBe(201);
+    const created = await createdResponse.json();
+
+    expect(created.data.project).toMatchObject({
+      name: "Research launch",
+      slug: "research-launch",
+    });
+    expect(
+      created.data.statuses.map((status: { name: string }) => status.name),
+    ).toEqual(["Backlog", "Ready", "In Progress", "Blocked", "In Review", "Done"]);
+
+    const listed = await (await request("/api/v1/projects")).json();
+    expect(listed.data.map((project: { name: string }) => project.name)).toEqual([
+      "Research launch",
+    ]);
+    expect(listed.page).toEqual({ nextCursor: null, hasMore: false });
+
+    const fetched = await (
+      await request(`/api/v1/projects/${created.data.project.id}`)
+    ).json();
+    expect(fetched.data).toEqual(created.data);
+  });
+
+  it("returns one normalized board response and reports truncation", async () => {
+    const created = await (
+      await jsonRequest("/api/v1/projects", "POST", { name: "Research launch" })
+    ).json();
+    const projectId = created.data.project.id as string;
+    const readyId = created.data.statuses.find(
+      (status: { category: string }) => status.category === "ready",
+    ).id as string;
+
+    await jsonRequest("/api/v1/tasks", "POST", {
+      title: "First board card",
+      projectId,
+      statusId: readyId,
+    });
+    await jsonRequest("/api/v1/tasks", "POST", {
+      title: "Second board card",
+      projectId,
+      statusId: readyId,
+    });
+
+    const response = await request(`/api/v1/projects/${projectId}/board?limit=1`);
+    expect(response.status).toBe(200);
+    const board = await response.json();
+
+    expect(board.data.project.id).toBe(projectId);
+    expect(board.data.statuses).toHaveLength(6);
+    expect(board.data.tasks).toHaveLength(1);
+    expect(board.page).toEqual({ hasMore: true, truncated: true });
+  });
+
+  it("moves a task across statuses and reorders from neighbour IDs", async () => {
+    const created = await (
+      await jsonRequest("/api/v1/projects", "POST", { name: "Research launch" })
+    ).json();
+    const projectId = created.data.project.id as string;
+    const readyId = created.data.statuses.find(
+      (status: { category: string }) => status.category === "ready",
+    ).id as string;
+    const progressId = created.data.statuses.find(
+      (status: { category: string }) => status.category === "in_progress",
+    ).id as string;
+
+    const first = await (
+      await jsonRequest("/api/v1/tasks", "POST", {
+        title: "First",
+        projectId,
+        statusId: readyId,
+      })
+    ).json();
+    const second = await (
+      await jsonRequest("/api/v1/tasks", "POST", {
+        title: "Second",
+        projectId,
+        statusId: readyId,
+      })
+    ).json();
+
+    const reordered = await (
+      await jsonRequest(`/api/v1/tasks/${second.data.id}/reorder`, "POST", {
+        afterTaskId: first.data.id,
+        expectedVersion: second.data.version,
+      })
+    ).json();
+    expect(reordered.data.rank < first.data.rank).toBe(true);
+
+    const moved = await (
+      await jsonRequest(`/api/v1/tasks/${reordered.data.id}/move`, "POST", {
+        projectId,
+        statusId: progressId,
+        expectedVersion: reordered.data.version,
+      })
+    ).json();
+    expect(moved.data.statusId).toBe(progressId);
+  });
+
+  it("rejects ambiguous movement neighbours before calling the service", async () => {
+    const response = await jsonRequest(`/api/v1/tasks/${uuidv7()}/reorder`, "POST", {
+      beforeTaskId: "0198f0a0-0000-7000-8000-000000000002",
+      afterTaskId: "0198f0a0-0000-7000-8000-000000000002",
+    });
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "VALIDATION_FAILED" },
     });
   });
 });

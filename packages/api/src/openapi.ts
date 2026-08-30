@@ -1,9 +1,16 @@
 import {
   completeTaskRequestSchema,
+  createProjectRequestSchema,
   createTaskRequestSchema,
   errorResponseSchema,
   listTasksQuerySchema,
   meResponseSchema,
+  moveTaskRequestSchema,
+  projectBoardQuerySchema,
+  projectBoardResponseSchema,
+  projectListResponseSchema,
+  projectResponseSchema,
+  reorderTaskRequestSchema,
   taskListResponseSchema,
   taskResponseSchema,
   updateTaskRequestSchema,
@@ -22,8 +29,14 @@ import { API_BASE_PATH } from "./app.js";
 const registry = {
   Task: taskResponseSchema.shape.data,
   TaskList: taskListResponseSchema,
+  ProjectDetail: projectResponseSchema,
+  ProjectList: projectListResponseSchema,
+  ProjectBoard: projectBoardResponseSchema,
+  CreateProjectRequest: createProjectRequestSchema,
   CreateTaskRequest: createTaskRequestSchema,
   UpdateTaskRequest: updateTaskRequestSchema,
+  MoveTaskRequest: moveTaskRequestSchema,
+  ReorderTaskRequest: reorderTaskRequestSchema,
   CompleteTaskRequest: completeTaskRequestSchema,
   MeResponse: meResponseSchema,
   ErrorResponse: errorResponseSchema,
@@ -59,6 +72,13 @@ const workspaceIdParam = {
 
 const taskIdParam = {
   name: "id",
+  in: "path",
+  required: true,
+  schema: { type: "string", format: "uuid" },
+};
+
+const projectIdParam = {
+  name: "projectId",
   in: "path",
   required: true,
   schema: { type: "string", format: "uuid" },
@@ -122,6 +142,68 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
           summary: "Current user, workspaces, and capabilities",
           responses: {
             "200": { description: "The caller", ...jsonContent(ref("MeResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/projects": {
+        get: {
+          summary: "List projects",
+          parameters: [workspaceIdParam],
+          responses: {
+            "200": {
+              description: "The workspace's active projects",
+              ...jsonContent(ref("ProjectList")),
+            },
+            ...commonErrors,
+          },
+        },
+        post: {
+          summary: "Create a project with its default workflow",
+          parameters: [workspaceIdParam],
+          requestBody: {
+            required: true,
+            ...jsonContent(ref("CreateProjectRequest")),
+          },
+          responses: {
+            "201": {
+              description: "The created project and workflow",
+              ...jsonContent(ref("ProjectDetail")),
+            },
+            ...commonErrors,
+          },
+        },
+      },
+      "/projects/{projectId}": {
+        get: {
+          summary: "Get a project and its ordered workflow",
+          parameters: [projectIdParam, workspaceIdParam],
+          responses: {
+            "200": {
+              description: "The project and its active statuses",
+              ...jsonContent(ref("ProjectDetail")),
+            },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/projects/{projectId}/board": {
+        get: {
+          summary: "Get a normalized project board",
+          description:
+            "Statuses and tasks are returned in manual-rank order. The page signal explicitly reports when the bounded task projection was truncated.",
+          parameters: [
+            projectIdParam,
+            workspaceIdParam,
+            ...queryParameters(projectBoardQuerySchema),
+          ],
+          responses: {
+            "200": {
+              description: "The board projection",
+              ...jsonContent(ref("ProjectBoard")),
+            },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
             ...commonErrors,
           },
         },
@@ -199,6 +281,46 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
           requestBody: { required: false, ...jsonContent(ref("CompleteTaskRequest")) },
           responses: {
             "200": { description: "The completed task", ...jsonContent(ref("Task")) },
+            "409": {
+              description: "Version conflict",
+              ...jsonContent(ref("ErrorResponse")),
+            },
+            ...commonErrors,
+          },
+        },
+      },
+      "/tasks/{id}/move": {
+        post: {
+          summary: "Move a task to another project status or the Inbox",
+          description:
+            "Neighbour IDs describe the intended position; the server computes the authoritative rank.",
+          parameters: [taskIdParam, workspaceIdParam],
+          requestBody: { required: true, ...jsonContent(ref("MoveTaskRequest")) },
+          responses: {
+            "200": { description: "The moved task", ...jsonContent(ref("Task")) },
+            "409": {
+              description: "Version conflict",
+              ...jsonContent(ref("ErrorResponse")),
+            },
+            ...commonErrors,
+          },
+        },
+      },
+      "/tasks/{id}/reorder": {
+        post: {
+          summary: "Reorder a task within its current status",
+          description:
+            "Neighbour IDs describe the intended position; the server computes the authoritative rank.",
+          parameters: [taskIdParam, workspaceIdParam],
+          requestBody: {
+            required: true,
+            ...jsonContent(ref("ReorderTaskRequest")),
+          },
+          responses: {
+            "200": {
+              description: "The reordered task",
+              ...jsonContent(ref("Task")),
+            },
             "409": {
               description: "Version conflict",
               ...jsonContent(ref("ErrorResponse")),

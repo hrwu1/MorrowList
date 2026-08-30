@@ -86,21 +86,53 @@ export const updateTaskRequestSchema = z
     message: "at least one field must be supplied",
   });
 
-export const moveTaskRequestSchema = z.object({
-  /** Null moves the task back to the Inbox (spec 11.5). */
-  projectId: uuidSchema.nullable(),
-  statusId: uuidSchema.nullish(),
-  /** Neighbours describe the intended position; the server computes the rank (spec 24.2). */
-  beforeTaskId: uuidSchema.nullish(),
-  afterTaskId: uuidSchema.nullish(),
-  expectedVersion: z.number().int().positive().optional(),
-});
+export const moveTaskRequestSchema = z
+  .object({
+    /** Null moves the task back to the Inbox (spec 11.5). */
+    projectId: uuidSchema.nullable(),
+    statusId: uuidSchema.nullish(),
+    /** Neighbours describe the intended position; the server computes the rank (spec 24.2). */
+    beforeTaskId: uuidSchema.nullish(),
+    afterTaskId: uuidSchema.nullish(),
+    expectedVersion: z.number().int().positive().optional(),
+  })
+  .superRefine((body, context) => {
+    if (body.projectId === null && body.statusId != null) {
+      context.addIssue({
+        code: "custom",
+        message: "statusId requires a project destination",
+        path: ["statusId"],
+      });
+    }
+    if (
+      body.beforeTaskId != null &&
+      body.afterTaskId != null &&
+      body.beforeTaskId === body.afterTaskId
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "beforeTaskId and afterTaskId must be different tasks",
+        path: ["afterTaskId"],
+      });
+    }
+  });
 
-export const reorderTaskRequestSchema = z.object({
-  beforeTaskId: uuidSchema.nullish(),
-  afterTaskId: uuidSchema.nullish(),
-  expectedVersion: z.number().int().positive().optional(),
-});
+export const reorderTaskRequestSchema = z
+  .object({
+    beforeTaskId: uuidSchema.nullish(),
+    afterTaskId: uuidSchema.nullish(),
+    expectedVersion: z.number().int().positive().optional(),
+  })
+  .refine(
+    (body) =>
+      body.beforeTaskId == null ||
+      body.afterTaskId == null ||
+      body.beforeTaskId !== body.afterTaskId,
+    {
+      message: "beforeTaskId and afterTaskId must be different tasks",
+      path: ["afterTaskId"],
+    },
+  );
 
 export const completeTaskRequestSchema = z.object({
   expectedVersion: z.number().int().positive().optional(),
