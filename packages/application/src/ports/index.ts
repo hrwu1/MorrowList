@@ -1,11 +1,14 @@
 export type { TransactionContext, UnitOfWork } from "./unit-of-work.js";
-export type {
-  Cursor,
-  Page,
-  RankScope,
-  TaskCounterRepository,
-  TaskFilter,
-  TaskRepository,
+export {
+  BOARD_TASK_LIMIT,
+  type BoardTaskPage,
+  type BoardTaskQuery,
+  type Cursor,
+  type Page,
+  type RankScope,
+  type TaskCounterRepository,
+  type TaskFilter,
+  type TaskRepository,
 } from "./tasks.js";
 export type {
   Project,

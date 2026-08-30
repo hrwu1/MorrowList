@@ -1,10 +1,12 @@
-import type {
-  Cursor,
-  Page,
-  RankScope,
-  TaskCounterRepository,
-  TaskFilter,
-  TaskRepository,
+import {
+  BOARD_TASK_LIMIT,
+  type BoardTaskPage,
+  type Cursor,
+  type Page,
+  type RankScope,
+  type TaskCounterRepository,
+  type TaskFilter,
+  type TaskRepository,
 } from "@morrowlist/application";
 import type { Task } from "@morrowlist/domain";
 import {
@@ -21,7 +23,7 @@ import {
 } from "drizzle-orm";
 
 import type { Database } from "../client.js";
-import { tasks, workspaceTaskCounters } from "../schema/index.js";
+import { tasks, workflowStatuses, workspaceTaskCounters } from "../schema/index.js";
 
 import { toTask, toTaskRow } from "./mappers.js";
 
@@ -147,6 +149,39 @@ export function createTaskRepository(db: Database): TaskRepository {
         items: rows.slice(0, cursor.limit).map(toTask),
         hasMore,
         nextCursor: null,
+      };
+    },
+
+    async listBoard(query): Promise<BoardTaskPage> {
+      const limit = Math.max(
+        1,
+        Math.min(query.limit ?? BOARD_TASK_LIMIT, BOARD_TASK_LIMIT),
+      );
+
+      // The joined status rank makes this one bounded data query for the complete board,
+      // rather than one task request per lane. Archived statuses are excluded because they
+      // are not board columns and therefore cannot safely receive or display live work.
+      const rows = await db
+        .select({ task: tasks })
+        .from(tasks)
+        .innerJoin(workflowStatuses, eq(workflowStatuses.id, tasks.statusId))
+        .where(
+          and(
+            eq(tasks.workspaceId, query.workspaceId),
+            eq(tasks.projectId, query.projectId),
+            isNull(tasks.deletedAt),
+            eq(workflowStatuses.projectId, query.projectId),
+            isNull(workflowStatuses.archivedAt),
+          ),
+        )
+        .orderBy(asc(workflowStatuses.rank), asc(tasks.rank), asc(tasks.id))
+        .limit(limit + 1);
+
+      const hasMore = rows.length > limit;
+      return {
+        items: rows.slice(0, limit).map((row) => toTask(row.task)),
+        hasMore,
+        truncated: hasMore,
       };
     },
 

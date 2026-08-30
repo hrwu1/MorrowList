@@ -1,6 +1,8 @@
 import type {
   CreateTaskRequest,
   ListTasksQuery,
+  MoveTaskRequest,
+  ReorderTaskRequest,
   TaskDto,
   UpdateTaskRequest,
 } from "@morrowlist/contracts";
@@ -13,8 +15,10 @@ import {
   deleteTask,
   isTerminal,
   materialChanges,
+  moveTask as applyTaskMove,
   rankBetween,
   reopenTask,
+  reorderTask as applyTaskReorder,
   resolveReopenStatus,
   restoreTask,
   systemClock,
@@ -89,7 +93,12 @@ export class TaskService {
       const workspace = await this.requireWorkspace(tx, request.workspaceId);
 
       const destination = request.projectId
-        ? await this.resolveDestination(tx, request.projectId, request.statusId ?? null)
+        ? await this.resolveDestination(
+            tx,
+            request.workspaceId,
+            request.projectId,
+            request.statusId ?? null,
+          )
         : null;
 
       const scope: RankScope = {
@@ -241,6 +250,93 @@ export class TaskService {
           },
           { actor: actorRef(context), clock: this.clock },
         ),
+    });
+  }
+
+  /**
+   * Move a task to another project/status and place it between server-validated neighbours.
+   * The destination category drives completion, so a card dropped into Done is the same
+   * canonical completion seen by every other task projection.
+   */
+  async move(
+    context: ActorContext,
+    workspaceId: string,
+    taskId: string,
+    request: MoveTaskRequest,
+  ): Promise<TaskDto> {
+    assertWorkspaceAccess(context, workspaceId);
+    assertScope(context, SCOPES.tasksWrite);
+
+    return this.mutate(context, workspaceId, taskId, request.expectedVersion, {
+      eventType: TASK_EVENTS.moved,
+      summarize: (next) =>
+        next.projectId === null
+          ? "Moved task to Inbox"
+          : "Moved task to another status",
+      apply: async (task, tx) => {
+        if (request.projectId === null && request.statusId != null) {
+          throw new DomainError(
+            "VALIDATION_FAILED",
+            "An Inbox destination cannot have a workflow status.",
+            { projectId: null, statusId: request.statusId },
+          );
+        }
+
+        const destination =
+          request.projectId === null
+            ? null
+            : await this.resolveDestination(
+                tx,
+                workspaceId,
+                request.projectId,
+                request.statusId ?? null,
+              );
+        const scope: RankScope = {
+          workspaceId,
+          projectId: destination?.id ?? null,
+          statusId: destination?.status.id ?? null,
+        };
+        const rank = await this.resolveOrderingRank(tx, task.id, scope, request);
+
+        return applyTaskMove(
+          task,
+          {
+            destination: destination
+              ? { projectId: destination.id, status: destination.status }
+              : null,
+            rank,
+          },
+          { actor: actorRef(context), clock: this.clock },
+        );
+      },
+    });
+  }
+
+  /** Reorder a task inside its current Inbox or project-status rank scope. */
+  async reorder(
+    context: ActorContext,
+    workspaceId: string,
+    taskId: string,
+    request: ReorderTaskRequest,
+  ): Promise<TaskDto> {
+    assertWorkspaceAccess(context, workspaceId);
+    assertScope(context, SCOPES.tasksWrite);
+
+    return this.mutate(context, workspaceId, taskId, request.expectedVersion, {
+      eventType: TASK_EVENTS.reordered,
+      summarize: () => "Reordered task",
+      apply: async (task, tx) => {
+        const scope: RankScope = {
+          workspaceId,
+          projectId: task.projectId,
+          statusId: task.statusId,
+        };
+        const rank = await this.resolveOrderingRank(tx, task.id, scope, request);
+        return applyTaskReorder(task, rank, {
+          actor: actorRef(context),
+          clock: this.clock,
+        });
+      },
     });
   }
 
@@ -462,9 +558,14 @@ export class TaskService {
 
   private async resolveDestination(
     tx: TransactionContext,
+    workspaceId: string,
     projectId: string,
     statusId: string | null,
   ): Promise<{ id: string; status: WorkflowStatus }> {
+    const project = await tx.projects.findById(workspaceId, projectId);
+    if (!project || project.archivedAt !== null) {
+      throw new DomainError("PROJECT_NOT_FOUND", "Project not found.", { projectId });
+    }
     const statuses = await tx.statuses.listByProject(projectId);
     if (statuses.length === 0) {
       throw new DomainError("PROJECT_NOT_FOUND", "Project not found.", { projectId });
@@ -484,6 +585,83 @@ export class TaskService {
       );
     }
     return { id: projectId, status };
+  }
+
+  /**
+   * Resolve a client-described position to a server-owned fractional rank. Every supplied
+   * anchor must still be a live task in the exact destination scope. A disappeared or moved
+   * anchor is a board race, so it becomes the same recoverable conflict UX as a stale task.
+   */
+  private async resolveOrderingRank(
+    tx: TransactionContext,
+    movingTaskId: string,
+    scope: RankScope,
+    request: {
+      readonly beforeTaskId?: string | null | undefined;
+      readonly afterTaskId?: string | null | undefined;
+    },
+  ): Promise<string> {
+    const beforeId = request.beforeTaskId ?? null;
+    const afterId = request.afterTaskId ?? null;
+    if (beforeId !== null && beforeId === afterId) {
+      throw new DomainError(
+        "VALIDATION_FAILED",
+        "Ordering neighbours must be different tasks.",
+        { beforeTaskId: beforeId, afterTaskId: afterId },
+      );
+    }
+    if (beforeId === movingTaskId || afterId === movingTaskId) {
+      throw new DomainError(
+        "VALIDATION_FAILED",
+        "A task cannot be its own ordering neighbour.",
+        { taskId: movingTaskId },
+      );
+    }
+
+    if (beforeId === null && afterId === null) {
+      return rankBetween(await tx.tasks.lastRankIn(scope), null);
+    }
+
+    const before = beforeId
+      ? await this.requireOrderingNeighbour(tx, movingTaskId, beforeId, scope)
+      : null;
+    const after = afterId
+      ? await this.requireOrderingNeighbour(tx, movingTaskId, afterId, scope)
+      : null;
+    if (before && after && before.rank >= after.rank) {
+      throw this.orderingConflict(movingTaskId, beforeId, afterId);
+    }
+    return rankBetween(before?.rank ?? null, after?.rank ?? null);
+  }
+
+  private async requireOrderingNeighbour(
+    tx: TransactionContext,
+    movingTaskId: string,
+    neighbourId: string,
+    scope: RankScope,
+  ): Promise<Task> {
+    const neighbour = await tx.tasks.findById(scope.workspaceId, neighbourId);
+    if (
+      !neighbour ||
+      neighbour.deletedAt !== null ||
+      neighbour.projectId !== scope.projectId ||
+      neighbour.statusId !== scope.statusId
+    ) {
+      throw this.orderingConflict(movingTaskId, neighbourId, null);
+    }
+    return neighbour;
+  }
+
+  private orderingConflict(
+    taskId: string,
+    beforeTaskId: string | null,
+    afterTaskId: string | null,
+  ): DomainError {
+    return new DomainError(
+      "TASK_VERSION_CONFLICT",
+      "The board order changed before this move could be saved.",
+      { taskId, beforeTaskId, afterTaskId },
+    );
   }
 
   private async resolveDoneStatus(

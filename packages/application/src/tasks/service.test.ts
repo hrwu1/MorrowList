@@ -174,6 +174,18 @@ describe("TaskService authorization", () => {
     ).rejects.toMatchObject({ code: "TASK_NOT_FOUND" });
   });
 
+  it("does not assign this workspace's task to another workspace's project", async () => {
+    const other = seedWorkspace(unitOfWork.data);
+
+    await expect(
+      service.create(seeded.context, {
+        workspaceId: seeded.workspace.id,
+        projectId: other.project.id,
+        title: "Cross-tenant task",
+      }),
+    ).rejects.toMatchObject({ code: "PROJECT_NOT_FOUND" });
+  });
+
   it("requires the write scope for an API key actor", async () => {
     const readOnlyKey: ActorContext = buildActorContext({
       actorKind: "api_key",
@@ -258,6 +270,147 @@ describe("TaskService.update", () => {
 
     expect(unchanged.version).toBe(1);
     expect(unitOfWork.data.activity).toHaveLength(1);
+  });
+});
+
+describe("TaskService.move and reorder", () => {
+  it("moves through Done and back using canonical completion semantics", async () => {
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const done = statusByCategory(seeded.statuses, "done");
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      projectId: seeded.project.id,
+      statusId: ready.id,
+      title: "Ship Dawnflow",
+    });
+
+    const completed = await service.move(seeded.context, seeded.workspace.id, task.id, {
+      projectId: seeded.project.id,
+      statusId: done.id,
+      expectedVersion: task.version,
+    });
+    expect(completed.statusId).toBe(done.id);
+    expect(completed.isCompleted).toBe(true);
+    expect(completed.completedAt).toBe(NOW.toISOString());
+
+    const reopened = await service.move(seeded.context, seeded.workspace.id, task.id, {
+      projectId: seeded.project.id,
+      statusId: ready.id,
+      expectedVersion: completed.version,
+    });
+    expect(reopened.statusId).toBe(ready.id);
+    expect(reopened.isCompleted).toBe(false);
+    expect(reopened.completedAt).toBeNull();
+    expect(unitOfWork.data.activity.slice(-2).map((event) => event.eventType)).toEqual([
+      "task.moved",
+      "task.moved",
+    ]);
+  });
+
+  it("resolves the destination default status and a rank between valid neighbours", async () => {
+    const inProgress = statusByCategory(seeded.statuses, "in_progress");
+    const first = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      projectId: seeded.project.id,
+      statusId: inProgress.id,
+      title: "First",
+    });
+    const last = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      projectId: seeded.project.id,
+      statusId: inProgress.id,
+      title: "Last",
+    });
+    const inbox = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Move me",
+    });
+
+    const moved = await service.move(seeded.context, seeded.workspace.id, inbox.id, {
+      projectId: seeded.project.id,
+      statusId: inProgress.id,
+      beforeTaskId: first.id,
+      afterTaskId: last.id,
+      expectedVersion: inbox.version,
+    });
+    expect(moved.rank > first.rank && moved.rank < last.rank).toBe(true);
+
+    const returnedToInbox = await service.move(
+      seeded.context,
+      seeded.workspace.id,
+      moved.id,
+      { projectId: null, expectedVersion: moved.version },
+    );
+    const defaulted = await service.move(
+      seeded.context,
+      seeded.workspace.id,
+      moved.id,
+      { projectId: seeded.project.id, expectedVersion: returnedToInbox.version },
+    );
+    expect(defaulted.statusId).toBe(statusByCategory(seeded.statuses, "ready").id);
+  });
+
+  it("rejects a neighbour outside the destination scope without changing the task", async () => {
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const blocked = statusByCategory(seeded.statuses, "blocked");
+    const moving = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      projectId: seeded.project.id,
+      statusId: ready.id,
+      title: "Moving",
+    });
+    const wrongScope = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      projectId: seeded.project.id,
+      statusId: blocked.id,
+      title: "Wrong lane",
+    });
+    const eventCount = unitOfWork.data.activity.length;
+
+    await expect(
+      service.move(seeded.context, seeded.workspace.id, moving.id, {
+        projectId: seeded.project.id,
+        statusId: ready.id,
+        beforeTaskId: wrongScope.id,
+        expectedVersion: moving.version,
+      }),
+    ).rejects.toMatchObject({ code: "TASK_VERSION_CONFLICT" });
+
+    const current = await service.get(seeded.context, seeded.workspace.id, moving.id);
+    expect(current).toMatchObject({ statusId: ready.id, version: moving.version });
+    expect(unitOfWork.data.activity).toHaveLength(eventCount);
+  });
+
+  it("reorders only within the current scope and honors expectedVersion", async () => {
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const first = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      projectId: seeded.project.id,
+      statusId: ready.id,
+      title: "First",
+    });
+    const second = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      projectId: seeded.project.id,
+      statusId: ready.id,
+      title: "Second",
+    });
+
+    const reordered = await service.reorder(
+      seeded.context,
+      seeded.workspace.id,
+      second.id,
+      { afterTaskId: first.id, expectedVersion: second.version },
+    );
+    expect(reordered.rank < first.rank).toBe(true);
+    expect(reordered.statusId).toBe(ready.id);
+    expect(reordered.version).toBe(second.version + 1);
+
+    await expect(
+      service.reorder(seeded.context, seeded.workspace.id, reordered.id, {
+        expectedVersion: second.version,
+      }),
+    ).rejects.toMatchObject({ code: "TASK_VERSION_CONFLICT" });
   });
 });
 

@@ -1,3 +1,4 @@
+import { PROJECT_BOARD_TASK_LIMIT } from "@morrowlist/contracts";
 import type { Task } from "@morrowlist/domain";
 
 /** Persistence ports for tasks. Implemented by `@morrowlist/database`. */
@@ -42,6 +43,25 @@ export interface Page<T> {
   readonly hasMore: boolean;
 }
 
+/**
+ * The project-board read is deliberately bounded. Unlike the cursor-paginated list views,
+ * a board has to be internally complete enough to support cross-column ordering in one
+ * response, so the repository reports when its hard cap omitted additional cards.
+ */
+export interface BoardTaskPage {
+  readonly items: readonly Task[];
+  readonly hasMore: boolean;
+  readonly truncated: boolean;
+}
+
+export interface BoardTaskQuery {
+  readonly workspaceId: string;
+  readonly projectId: string;
+  readonly limit?: number | undefined;
+}
+
+export const BOARD_TASK_LIMIT = PROJECT_BOARD_TASK_LIMIT;
+
 /** The ordering scope a rank is unique within: an Inbox, or a project status column. */
 export interface RankScope {
   readonly workspaceId: string;
@@ -53,6 +73,8 @@ export interface TaskRepository {
   findById(workspaceId: string, taskId: string): Promise<Task | null>;
   findByNumber(workspaceId: string, taskNumber: number): Promise<Task | null>;
   list(filter: TaskFilter, cursor: Cursor): Promise<Page<Task>>;
+  /** Active project tasks ordered by status rank, then task rank, in one data query. */
+  listBoard(query: BoardTaskQuery): Promise<BoardTaskPage>;
   insert(task: Task): Promise<void>;
   /**
    * Persist a task, guarding on the version the caller loaded. Returns false when the

@@ -23,6 +23,7 @@ import type {
   WorkspaceRepository,
   WorkspaceRole,
 } from "../ports/index.js";
+import { BOARD_TASK_LIMIT } from "../ports/tasks.js";
 
 /**
  * In-memory adapters for the application ports.
@@ -150,6 +151,44 @@ function taskRepository(data: InMemoryData): TaskRepository {
         nextCursor: null,
       };
     },
+    async listBoard(query) {
+      const limit = Math.max(
+        1,
+        Math.min(query.limit ?? BOARD_TASK_LIMIT, BOARD_TASK_LIMIT),
+      );
+      const items = [...data.tasks.values()]
+        .filter((task) => {
+          if (
+            task.workspaceId !== query.workspaceId ||
+            task.projectId !== query.projectId ||
+            task.deletedAt !== null ||
+            task.statusId === null
+          ) {
+            return false;
+          }
+          const status = data.statuses.get(task.statusId);
+          return status?.projectId === query.projectId && status.archivedAt === null;
+        })
+        .sort((left, right) => {
+          const leftStatus = data.statuses.get(
+            left.statusId as string,
+          ) as WorkflowStatus;
+          const rightStatus = data.statuses.get(
+            right.statusId as string,
+          ) as WorkflowStatus;
+          if (leftStatus.rank !== rightStatus.rank) {
+            return leftStatus.rank < rightStatus.rank ? -1 : 1;
+          }
+          if (left.rank !== right.rank) return left.rank < right.rank ? -1 : 1;
+          return left.id < right.id ? -1 : 1;
+        });
+      const hasMore = items.length > limit;
+      return {
+        items: items.slice(0, limit),
+        hasMore,
+        truncated: hasMore,
+      };
+    },
     async insert(task) {
       data.tasks.set(task.id, task);
     },
@@ -220,11 +259,13 @@ function projectRepository(data: InMemoryData): ProjectRepository {
       return project && project.workspaceId === workspaceId ? project : null;
     },
     async listByWorkspace(workspaceId, options) {
-      return [...data.projects.values()].filter(
-        (project) =>
-          project.workspaceId === workspaceId &&
-          (options?.includeArchived || project.archivedAt === null),
-      );
+      return [...data.projects.values()]
+        .filter(
+          (project) =>
+            project.workspaceId === workspaceId &&
+            (options?.includeArchived || project.archivedAt === null),
+        )
+        .sort((left, right) => left.name.localeCompare(right.name));
     },
     async insert(project) {
       data.projects.set(project.id, project);
