@@ -1,4 +1,9 @@
+import { loadRootEnv } from "@morrowlist/config/load-env";
 import type { NextConfig } from "next";
+
+// The single `.env` lives at the workspace root; Next only looks beside this app. Load it
+// here, before the config is evaluated, so the server starts configured.
+loadRootEnv();
 
 const config: NextConfig = {
   reactStrictMode: true,

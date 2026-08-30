@@ -14,6 +14,10 @@
       "types": "./dist/env.d.ts",
       "default": "./dist/env.js"
     },
+    "./load-env": {
+      "types": "./dist/load-env.d.ts",
+      "default": "./dist/load-env.js"
+    },
     "./tsconfig/base.json": "./tsconfig/base.json",
     "./tsconfig/library.json": "./tsconfig/library.json",
     "./tsconfig/next.json": "./tsconfig/next.json",

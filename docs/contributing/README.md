@@ -25,6 +25,14 @@ and differs from `DATABASE_URL`: `TEST_DATABASE_URL` for `pnpm test:integration`
 in its global setup and starts its server against it, so a browser run never touches
 development data.
 
+`.env` lives at the repository root and there is only one. Nothing reads it from there on
+its own — `next dev` looks only beside the app it serves, and `vitest` and `playwright`
+look for no env file at all — so `loadRootEnv()` from `@morrowlist/config/load-env` is
+called from `next.config.ts`, `playwright.config.ts`, and the shared vitest integration
+preset. It never overwrites a variable that is already set, so CI's `env:` block and a
+real deployment still win, and it does nothing when there is no `.env` on disk. Export
+nothing by hand; the documented commands work as written.
+
 Generate `AUTH_SECRET` with `openssl rand -base64 32`. There is no usable default; the
 application refuses to start in production without it.
 
@@ -40,6 +48,8 @@ application refuses to start in production without it.
 | `pnpm typecheck`        | TypeScript across the workspace                   |
 | `pnpm openapi:generate` | Regenerates `docs/api/openapi.json`               |
 | `pnpm db:generate`      | Generates a migration from schema changes         |
+
+`pnpm db:migrate` targets `DATABASE_URL`; add `--test` to migrate `TEST_DATABASE_URL`.
 
 ## Architecture rules
 

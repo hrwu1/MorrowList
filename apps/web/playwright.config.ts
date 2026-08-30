@@ -1,6 +1,10 @@
+import { loadRootEnv } from "@morrowlist/config/load-env";
 import { defineConfig, devices } from "@playwright/test";
 
 import { e2eDatabaseUrl } from "./e2e/database";
+
+// Playwright reads no env file of its own; the suite's database comes from the root `.env`.
+loadRootEnv();
 
 /**
  * Browser end-to-end baseline (FND-009, spec 28.2).
