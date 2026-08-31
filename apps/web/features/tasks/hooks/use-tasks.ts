@@ -3,6 +3,7 @@
 import type {
   CreateTaskRequest,
   ListTasksQuery,
+  ProjectBoardResponse,
   TaskDto,
   TaskListResponse,
   UpdateTaskRequest,
@@ -15,6 +16,8 @@ import {
   type QueryKey,
 } from "@tanstack/react-query";
 
+import { projectKeys } from "../../projects/hooks/use-projects";
+import { patchTaskInBoard, selectInboxDestination } from "../lib/task-projections";
 import { matchesFilters } from "../lib/task-view";
 
 import { apiClient } from "@/lib/api-client";
@@ -37,6 +40,14 @@ export const taskKeys = {
 };
 
 type ListSnapshot = readonly [QueryKey, TaskListResponse | undefined][];
+type BoardSnapshot = readonly [QueryKey, ProjectBoardResponse | undefined][];
+
+interface TaskProjectionSnapshot {
+  readonly lists: ListSnapshot;
+  readonly boards: BoardSnapshot;
+  readonly byId: TaskDto | undefined;
+  readonly byKey: TaskDto | undefined;
+}
 
 function filtersOf(key: QueryKey): Partial<ListTasksQuery> {
   return (key[2] ?? {}) as Partial<ListTasksQuery>;
@@ -63,6 +74,15 @@ function patchTaskEverywhere(queryClient: QueryClient, task: TaskDto): void {
     });
   }
 
+  for (const [key, current] of snapshotBoards(queryClient)) {
+    if (current) {
+      queryClient.setQueryData<ProjectBoardResponse>(
+        key,
+        patchTaskInBoard(current, task),
+      );
+    }
+  }
+
   patchDetail(queryClient, task.id, task);
   patchDetail(queryClient, task.key, task);
 }
@@ -81,12 +101,57 @@ function snapshotLists(queryClient: QueryClient): ListSnapshot {
   return queryClient.getQueriesData<TaskListResponse>({ queryKey: taskKeys.lists() });
 }
 
+function snapshotBoards(queryClient: QueryClient): BoardSnapshot {
+  return queryClient.getQueriesData<ProjectBoardResponse>({
+    queryKey: projectKeys.boards(),
+  });
+}
+
+function snapshotTaskProjections(
+  queryClient: QueryClient,
+  task: TaskDto,
+): TaskProjectionSnapshot {
+  return {
+    lists: snapshotLists(queryClient),
+    boards: snapshotBoards(queryClient),
+    byId: queryClient.getQueryData<TaskDto>(taskKeys.detail(task.id)),
+    byKey: queryClient.getQueryData<TaskDto>(taskKeys.detail(task.key)),
+  };
+}
+
 function restoreLists(queryClient: QueryClient, snapshot: ListSnapshot): void {
   for (const [key, value] of snapshot) queryClient.setQueryData(key, value);
 }
 
+function restoreBoards(queryClient: QueryClient, snapshot: BoardSnapshot): void {
+  for (const [key, value] of snapshot) queryClient.setQueryData(key, value);
+}
+
+function restoreTaskProjections(
+  queryClient: QueryClient,
+  task: TaskDto,
+  snapshot: TaskProjectionSnapshot,
+): void {
+  restoreLists(queryClient, snapshot.lists);
+  restoreBoards(queryClient, snapshot.boards);
+  patchDetail(queryClient, task.id, snapshot.byId);
+  patchDetail(queryClient, task.key, snapshot.byKey);
+}
+
 function invalidateLists(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
+}
+
+function invalidateTaskProjections(queryClient: QueryClient): void {
+  invalidateLists(queryClient);
+  void queryClient.invalidateQueries({ queryKey: projectKeys.boards() });
+}
+
+async function cancelTaskProjections(queryClient: QueryClient): Promise<void> {
+  await Promise.all([
+    queryClient.cancelQueries({ queryKey: taskKeys.all }),
+    queryClient.cancelQueries({ queryKey: projectKeys.boards() }),
+  ]);
 }
 
 export function useTaskList(filters: Partial<ListTasksQuery>) {
@@ -112,11 +177,41 @@ export function useCreateTask() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (request: CreateTaskRequest) => apiClient.createTask(request),
-    onSuccess: () => {
-      invalidateLists(queryClient);
-      // Project boards are another projection of the canonical task collection.
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+    onSuccess: (created) => {
+      patchTaskEverywhere(queryClient, created);
+      invalidateTaskProjections(queryClient);
     },
+  });
+}
+
+export interface AssignInboxTaskInput {
+  readonly task: TaskDto;
+  readonly projectId: string;
+}
+
+/** Resolve the project's active default lane, then atomically move an Inbox task there. */
+export function useAssignInboxTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ task, projectId }: AssignInboxTaskInput) => {
+      const detail = await queryClient.fetchQuery({
+        queryKey: projectKeys.detail(projectId),
+        queryFn: () => apiClient.getProject(projectId),
+      });
+      const destination = selectInboxDestination(detail.statuses);
+      if (!destination) {
+        throw new Error("This project has no active workflow status.");
+      }
+
+      return apiClient.moveTask(task.id, {
+        projectId,
+        statusId: destination.id,
+        expectedVersion: task.version,
+      });
+    },
+    onSuccess: (moved) => patchTaskEverywhere(queryClient, moved),
+    onSettled: () => invalidateTaskProjections(queryClient),
   });
 }
 
@@ -132,21 +227,17 @@ export function useUpdateTask() {
     mutationFn: ({ task, patch }: { task: TaskDto; patch: UpdateTaskRequest }) =>
       apiClient.updateTask(task.id, { expectedVersion: task.version, ...patch }),
     onMutate: async ({ task, patch }) => {
-      await queryClient.cancelQueries({ queryKey: taskKeys.all });
-      const previous = snapshotLists(queryClient);
-      const byId = queryClient.getQueryData<TaskDto>(taskKeys.detail(task.id));
-      const byKey = queryClient.getQueryData<TaskDto>(taskKeys.detail(task.key));
+      await cancelTaskProjections(queryClient);
+      const previous = snapshotTaskProjections(queryClient, task);
       patchTaskEverywhere(queryClient, { ...task, ...stripControlFields(patch) });
-      return { previous, byId, byKey, task };
+      return { previous, task };
     },
     onError: (_error, _variables, context) => {
       if (!context) return;
-      restoreLists(queryClient, context.previous);
-      patchDetail(queryClient, context.task.id, context.byId);
-      patchDetail(queryClient, context.task.key, context.byKey);
+      restoreTaskProjections(queryClient, context.task, context.previous);
     },
     onSuccess: (updated) => patchTaskEverywhere(queryClient, updated),
-    onSettled: () => invalidateLists(queryClient),
+    onSettled: () => invalidateTaskProjections(queryClient),
   });
 }
 
@@ -211,15 +302,17 @@ function useTaskAction(
   return useMutation({
     mutationFn: send,
     onMutate: async (task: TaskDto) => {
-      await queryClient.cancelQueries({ queryKey: taskKeys.all });
-      const previous = snapshotLists(queryClient);
+      await cancelTaskProjections(queryClient);
+      const previous = snapshotTaskProjections(queryClient, task);
       patchTaskEverywhere(queryClient, guess(task));
-      return { previous };
+      return { previous, task };
     },
     onError: (_error, _task, context) => {
-      if (context) restoreLists(queryClient, context.previous);
+      if (context) {
+        restoreTaskProjections(queryClient, context.task, context.previous);
+      }
     },
     onSuccess: (task) => patchTaskEverywhere(queryClient, task),
-    onSettled: () => invalidateLists(queryClient),
+    onSettled: () => invalidateTaskProjections(queryClient),
   });
 }
