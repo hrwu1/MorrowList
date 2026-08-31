@@ -31,6 +31,19 @@ async function capture(page: Page, title: string) {
   await expect(page.getByRole("link", { name: title })).toBeVisible();
 }
 
+async function openFullInbox(page: Page) {
+  await page.getByRole("link", { name: "Open full Inbox" }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Inbox", exact: true }),
+  ).toBeVisible();
+}
+
+async function openHistoryView(page: Page, view: "Completed" | "Trash") {
+  await page.getByRole("link", { name: "History" }).click();
+  const history = page.getByRole("navigation", { name: "History views" });
+  await history.getByRole("link", { name: view }).click();
+}
+
 test("a new account lands in an empty Inbox", async ({ page }) => {
   await signUp(page);
 
@@ -63,7 +76,7 @@ test("captures a task, completes it, and reopens it", async ({ page }) => {
 
   await expect(list.getByRole("listitem")).toHaveCount(1);
 
-  await page.getByRole("link", { name: "Completed" }).click();
+  await openHistoryView(page, "Completed");
   const completed = page.getByRole("list", { name: "Completed tasks" });
   await expect(completed.getByText("Prepare research presentation")).toBeVisible();
 
@@ -72,7 +85,7 @@ test("captures a task, completes it, and reopens it", async ({ page }) => {
     .click();
   await expect(completed.getByRole("listitem")).toHaveCount(0);
 
-  await page.getByRole("link", { name: "Inbox" }).click();
+  await openFullInbox(page);
   await expect(list.getByRole("listitem")).toHaveCount(2);
 });
 
@@ -92,11 +105,12 @@ test("edits priority, due date, and description, and they survive a reload", asy
   await capture(page, "Write the summary");
 
   await page.getByRole("link", { name: "Write the summary" }).click();
-  const panel = page.getByRole("complementary");
+  const panel = page.getByRole("complementary", { name: /Task details for/ });
   await expect(panel).toBeVisible();
 
   await panel.getByLabel("Priority").selectOption("urgent");
   await panel.getByLabel("Due date").fill("2026-09-15");
+  await panel.locator("summary").filter({ hasText: "Description" }).click();
   await panel
     .getByLabel("Markdown")
     .fill("## Notes\n- **one** thing\n- <b>literal</b> html");
@@ -112,6 +126,7 @@ test("edits priority, due date, and description, and they survive a reload", asy
   await page.reload();
   await expect(panel.getByLabel("Priority")).toHaveValue("urgent");
   await expect(panel.getByLabel("Due date")).toHaveValue("2026-09-15");
+  await panel.locator("summary").filter({ hasText: "Description" }).click();
   await expect(panel.getByLabel("Markdown")).toHaveValue(/\*\*one\*\* thing/);
 });
 
@@ -122,7 +137,7 @@ test("a concurrent edit is reported as a conflict instead of overwriting", async
   await capture(page, "Contended task");
   await page.getByRole("link", { name: "Contended task" }).click();
 
-  const panel = page.getByRole("complementary");
+  const panel = page.getByRole("complementary", { name: /Task details for/ });
   await expect(panel.getByLabel("Title")).toHaveValue("Contended task");
 
   // Change the task behind the open panel, exactly as another device would.
@@ -162,14 +177,14 @@ test("deleting moves a task to Trash and restoring returns it to the Inbox", asy
     page.getByRole("heading", { name: "Your Inbox is clear" }),
   ).toBeVisible();
 
-  await page.getByRole("link", { name: "Trash" }).click();
+  await openHistoryView(page, "Trash");
   const trash = page.getByRole("list", { name: "Trash tasks" });
   await expect(trash.getByText("Deleted by mistake")).toBeVisible();
 
   await trash.getByRole("button", { name: "Restore Deleted by mistake" }).click();
   await expect(page.getByRole("heading", { name: "The Trash is empty" })).toBeVisible();
 
-  await page.getByRole("link", { name: "Inbox" }).click();
+  await openFullInbox(page);
   await expect(page.getByText("Deleted by mistake")).toBeVisible();
 });
 
@@ -186,6 +201,7 @@ test("a filtered view can be copied from the URL and reopened", async ({ page })
     .selectOption("urgent");
 
   const filters = page.getByRole("region", { name: "Filter and sort" });
+  await filters.locator("summary").click();
   await filters.getByLabel("Priority").selectOption("urgent");
   await expect(page).toHaveURL(/priority=urgent/);
 
@@ -216,13 +232,46 @@ test("an unauthenticated visitor is redirected to sign in", async ({ page }) => 
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 });
 
-test("the quick add field is reachable by keyboard shortcut", async ({ page }) => {
+test("global capture keeps keyboard focus predictable", async ({ page }) => {
   await signUp(page);
 
-  await page.getByRole("heading", { level: 1, name: "Inbox", exact: true }).click();
+  const inboxField = page.getByPlaceholder("Add a task and press Enter");
+  await inboxField.fill("Keep this task in context");
+  await inboxField.press("Enter");
+  await page.getByRole("link", { name: "Keep this task in context" }).click();
+  const panel = page.getByRole("complementary", { name: /Task details for/ });
+  await expect(panel).toBeVisible();
+
+  const trigger = page.getByRole("button", {
+    name: "Capture a new Inbox task",
+    exact: true,
+  });
+  await trigger.focus();
   await page.keyboard.press("n");
 
-  await expect(page.getByPlaceholder("Add a task and press Enter")).toBeFocused();
+  const tray = page.getByRole("dialog", { name: "Inbox" });
+  const field = tray.getByPlaceholder("Add a task and press Enter");
+  await expect(tray).toBeVisible();
+  await expect(field).toBeFocused();
+
+  await field.fill("draft");
+  await page.keyboard.press("n");
+  await expect(field).toHaveValue("draftn");
+
+  await page.keyboard.press("Escape");
+  await expect(tray).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await expect(panel).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const menuTrigger = page.locator('summary[aria-label="Open workspace navigation"]');
+  await menuTrigger.click();
+  await page.getByRole("button", { name: /Open Inbox tray, 1 open task/ }).click();
+  await expect(tray).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(tray).toHaveCount(0);
+  await expect(menuTrigger).toBeFocused();
+  await expect(panel).toBeVisible();
 });
 
 test("quick add can capture a priority and a due date in one go", async ({ page }) => {
