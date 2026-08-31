@@ -15,14 +15,14 @@ same versioned REST API, so anything you can do by clicking you can do from a sc
 
 ```bash
 corepack enable pnpm
-pnpm install
-cp .env.example .env          # set DATABASE_URL and AUTH_SECRET
-pnpm db:migrate
+pnpm setup:dev                # one-time setup; PostgreSQL must be running
 pnpm dev                      # http://localhost:3000
 ```
 
 Requires Node.js 24 and PostgreSQL 18. `docker compose -f infra/compose/docker-compose.yml up -d`
-starts a matching database if you prefer containers.
+starts a matching database if you prefer containers. `pnpm setup:dev` installs workspace
+dependencies, creates `.env` when needed, checks PostgreSQL, builds workspace packages,
+and applies migrations. It is safe to rerun and never replaces an existing `.env`.
 
 ## Repository layout
 

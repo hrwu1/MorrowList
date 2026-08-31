@@ -5,11 +5,13 @@
 Prerequisites: Node.js 24, pnpm (via `corepack enable pnpm`), and PostgreSQL 18.
 
 ```bash
-pnpm install
-cp .env.example .env          # then set DATABASE_URL and AUTH_SECRET
-pnpm db:migrate               # applies migrations from an empty database
+pnpm setup:dev                # one-time setup; safe to rerun
 pnpm dev                      # http://localhost:3000
 ```
+
+`pnpm setup:dev` installs workspace dependencies, creates `.env` from `.env.example`
+when absent, generates its local `AUTH_SECRET`, verifies PostgreSQL is reachable, builds
+workspace packages, and applies pending migrations. It preserves an existing `.env`.
 
 For PostgreSQL either run `docker compose -f infra/compose/docker-compose.yml up -d`, or
 install it natively and create three databases: one for development, one for the
