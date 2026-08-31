@@ -7,6 +7,16 @@ import type {
 export const BOARD_SORTS = ["manual", "due", "priority"] as const;
 export type BoardSort = (typeof BOARD_SORTS)[number];
 
+export const BOARD_STAGE_VIEWS = ["focus", "all"] as const;
+export type BoardStageView = (typeof BOARD_STAGE_VIEWS)[number];
+
+const CORE_BOARD_CATEGORIES = new Set<WorkflowStatusDto["category"]>([
+  "backlog",
+  "ready",
+  "in_progress",
+  "done",
+]);
+
 const PRIORITY_WEIGHT: Record<TaskDto["priority"], number> = {
   none: 0,
   low: 1,
@@ -18,6 +28,29 @@ const PRIORITY_WEIGHT: Record<TaskDto["priority"], number> = {
 export function readBoardSort(params: URLSearchParams): BoardSort {
   const requested = params.get("sort");
   return BOARD_SORTS.find((sort) => sort === requested) ?? "manual";
+}
+
+/** Empty exception lanes stay out of the way unless the user explicitly asks for them. */
+export function readBoardStageView(params: URLSearchParams): BoardStageView {
+  return params.get("show") === "all" ? "all" : "focus";
+}
+
+/**
+ * Keep the four everyday stages visible while never hiding work in Blocked or Review.
+ * Status order is preserved because it is the project's canonical workflow order.
+ */
+export function visibleBoardStatuses(
+  statuses: readonly WorkflowStatusDto[],
+  tasks: readonly TaskDto[],
+  stageView: BoardStageView,
+): WorkflowStatusDto[] {
+  if (stageView === "all") return [...statuses];
+
+  const occupiedStatusIds = new Set(tasks.map((task) => task.statusId));
+  return statuses.filter(
+    (status) =>
+      CORE_BOARD_CATEGORIES.has(status.category) || occupiedStatusIds.has(status.id),
+  );
 }
 
 /** JS relational comparison follows code-point order, matching the rank column's C collation. */

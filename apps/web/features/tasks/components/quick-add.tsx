@@ -1,8 +1,8 @@
 "use client";
 
 import type { CreateTaskRequest, Priority } from "@morrowlist/contracts";
-import { Alert, Button, TextInput, VisuallyHidden } from "@morrowlist/ui";
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { Alert, Button, TextInput } from "@morrowlist/ui";
+import { useId, useRef, useState, type FormEvent } from "react";
 
 import { useCreateTask } from "../hooks/use-tasks";
 
@@ -21,12 +21,14 @@ export interface QuickAddProps {
   readonly projectId?: string | undefined;
   readonly statusId?: string | undefined;
   readonly destinationLabel?: string | undefined;
+  readonly autoFocus?: boolean | undefined;
 }
 
 export function QuickAdd({
   projectId,
   statusId,
   destinationLabel,
+  autoFocus = false,
 }: QuickAddProps = {}) {
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<Priority>("none");
@@ -34,26 +36,12 @@ export function QuickAdd({
   const [showDetails, setShowDetails] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const detailsId = useId();
+  const id = useId();
+  const detailsId = `${id}-details`;
+  const titleId = `${id}-title`;
+  const priorityId = `${id}-priority`;
+  const dueId = `${id}-due`;
   const createTask = useCreateTask();
-
-  // "n" is the conventional new-task shortcut; it must not fire while typing elsewhere.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-      const typing =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.tagName === "SELECT" ||
-        target?.isContentEditable;
-      if (event.key === "n" && !typing && !event.metaKey && !event.ctrlKey) {
-        event.preventDefault();
-        inputRef.current?.focus();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -85,12 +73,13 @@ export function QuickAdd({
   return (
     <form className="quick-add" aria-label="Quick add" onSubmit={onSubmit}>
       <div className="quick-add__row">
-        <label htmlFor="quick-add-title">
-          <VisuallyHidden>Task title</VisuallyHidden>
+        <label className="ml-visually-hidden" htmlFor={titleId}>
+          Task title
         </label>
         <TextInput
-          id="quick-add-title"
+          id={titleId}
           ref={inputRef}
+          autoFocus={autoFocus}
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           placeholder={
@@ -121,20 +110,16 @@ export function QuickAdd({
       {showDetails ? (
         <div className="quick-add__details" id={detailsId}>
           <div className="quick-add__field">
-            <label className="ml-field__label" htmlFor="quick-add-priority">
+            <label className="ml-field__label" htmlFor={priorityId}>
               Priority
             </label>
-            <PrioritySelect
-              id="quick-add-priority"
-              value={priority}
-              onChange={setPriority}
-            />
+            <PrioritySelect id={priorityId} value={priority} onChange={setPriority} />
           </div>
           <div className="quick-add__field">
-            <label className="ml-field__label" htmlFor="quick-add-due">
+            <label className="ml-field__label" htmlFor={dueId}>
               Due date
             </label>
-            <DueDateInput id="quick-add-due" value={dueDate} onChange={setDueDate} />
+            <DueDateInput id={dueId} value={dueDate} onChange={setDueDate} />
           </div>
         </div>
       ) : null}

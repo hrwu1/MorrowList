@@ -8,6 +8,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -21,10 +22,13 @@ import { isMoveConflict, useMoveBoardTask, useProjectBoard } from "../hooks/use-
 import {
   placementChangesTask,
   placementForDrop,
+  readBoardStageView,
   readBoardSort,
   tasksInStatus,
+  visibleBoardStatuses,
   type BoardPlacement,
   type BoardSort,
+  type BoardStageView,
 } from "../lib/board-view";
 
 import { KanbanColumn } from "./kanban-column";
@@ -38,6 +42,16 @@ const SORT_LABELS: Record<BoardSort, string> = {
   priority: "Priority",
 };
 
+const boardCollisionDetection: CollisionDetection = (args) =>
+  closestCorners({
+    ...args,
+    // A sortable card is also a droppable target. Excluding the active card keeps
+    // empty-column drops from resolving back onto the card as it follows the pointer.
+    droppableContainers: args.droppableContainers.filter(
+      (container) => container.id !== args.active.id,
+    ),
+  });
+
 export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -45,6 +59,7 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   const board = useProjectBoard(projectId);
   const moveTask = useMoveBoardTask(projectId);
   const sort = readBoardSort(new URLSearchParams(searchParams.toString()));
+  const stageView = readBoardStageView(new URLSearchParams(searchParams.toString()));
   const selectedTaskKey = searchParams.get("task");
   const [mobileStatusId, setMobileStatusId] = useState<string | null>(null);
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
@@ -78,8 +93,14 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   );
   const tasks = response?.data.tasks ?? [];
   const defaultStatus = statuses.find((status) => status.isDefault) ?? statuses[0];
+  const visibleStatuses = useMemo(
+    () => visibleBoardStatuses(statuses, tasks, stageView),
+    [stageView, statuses, tasks],
+  );
   const selectedMobileStatus =
-    statuses.find((status) => status.id === mobileStatusId) ?? defaultStatus;
+    visibleStatuses.find((status) => status.id === mobileStatusId) ??
+    visibleStatuses.find((status) => status.id === defaultStatus?.id) ??
+    visibleStatuses[0];
   const activeTask = tasks.find((task) => task.id === activeTaskId) ?? null;
   const manuallyOrderedTasks = useMemo(
     () => statuses.flatMap((status) => tasksInStatus(tasks, status.id, "manual")),
@@ -90,6 +111,14 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
     const params = new URLSearchParams(searchParams.toString());
     if (next === "manual") params.delete("sort");
     else params.set("sort", next);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
+  function changeStageView(next: BoardStageView) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "focus") params.delete("show");
+    else params.set("show", next);
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
@@ -201,7 +230,7 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
         </div>
         {defaultStatus ? (
           <Button variant="primary" onClick={() => setShowQuickAdd((open) => !open)}>
-            {showQuickAdd ? "Close" : "+ New task"}
+            {showQuickAdd ? "Close" : `+ Add to ${defaultStatus.name}`}
           </Button>
         ) : null}
       </header>
@@ -216,28 +245,66 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
         </div>
       ) : null}
 
-      <div className="board-toolbar" aria-label="Board controls">
+      <section className="board-toolbar" aria-label="Board controls">
         <strong>Board</strong>
-        <span className="board-toolbar__hint" id="board-drag-hint">
-          {sort === "manual"
-            ? "Drag cards or press Space on a drag handle, then use arrow keys."
-            : "Drag is off while the board is automatically sorted. Move menus still work."}
-        </span>
-        <label className="board-toolbar__sort">
-          <span className="ml-visually-hidden">Sort board</span>
-          <Select
-            value={sort}
-            aria-label="Sort board"
-            onChange={(event) => changeSort(event.target.value as BoardSort)}
-          >
-            {Object.entries(SORT_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </Select>
-        </label>
-      </div>
+        <details className="view-disclosure board-toolbar__view">
+          <summary className="view-disclosure__summary">
+            <span className="view-disclosure__summary-label">View</span>
+            <span className="view-disclosure__chips">
+              <span
+                className="view-disclosure__chip"
+                data-active={sort !== "manual" || undefined}
+              >
+                {SORT_LABELS[sort]}
+              </span>
+              <span
+                className="view-disclosure__chip"
+                data-active={stageView === "all" || undefined}
+              >
+                {stageView === "all"
+                  ? "All stages"
+                  : `${visibleStatuses.length} of ${statuses.length} stages`}
+              </span>
+            </span>
+          </summary>
+          <div className="view-disclosure__panel board-toolbar__view-panel">
+            <label className="filters__control">
+              <span className="ml-field__label">Sort by</span>
+              <Select
+                value={sort}
+                aria-label="Sort board"
+                onChange={(event) => changeSort(event.target.value as BoardSort)}
+              >
+                {Object.entries(SORT_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <label className="filters__control">
+              <span className="ml-field__label">Stages</span>
+              <Select
+                value={stageView}
+                aria-label="Stages shown"
+                onChange={(event) =>
+                  changeStageView(event.target.value as BoardStageView)
+                }
+              >
+                <option value="focus">Focused stages</option>
+                <option value="all">All stages</option>
+              </Select>
+            </label>
+            <p className="board-toolbar__hint" id="board-drag-hint">
+              {sort === "manual"
+                ? "Drag cards or press Space on a drag handle, then use arrow keys."
+                : "Drag is off while automatically sorted. Move menus still work."}
+              <br />
+              Blocked and Review appear automatically when they contain work.
+            </p>
+          </div>
+        </details>
+      </section>
 
       {board.data.page.truncated ? (
         <Alert tone="info" title="Showing the first 500 cards">
@@ -299,7 +366,7 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
                 value={selectedMobileStatus?.id ?? ""}
                 onChange={(event) => setMobileStatusId(event.target.value)}
               >
-                {statuses.map((status) => (
+                {visibleStatuses.map((status) => (
                   <option key={status.id} value={status.id}>
                     {status.name} · {tasksInStatus(tasks, status.id, sort).length}
                   </option>
@@ -309,13 +376,13 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
 
             <DndContext
               sensors={sensors}
-              collisionDetection={closestCorners}
+              collisionDetection={boardCollisionDetection}
               onDragStart={onDragStart}
               onDragCancel={() => setActiveTaskId(null)}
               onDragEnd={onDragEnd}
             >
               <div className="kanban-board" aria-label={`${project.name} board`}>
-                {statuses.map((status) => (
+                {visibleStatuses.map((status) => (
                   <KanbanColumn
                     key={status.id}
                     status={status}

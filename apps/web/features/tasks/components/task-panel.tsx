@@ -21,12 +21,30 @@ export function TaskPanel({
   const container = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    container.current?.focus();
+    const panel = container.current;
+    panel?.focus({ preventScroll: true });
+    if (panel && window.matchMedia("(max-width: 59.99rem)").matches) {
+      // Next restores `scroll: false` after a route-query change. Let that settle before
+      // positioning a stacked mobile panel, otherwise only its top border peeks onscreen.
+      let settleFrame = 0;
+      const layoutFrame = window.requestAnimationFrame(() => {
+        settleFrame = window.requestAnimationFrame(() => {
+          panel.scrollIntoView({ block: "start" });
+        });
+      });
+      return () => {
+        window.cancelAnimationFrame(layoutFrame);
+        window.cancelAnimationFrame(settleFrame);
+      };
+    }
+    return undefined;
   }, [idOrKey]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape" && !document.querySelector("dialog[open]")) {
+        onClose();
+      }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);

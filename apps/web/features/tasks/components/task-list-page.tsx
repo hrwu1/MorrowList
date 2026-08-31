@@ -115,6 +115,7 @@ export function TaskListPage({
 
         <TaskFilters
           view={view}
+          base={base}
           onChange={changeView}
           showCompletion={scope === "inbox"}
           resultCount={tasks.length}

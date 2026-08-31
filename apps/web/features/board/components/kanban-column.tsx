@@ -35,12 +35,17 @@ export function KanbanColumn({
   });
   const overLimit = status.wipLimit !== null && tasks.length > status.wipLimit;
   const atLimit = status.wipLimit !== null && tasks.length === status.wipLimit;
+  const exceptionStage = status.category === "blocked" || status.category === "review";
 
   return (
     <section
       ref={setNodeRef}
       className="kanban-column"
       data-category={status.category}
+      data-core-stage={!exceptionStage || undefined}
+      data-exception-stage={exceptionStage || undefined}
+      data-revealed={exceptionStage || undefined}
+      data-occupied={tasks.length > 0 || undefined}
       data-drop-target={isOver || undefined}
       data-wip-over={overLimit || undefined}
       data-mobile-active={mobileActive || undefined}

@@ -342,57 +342,60 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
         </Field>
       </div>
 
-      <section aria-labelledby={fieldId("description-heading")} className="stack-tight">
-        <div className="task-detail__section-header">
-          <h3
-            id={fieldId("description-heading")}
-            className="task-detail__section-title"
-          >
-            Description
-          </h3>
-          <Button
-            variant="ghost"
-            aria-pressed={showPreview}
-            onClick={() => setShowPreview((current) => !current)}
-          >
-            {showPreview ? "Hide preview" : "Show preview"}
-          </Button>
-        </div>
-
-        <label className="ml-field__label" htmlFor={fieldId("description")}>
-          Markdown
-        </label>
-        <TextArea
-          id={fieldId("description")}
-          value={draft.descriptionMd}
-          rows={6}
-          maxLength={50_000}
-          disabled={!editable}
-          aria-describedby={fieldId("description-hint")}
-          onChange={(event) =>
-            edit(
-              { descriptionMd: event.target.value },
-              { descriptionMd: event.target.value === "" ? null : event.target.value },
-              false,
-            )
-          }
-          onBlur={flush}
-        />
-        <p className="ml-field__hint" id={fieldId("description-hint")}>
-          Markdown is supported. HTML is shown as text, never rendered.
-        </p>
-
-        {showPreview ? (
-          <div className="task-detail__preview">
-            <h4 className="task-detail__preview-title">Preview</h4>
-            {draft.descriptionMd.trim().length > 0 ? (
-              <Markdown source={draft.descriptionMd} />
-            ) : (
-              <p className="task-detail__hint">Nothing to preview yet.</p>
-            )}
+      <details className="task-detail__disclosure">
+        <summary className="task-detail__disclosure-summary">
+          <span>Description</span>
+          <span className="task-detail__hint">
+            {draft.descriptionMd.trim().length > 0 ? "Notes added" : "Markdown notes"}
+          </span>
+        </summary>
+        <div className="task-detail__disclosure-body stack-tight">
+          <div className="task-detail__section-header">
+            <label className="ml-field__label" htmlFor={fieldId("description")}>
+              Markdown
+            </label>
+            <Button
+              variant="ghost"
+              aria-pressed={showPreview}
+              onClick={() => setShowPreview((current) => !current)}
+            >
+              {showPreview ? "Hide preview" : "Show preview"}
+            </Button>
           </div>
-        ) : null}
-      </section>
+          <TextArea
+            id={fieldId("description")}
+            value={draft.descriptionMd}
+            rows={6}
+            maxLength={50_000}
+            disabled={!editable}
+            aria-describedby={fieldId("description-hint")}
+            onChange={(event) =>
+              edit(
+                { descriptionMd: event.target.value },
+                {
+                  descriptionMd: event.target.value === "" ? null : event.target.value,
+                },
+                false,
+              )
+            }
+            onBlur={flush}
+          />
+          <p className="ml-field__hint" id={fieldId("description-hint")}>
+            Markdown is supported. HTML is shown as text, never rendered.
+          </p>
+
+          {showPreview ? (
+            <div className="task-detail__preview">
+              <h4 className="task-detail__preview-title">Preview</h4>
+              {draft.descriptionMd.trim().length > 0 ? (
+                <Markdown source={draft.descriptionMd} />
+              ) : (
+                <p className="task-detail__hint">Nothing to preview yet.</p>
+              )}
+            </div>
+          ) : null}
+        </div>
+      </details>
 
       {variant === "panel" ? (
         <p className="task-detail__hint">
@@ -402,25 +405,25 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
         </p>
       ) : null}
 
-      <section aria-labelledby={fieldId("danger-heading")} className="stack-tight">
-        <h3 id={fieldId("danger-heading")} className="task-detail__section-title">
-          Danger zone
-        </h3>
-        {editable ? (
-          <div className="button-row">
-            <Button
-              variant="danger"
-              loading={remove.isPending}
-              onClick={() => remove.mutate(task)}
-            >
-              Move to Trash
-            </Button>
-            <span className="task-detail__hint">
-              Deleted tasks stay in the Trash and can be restored.
-            </span>
+      {editable ? (
+        <details className="task-detail__disclosure task-detail__disclosure--danger">
+          <summary className="task-detail__disclosure-summary">More actions</summary>
+          <div className="task-detail__disclosure-body">
+            <div className="button-row">
+              <Button
+                variant="danger"
+                loading={remove.isPending}
+                onClick={() => remove.mutate(task)}
+              >
+                Move to Trash
+              </Button>
+              <span className="task-detail__hint">
+                Deleted tasks stay in the Trash and can be restored.
+              </span>
+            </div>
           </div>
-        ) : null}
-      </section>
+        </details>
+      ) : null}
     </div>
   );
 }

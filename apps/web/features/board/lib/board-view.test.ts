@@ -9,9 +9,11 @@ import {
   moveTaskInBoard,
   placementChangesTask,
   placementForDrop,
+  readBoardStageView,
   readBoardSort,
   sortBoardTasks,
   tasksInStatus,
+  visibleBoardStatuses,
 } from "./board-view";
 
 const BASE_TASK: TaskDto = {
@@ -41,6 +43,10 @@ const BASE_TASK: TaskDto = {
 
 const READY = "0198f0a0-0000-7000-8000-000000000030";
 const DONE = "0198f0a0-0000-7000-8000-000000000031";
+const BACKLOG = "0198f0a0-0000-7000-8000-000000000032";
+const IN_PROGRESS = "0198f0a0-0000-7000-8000-000000000033";
+const BLOCKED = "0198f0a0-0000-7000-8000-000000000034";
+const REVIEW = "0198f0a0-0000-7000-8000-000000000035";
 const task = (id: string, overrides: Partial<TaskDto> = {}): TaskDto => ({
   ...BASE_TASK,
   id,
@@ -68,9 +74,50 @@ const status = (
 });
 
 describe("board view", () => {
-  it("falls back to manual sort for unknown URL values", () => {
+  it("reads known board URL choices and safely ignores unknown values", () => {
     expect(readBoardSort(new URLSearchParams("sort=surprise"))).toBe("manual");
     expect(readBoardSort(new URLSearchParams("sort=due"))).toBe("due");
+    expect(readBoardSort(new URLSearchParams("sort=priority"))).toBe("priority");
+    expect(readBoardStageView(new URLSearchParams())).toBe("focus");
+    expect(readBoardStageView(new URLSearchParams("show=surprise"))).toBe("focus");
+    expect(readBoardStageView(new URLSearchParams("show=ALL"))).toBe("focus");
+    expect(readBoardStageView(new URLSearchParams("show=all"))).toBe("all");
+  });
+
+  it("keeps the four core stages and reveals only occupied exception stages", () => {
+    const statuses = [
+      status(BACKLOG, { name: "Backlog", category: "backlog" }),
+      status(READY),
+      status(IN_PROGRESS, { name: "In Progress", category: "in_progress" }),
+      status(BLOCKED, { name: "Blocked", category: "blocked" }),
+      status(REVIEW, { name: "In Review", category: "review" }),
+      status(DONE, { name: "Done", category: "done", isTerminal: true }),
+    ];
+
+    expect(
+      visibleBoardStatuses(statuses, [], "focus").map(({ category }) => category),
+    ).toEqual(["backlog", "ready", "in_progress", "done"]);
+
+    const exceptionTasks = [
+      task("0198f0a0-0000-7000-8000-000000000006", { statusId: BLOCKED }),
+      task("0198f0a0-0000-7000-8000-000000000007", { statusId: REVIEW }),
+    ];
+    expect(
+      visibleBoardStatuses(statuses, exceptionTasks, "focus").map(
+        ({ category }) => category,
+      ),
+    ).toEqual(["backlog", "ready", "in_progress", "blocked", "review", "done"]);
+  });
+
+  it("shows every stage on request without changing workflow order", () => {
+    const statuses = [
+      status(BACKLOG, { name: "Backlog", category: "backlog" }),
+      status(BLOCKED, { name: "Blocked", category: "blocked" }),
+      status(REVIEW, { name: "In Review", category: "review" }),
+      status(DONE, { name: "Done", category: "done", isTerminal: true }),
+    ];
+
+    expect(visibleBoardStatuses(statuses, [], "all")).toEqual(statuses);
   });
 
   it("keeps manual order and applies the two automatic sorts", () => {

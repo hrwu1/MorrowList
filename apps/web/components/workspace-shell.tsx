@@ -1,0 +1,746 @@
+"use client";
+
+import type { ProjectDto, TaskDto } from "@morrowlist/contracts";
+import { Alert, Button, Spinner } from "@morrowlist/ui";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type SVGProps,
+} from "react";
+
+import { useProjects } from "@/features/projects/hooks/use-projects";
+import { QuickAdd } from "@/features/tasks/components/quick-add";
+import { useAssignInboxTask, useTaskList } from "@/features/tasks/hooks/use-tasks";
+import { authClient } from "@/lib/auth-client";
+
+export interface WorkspaceUser {
+  readonly email: string;
+  readonly name: string | null;
+}
+
+/**
+ * The authenticated product frame. Capture and live project work lead the hierarchy;
+ * history, project setup, and account actions remain one deliberate step away.
+ */
+export function WorkspaceShell({
+  children,
+  user,
+}: {
+  readonly children: ReactNode;
+  readonly user: WorkspaceUser;
+}) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const projects = useProjects();
+  const inbox = useTaskList({
+    inbox: true,
+    isCompleted: false,
+    sort: "rank",
+    order: "asc",
+    limit: 200,
+  });
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const restoreFocusTo = useRef<HTMLElement | null>(null);
+
+  const inboxCount = inbox.data?.data.length ?? 0;
+  const inboxUnavailable = inbox.isError && !inbox.data;
+  const projectsUnavailable = projects.isError && !projects.data;
+  const inboxCountLabel = inboxUnavailable
+    ? "!"
+    : `${inboxCount}${inbox.data?.page.hasMore ? "+" : ""}`;
+
+  function openInbox() {
+    restoreFocusTo.current = document.activeElement as HTMLElement | null;
+    setInboxOpen(true);
+  }
+
+  function closeInbox() {
+    setInboxOpen(false);
+    window.requestAnimationFrame(() => restoreFocusTo.current?.focus());
+  }
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const typing =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.tagName === "SELECT" ||
+        target?.isContentEditable;
+      if (
+        inboxOpen ||
+        event.key.toLowerCase() !== "n" ||
+        typing ||
+        event.metaKey ||
+        event.ctrlKey
+      ) {
+        return;
+      }
+      event.preventDefault();
+      openInbox();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [inboxOpen]);
+
+  async function signOut() {
+    await authClient.signOut();
+    router.push("/sign-in");
+    router.refresh();
+  }
+
+  const projectItems = projects.data?.data ?? [];
+  const historyCurrent = pathname === "/completed" || pathname === "/trash";
+
+  return (
+    <div className="app-shell">
+      <aside className="workspace-sidebar" aria-label="Workspace">
+        <Brand />
+
+        <button
+          type="button"
+          className="workspace-capture"
+          aria-label="Capture a new Inbox task"
+          onClick={openInbox}
+        >
+          <Icon name="plus" />
+          <span>New task</span>
+          <kbd aria-hidden="true">N</kbd>
+        </button>
+
+        <nav className="workspace-nav" aria-label="Primary">
+          <div className="workspace-inbox-link">
+            <button
+              type="button"
+              className="workspace-nav__link workspace-nav__link--button"
+              aria-label={
+                inboxUnavailable
+                  ? "Open Inbox tray, Inbox unavailable"
+                  : `Open Inbox tray, ${inboxCountLabel} task${inboxCount === 1 ? "" : "s"}`
+              }
+              data-current={pathname === "/inbox" || undefined}
+              onClick={openInbox}
+            >
+              <Icon name="inbox" />
+              <span>Inbox</span>
+              <span className="workspace-nav__count" aria-hidden="true">
+                {inbox.isPending ? "·" : inboxCountLabel}
+              </span>
+            </button>
+            <Link
+              className="workspace-inbox-link__full"
+              href="/inbox"
+              aria-label="Open full Inbox"
+              title="Open full Inbox"
+            >
+              <Icon name="arrow-up-right" />
+            </Link>
+          </div>
+
+          <div className="workspace-nav__section">
+            <div className="workspace-nav__label">Projects</div>
+            <ProjectLinks
+              projects={projectItems}
+              pending={projects.isPending}
+              error={projectsUnavailable}
+              pathname={pathname}
+              onRetry={() => void projects.refetch()}
+            />
+          </div>
+
+          <Link
+            className="workspace-nav__link"
+            href="/completed"
+            aria-current={pathname === "/completed" ? "page" : undefined}
+            data-current={historyCurrent || undefined}
+          >
+            <Icon name="history" />
+            <span>History</span>
+          </Link>
+        </nav>
+
+        <div className="workspace-sidebar__utilities">
+          <Link
+            className="workspace-nav__link workspace-nav__link--quiet"
+            href="/projects"
+            aria-current={pathname === "/projects" ? "page" : undefined}
+          >
+            <Icon name="settings" />
+            <span>Manage projects</span>
+          </Link>
+
+          <details className="workspace-account" key={`account-${pathname}`}>
+            <summary>
+              <UserMark user={user} />
+              <span className="workspace-account__identity">
+                <strong>{user.name ?? "Your account"}</strong>
+                <span>{user.email}</span>
+              </span>
+              <Icon name="chevron-up" />
+            </summary>
+            <div className="workspace-account__menu">
+              <button type="button" onClick={() => void signOut()}>
+                <Icon name="sign-out" />
+                Sign out
+              </button>
+            </div>
+          </details>
+        </div>
+      </aside>
+
+      <MobileHeader
+        inboxCount={inboxCountLabel}
+        inboxUnavailable={inboxUnavailable}
+        pathname={pathname}
+        projects={projectItems}
+        projectsPending={projects.isPending}
+        projectsError={projectsUnavailable}
+        user={user}
+        onCapture={openInbox}
+        onProjectsRetry={() => void projects.refetch()}
+        onSignOut={() => void signOut()}
+      />
+
+      <main id="main" className="app-shell__main">
+        {children}
+      </main>
+
+      {inboxOpen ? (
+        <InboxTray
+          tasks={inbox.data?.data ?? []}
+          projects={projectItems}
+          tasksPending={inbox.isPending}
+          tasksError={inbox.isError ? inbox.error : null}
+          projectsPending={projects.isPending}
+          projectsError={projectsUnavailable}
+          hasMore={inbox.data?.page.hasMore ?? false}
+          onRetry={() => void inbox.refetch()}
+          onDismiss={closeInbox}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function Brand() {
+  return (
+    <Link className="workspace-brand" href="/inbox" aria-label="MorrowList home">
+      <span className="workspace-brand__mark" aria-hidden="true">
+        <span />
+        <span />
+      </span>
+      <span>MorrowList</span>
+    </Link>
+  );
+}
+
+function ProjectLinks({
+  projects,
+  pending,
+  error,
+  pathname,
+  onNavigate,
+  onRetry,
+}: {
+  readonly projects: readonly ProjectDto[];
+  readonly pending: boolean;
+  readonly error: boolean;
+  readonly pathname: string;
+  readonly onNavigate?: (() => void) | undefined;
+  readonly onRetry: () => void;
+}) {
+  if (pending) {
+    return (
+      <div className="workspace-projects__pending" aria-label="Loading projects">
+        <span />
+        <span />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="workspace-projects__error" role="status">
+        <span>Projects unavailable</span>
+        <button type="button" onClick={onRetry}>
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (projects.length === 0) {
+    return (
+      <Link
+        className="workspace-projects__empty"
+        href="/projects"
+        {...(onNavigate ? { onClick: onNavigate } : {})}
+      >
+        Create your first project
+      </Link>
+    );
+  }
+
+  return (
+    <ul className="workspace-projects">
+      {projects.map((project) => {
+        const href = `/projects/${project.id}/board`;
+        const current = pathname === href;
+        return (
+          <li key={project.id}>
+            <Link
+              className="workspace-project-link"
+              href={href}
+              aria-current={current ? "page" : undefined}
+              {...(onNavigate ? { onClick: onNavigate } : {})}
+            >
+              <span className="workspace-project-link__mark" aria-hidden="true" />
+              <span>{project.name}</span>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function MobileHeader({
+  inboxCount,
+  inboxUnavailable,
+  pathname,
+  projects,
+  projectsPending,
+  projectsError,
+  user,
+  onCapture,
+  onProjectsRetry,
+  onSignOut,
+}: {
+  readonly inboxCount: string;
+  readonly inboxUnavailable: boolean;
+  readonly pathname: string;
+  readonly projects: readonly ProjectDto[];
+  readonly projectsPending: boolean;
+  readonly projectsError: boolean;
+  readonly user: WorkspaceUser;
+  readonly onCapture: () => void;
+  readonly onProjectsRetry: () => void;
+  readonly onSignOut: () => void;
+}) {
+  const menuRef = useRef<HTMLDetailsElement>(null);
+
+  function closeMenu() {
+    menuRef.current?.removeAttribute("open");
+  }
+
+  useEffect(() => {
+    function onPointerDown(event: PointerEvent) {
+      const menu = menuRef.current;
+      if (menu?.open && !menu.contains(event.target as Node)) closeMenu();
+    }
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => window.removeEventListener("pointerdown", onPointerDown);
+  }, []);
+
+  return (
+    <header className="workspace-mobile-header">
+      <Brand />
+      <button
+        type="button"
+        className="workspace-mobile-header__capture"
+        aria-label="Capture a new Inbox task"
+        onClick={onCapture}
+      >
+        <Icon name="plus" />
+      </button>
+      <details
+        ref={menuRef}
+        className="workspace-mobile-menu"
+        key={`mobile-${pathname}`}
+        onKeyDown={(event) => {
+          if (event.key !== "Escape") return;
+          event.preventDefault();
+          event.stopPropagation();
+          closeMenu();
+          menuRef.current?.querySelector("summary")?.focus();
+        }}
+      >
+        <summary aria-label="Open workspace navigation">
+          <Icon name="menu" />
+        </summary>
+        <div className="workspace-mobile-menu__panel">
+          <div className="workspace-mobile-menu__topline">
+            <span>Workspace</span>
+            <UserMark user={user} />
+          </div>
+          <button
+            type="button"
+            className="workspace-mobile-inbox"
+            aria-label={
+              inboxUnavailable
+                ? "Open Inbox tray, Inbox unavailable"
+                : `Open Inbox tray, ${inboxCount} open tasks`
+            }
+            onClick={() => {
+              const menuTrigger =
+                menuRef.current?.querySelector<HTMLElement>("summary");
+              closeMenu();
+              menuTrigger?.focus();
+              onCapture();
+            }}
+          >
+            <Icon name="inbox" />
+            <span>Inbox</span>
+            <span>{inboxCount}</span>
+          </button>
+          <Link
+            className="workspace-mobile-full-inbox"
+            href="/inbox"
+            onClick={closeMenu}
+          >
+            Open full Inbox
+          </Link>
+          <nav aria-label="Mobile workspace">
+            <div className="workspace-nav__label">Projects</div>
+            <ProjectLinks
+              projects={projects}
+              pending={projectsPending}
+              error={projectsError}
+              pathname={pathname}
+              onNavigate={closeMenu}
+              onRetry={onProjectsRetry}
+            />
+            <Link
+              className="workspace-nav__link"
+              href="/completed"
+              aria-current={pathname === "/completed" ? "page" : undefined}
+              data-current={
+                pathname === "/completed" || pathname === "/trash" || undefined
+              }
+              onClick={closeMenu}
+            >
+              <Icon name="history" />
+              History
+            </Link>
+            <Link
+              className="workspace-nav__link workspace-nav__link--quiet"
+              href="/projects"
+              aria-current={pathname === "/projects" ? "page" : undefined}
+              onClick={closeMenu}
+            >
+              <Icon name="settings" />
+              Manage projects
+            </Link>
+          </nav>
+          <button
+            type="button"
+            className="workspace-mobile-signout"
+            onClick={onSignOut}
+          >
+            <Icon name="sign-out" />
+            Sign out
+          </button>
+        </div>
+      </details>
+    </header>
+  );
+}
+
+function InboxTray({
+  tasks,
+  projects,
+  tasksPending,
+  tasksError,
+  projectsPending,
+  projectsError,
+  hasMore,
+  onRetry,
+  onDismiss,
+}: {
+  readonly tasks: readonly TaskDto[];
+  readonly projects: readonly ProjectDto[];
+  readonly tasksPending: boolean;
+  readonly tasksError: Error | null;
+  readonly projectsPending: boolean;
+  readonly projectsError: boolean;
+  readonly hasMore: boolean;
+  readonly onRetry: () => void;
+  readonly onDismiss: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const assign = useAssignInboxTask();
+  const [announcement, setAnnouncement] = useState("");
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog?.open) dialog?.showModal();
+    const focusFrame = window.requestAnimationFrame(() => {
+      dialog
+        ?.querySelector<HTMLInputElement>('form[aria-label="Quick add"] input')
+        ?.focus();
+    });
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      if (dialog?.open) dialog.close();
+    };
+  }, []);
+
+  const projectById = useMemo(
+    () => new Map(projects.map((project) => [project.id, project.name])),
+    [projects],
+  );
+
+  function focusAfterAssignment(previousIndex: number) {
+    window.requestAnimationFrame(() => {
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      const remaining = Array.from(
+        dialog.querySelectorAll<HTMLSelectElement>(
+          "select[data-inbox-assignment]:not(:disabled)",
+        ),
+      );
+      const next = remaining[Math.min(previousIndex, remaining.length - 1)];
+      const capture = dialog.querySelector<HTMLInputElement>(
+        'form[aria-label="Quick add"] input',
+      );
+      (next ?? capture ?? dialog.querySelector<HTMLElement>("button"))?.focus();
+    });
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="inbox-tray"
+      aria-labelledby="inbox-tray-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        onDismiss();
+      }}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onDismiss();
+      }}
+    >
+      <div className="inbox-tray__surface">
+        <header className="inbox-tray__header">
+          <div>
+            <p className="inbox-tray__eyebrow">Capture</p>
+            <h2 id="inbox-tray-title">Inbox</h2>
+            <p>Catch it now. Decide where it belongs when you are ready.</p>
+          </div>
+          <button
+            type="button"
+            className="inbox-tray__close"
+            aria-label="Close Inbox"
+            onClick={onDismiss}
+          >
+            <Icon name="close" />
+          </button>
+        </header>
+
+        <div className="inbox-tray__capture">
+          <QuickAdd autoFocus />
+        </div>
+
+        <div className="inbox-tray__section-header">
+          <div>
+            <h3>Ready to sort</h3>
+            <span>
+              {tasks.length}
+              {hasMore ? "+" : ""} open
+            </span>
+          </div>
+          <Link href="/inbox" onClick={onDismiss}>
+            Open full Inbox
+          </Link>
+        </div>
+
+        <div className="inbox-tray__content">
+          {tasksPending ? (
+            <div className="inbox-tray__state">
+              <Spinner label="Loading Inbox" />
+            </div>
+          ) : tasksError ? (
+            <Alert tone="error" title="Inbox could not be loaded">
+              <p>{tasksError.message}</p>
+              <Button onClick={onRetry}>Try again</Button>
+            </Alert>
+          ) : tasks.length === 0 ? (
+            <div className="inbox-tray__empty">
+              <span className="inbox-tray__empty-mark" aria-hidden="true">
+                <Icon name="check" />
+              </span>
+              <h3>Nothing waiting</h3>
+              <p>Your Inbox is clear. New thoughts will land right here.</p>
+            </div>
+          ) : (
+            <ul className="inbox-tray__tasks" aria-label="Inbox tray tasks">
+              {tasks.map((task, taskIndex) => {
+                const assigning =
+                  assign.isPending && assign.variables?.task.id === task.id;
+                return (
+                  <li
+                    key={task.id}
+                    className="inbox-tray-task"
+                    data-busy={assigning || undefined}
+                  >
+                    <div className="inbox-tray-task__body">
+                      <Link
+                        href={`/inbox?task=${encodeURIComponent(task.key)}`}
+                        onClick={onDismiss}
+                      >
+                        {task.title}
+                      </Link>
+                      <span>
+                        <span>{task.key}</span>
+                        {task.priority !== "none" ? (
+                          <span>{sentenceCase(task.priority)}</span>
+                        ) : null}
+                        {task.dueDate ? <span>Due {task.dueDate}</span> : null}
+                      </span>
+                    </div>
+                    <label>
+                      <span className="ml-visually-hidden">
+                        Send {task.title} to project
+                      </span>
+                      <select
+                        className="inbox-tray-task__project"
+                        data-inbox-assignment
+                        value=""
+                        disabled={assigning || projectsPending || projects.length === 0}
+                        onChange={(event) => {
+                          const projectId = event.target.value;
+                          if (!projectId) return;
+                          const projectName = projectById.get(projectId) ?? "project";
+                          assign.mutate(
+                            { task, projectId },
+                            {
+                              onSuccess: () => {
+                                setAnnouncement(
+                                  `Sent ${task.title} to ${projectName}.`,
+                                );
+                                focusAfterAssignment(taskIndex);
+                              },
+                            },
+                          );
+                        }}
+                      >
+                        <option value="">
+                          {assigning ? "Sending…" : "Send to project…"}
+                        </option>
+                        {projects.map((project) => (
+                          <option key={project.id} value={project.id}>
+                            {project.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {projectsError ? (
+          <p className="inbox-tray__project-note">
+            Projects are unavailable right now. Capture still works; try sorting later.
+          </p>
+        ) : !projectsPending && projects.length === 0 && tasks.length > 0 ? (
+          <p className="inbox-tray__project-note">
+            <Link href="/projects" onClick={onDismiss}>
+              Create a project
+            </Link>{" "}
+            before sorting these tasks into a flow.
+          </p>
+        ) : null}
+
+        {assign.isError ? (
+          <Alert tone="error">
+            The task could not be sent. It is still in your Inbox.
+          </Alert>
+        ) : null}
+        <output className="ml-visually-hidden" aria-live="polite">
+          {announcement}
+        </output>
+      </div>
+    </dialog>
+  );
+}
+
+function UserMark({ user }: { readonly user: WorkspaceUser }) {
+  const label = user.name ?? user.email;
+  return (
+    <span className="workspace-user-mark" aria-hidden="true">
+      {label.trim().slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
+
+function sentenceCase(value: string): string {
+  return `${value.charAt(0).toUpperCase()}${value.slice(1).replaceAll("_", " ")}`;
+}
+
+type IconName =
+  | "arrow-up-right"
+  | "check"
+  | "chevron-up"
+  | "close"
+  | "history"
+  | "inbox"
+  | "menu"
+  | "plus"
+  | "settings"
+  | "sign-out";
+
+function Icon({
+  name,
+  ...props
+}: SVGProps<SVGSVGElement> & { readonly name: IconName }) {
+  const paths: Record<IconName, ReactNode> = {
+    "arrow-up-right": <path d="M7 17 17 7M8 7h9v9" />,
+    check: <path d="m5 12 4 4L19 6" />,
+    "chevron-up": <path d="m6 15 6-6 6 6" />,
+    close: <path d="M6 6l12 12M18 6 6 18" />,
+    history: (
+      <>
+        <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+        <path d="M3 3v5h5M12 7v5l3 2" />
+      </>
+    ),
+    inbox: (
+      <>
+        <path d="M4 5h16v14H4z" />
+        <path d="M4 14h4l2 2h4l2-2h4" />
+      </>
+    ),
+    menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+    plus: <path d="M12 5v14M5 12h14" />,
+    settings: (
+      <>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H3v-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" />
+      </>
+    ),
+    "sign-out": <path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10" />,
+  };
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      {paths[name]}
+    </svg>
+  );
+}

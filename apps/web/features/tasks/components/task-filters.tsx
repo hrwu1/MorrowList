@@ -56,6 +56,8 @@ const COMPLETION_LABELS: Record<Completion, string> = {
 
 export interface TaskFiltersProps {
   readonly view: TaskView;
+  /** The route's clean state. Completed and Trash intentionally use different defaults. */
+  readonly base?: TaskView | undefined;
   readonly onChange: (view: TaskView) => void;
   /** Completed and Trash fix the completion state, so the control would be a lie there. */
   readonly showCompletion?: boolean | undefined;
@@ -64,129 +66,168 @@ export interface TaskFiltersProps {
 
 export function TaskFilters({
   view,
+  base = DEFAULT_VIEW,
   onChange,
   showCompletion = true,
   resultCount,
 }: TaskFiltersProps) {
   const id = useId();
   const isDefault =
-    view.priority === DEFAULT_VIEW.priority &&
-    view.due === DEFAULT_VIEW.due &&
-    view.sort === DEFAULT_VIEW.sort &&
-    view.order === DEFAULT_VIEW.order &&
-    (!showCompletion || view.completion === DEFAULT_VIEW.completion);
+    view.priority === base.priority &&
+    view.due === base.due &&
+    view.sort === base.sort &&
+    view.order === base.order &&
+    (!showCompletion || view.completion === base.completion);
+  const activeChoices = [
+    ...(view.priority === base.priority
+      ? []
+      : [
+          view.priority === "any"
+            ? "Any priority"
+            : `${PRIORITY_LABELS[view.priority]} priority`,
+        ]),
+    ...(view.due === base.due
+      ? []
+      : [view.due === "any" ? "Any due date" : DUE_LABELS[view.due]]),
+    ...(!showCompletion || view.completion === base.completion
+      ? []
+      : [COMPLETION_LABELS[view.completion]]),
+    ...(view.sort === base.sort ? [] : [SORT_LABELS[view.sort]]),
+    ...(view.order === base.order ? [] : [ORDER_LABELS[view.order]]),
+  ];
 
   return (
     <section className="filters" aria-label="Filter and sort">
-      <div className="filters__control">
-        <label className="ml-field__label" htmlFor={`${id}-priority`}>
-          Priority
-        </label>
-        <Select
-          id={`${id}-priority`}
-          value={view.priority}
-          onChange={(event) =>
-            onChange({ ...view, priority: event.target.value as Priority | "any" })
-          }
-        >
-          <option value="any">Any priority</option>
-          {PRIORITIES.map((priority) => (
-            <option key={priority} value={priority}>
-              {PRIORITY_LABELS[priority]}
-            </option>
-          ))}
-        </Select>
-      </div>
+      <details className="view-disclosure">
+        <summary className="view-disclosure__summary">
+          <span className="view-disclosure__summary-label">View</span>
+          <span className="view-disclosure__chips">
+            {activeChoices.length === 0 ? (
+              <span className="view-disclosure__chip">Default</span>
+            ) : (
+              activeChoices.map((choice) => (
+                <span className="view-disclosure__chip" data-active key={choice}>
+                  {choice}
+                </span>
+              ))
+            )}
+            {/* Announces list changes even while the controls are collapsed. */}
+            <output className="view-disclosure__count" aria-live="polite">
+              {resultCount} {resultCount === 1 ? "task" : "tasks"}
+            </output>
+          </span>
+        </summary>
 
-      <div className="filters__control">
-        <label className="ml-field__label" htmlFor={`${id}-due`}>
-          Due
-        </label>
-        <Select
-          id={`${id}-due`}
-          value={view.due}
-          onChange={(event) =>
-            onChange({ ...view, due: event.target.value as DueFilter | "any" })
-          }
-        >
-          <option value="any">Any due date</option>
-          {DUE_FILTERS.map((due) => (
-            <option key={due} value={due}>
-              {DUE_LABELS[due]}
-            </option>
-          ))}
-        </Select>
-      </div>
+        <div className="view-disclosure__panel filters__panel">
+          <div className="filters__control">
+            <label className="ml-field__label" htmlFor={`${id}-priority`}>
+              Priority
+            </label>
+            <Select
+              id={`${id}-priority`}
+              value={view.priority}
+              onChange={(event) =>
+                onChange({
+                  ...view,
+                  priority: event.target.value as Priority | "any",
+                })
+              }
+            >
+              <option value="any">Any priority</option>
+              {PRIORITIES.map((priority) => (
+                <option key={priority} value={priority}>
+                  {PRIORITY_LABELS[priority]}
+                </option>
+              ))}
+            </Select>
+          </div>
 
-      {showCompletion ? (
-        <div className="filters__control">
-          <label className="ml-field__label" htmlFor={`${id}-completed`}>
-            Completion
-          </label>
-          <Select
-            id={`${id}-completed`}
-            value={view.completion}
-            onChange={(event) =>
-              onChange({ ...view, completion: event.target.value as Completion })
-            }
-          >
-            {COMPLETIONS.map((completion) => (
-              <option key={completion} value={completion}>
-                {COMPLETION_LABELS[completion]}
-              </option>
-            ))}
-          </Select>
+          <div className="filters__control">
+            <label className="ml-field__label" htmlFor={`${id}-due`}>
+              Due
+            </label>
+            <Select
+              id={`${id}-due`}
+              value={view.due}
+              onChange={(event) =>
+                onChange({ ...view, due: event.target.value as DueFilter | "any" })
+              }
+            >
+              <option value="any">Any due date</option>
+              {DUE_FILTERS.map((due) => (
+                <option key={due} value={due}>
+                  {DUE_LABELS[due]}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          {showCompletion ? (
+            <div className="filters__control">
+              <label className="ml-field__label" htmlFor={`${id}-completed`}>
+                Completion
+              </label>
+              <Select
+                id={`${id}-completed`}
+                value={view.completion}
+                onChange={(event) =>
+                  onChange({ ...view, completion: event.target.value as Completion })
+                }
+              >
+                {COMPLETIONS.map((completion) => (
+                  <option key={completion} value={completion}>
+                    {COMPLETION_LABELS[completion]}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          ) : null}
+
+          <div className="filters__control">
+            <label className="ml-field__label" htmlFor={`${id}-sort`}>
+              Sort by
+            </label>
+            <Select
+              id={`${id}-sort`}
+              value={view.sort}
+              onChange={(event) =>
+                onChange({ ...view, sort: event.target.value as TaskSort })
+              }
+            >
+              {SORTS.map((sort) => (
+                <option key={sort} value={sort}>
+                  {SORT_LABELS[sort]}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="filters__control">
+            <label className="ml-field__label" htmlFor={`${id}-order`}>
+              Order
+            </label>
+            <Select
+              id={`${id}-order`}
+              value={view.order}
+              onChange={(event) =>
+                onChange({ ...view, order: event.target.value as TaskOrder })
+              }
+            >
+              {ORDERS.map((order) => (
+                <option key={order} value={order}>
+                  {ORDER_LABELS[order]}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="filters__control filters__control--end">
+            <Button onClick={() => onChange(base)} disabled={isDefault}>
+              Reset
+            </Button>
+          </div>
         </div>
-      ) : null}
-
-      <div className="filters__control">
-        <label className="ml-field__label" htmlFor={`${id}-sort`}>
-          Sort by
-        </label>
-        <Select
-          id={`${id}-sort`}
-          value={view.sort}
-          onChange={(event) =>
-            onChange({ ...view, sort: event.target.value as TaskSort })
-          }
-        >
-          {SORTS.map((sort) => (
-            <option key={sort} value={sort}>
-              {SORT_LABELS[sort]}
-            </option>
-          ))}
-        </Select>
-      </div>
-
-      <div className="filters__control">
-        <label className="ml-field__label" htmlFor={`${id}-order`}>
-          Order
-        </label>
-        <Select
-          id={`${id}-order`}
-          value={view.order}
-          onChange={(event) =>
-            onChange({ ...view, order: event.target.value as TaskOrder })
-          }
-        >
-          {ORDERS.map((order) => (
-            <option key={order} value={order}>
-              {ORDER_LABELS[order]}
-            </option>
-          ))}
-        </Select>
-      </div>
-
-      <div className="filters__control filters__control--end">
-        <Button onClick={() => onChange(DEFAULT_VIEW)} disabled={isDefault}>
-          Reset
-        </Button>
-      </div>
-
-      {/* Announces how the list changed, which a purely visual result count does not. */}
-      <output className="filters__count" aria-live="polite">
-        {resultCount} {resultCount === 1 ? "task" : "tasks"}
-      </output>
+      </details>
     </section>
   );
 }
