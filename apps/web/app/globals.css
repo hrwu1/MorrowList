@@ -851,6 +851,9 @@
   .task-row:last-child {
     border-bottom: none;
   }
+  .task-row[data-dragging] {
+    opacity: 0.35;
+  }
   .task-row[data-busy] {
     opacity: 0.55;
   }

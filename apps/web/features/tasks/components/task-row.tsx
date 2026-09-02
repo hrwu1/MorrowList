@@ -1,5 +1,6 @@
 "use client";
 
+import { useDraggable } from "@dnd-kit/core";
 import type { Priority, TaskDto } from "@morrowlist/contracts";
 import { Button } from "@morrowlist/ui";
 import Link from "next/link";
@@ -12,7 +13,7 @@ import {
   useRestoreTask,
   useUpdateTask,
 } from "../hooks/use-tasks";
-import { writeTaskDrag } from "../lib/task-drag";
+import type { TaskDragData } from "../lib/task-dnd";
 
 import { DueBadge, DueDateInput, PriorityBadge, PrioritySelect } from "./task-fields";
 
@@ -38,21 +39,27 @@ export function TaskRow({ task, detailHref, selected }: TaskRowProps) {
   const remove = useDeleteTask();
   const [expanded, setExpanded] = useState(false);
   const panelId = useId();
+  // A row can be dragged onto a project in the sidebar, the same way a board card can.
+  const { listeners, setNodeRef, isDragging } = useDraggable({
+    id: task.id,
+    data: { type: "task", task } satisfies TaskDragData,
+  });
 
   const busy = complete.isPending || reopen.isPending || remove.isPending;
 
   return (
     <li
+      ref={setNodeRef}
       className="task-row"
       data-busy={busy || undefined}
       data-done={task.isCompleted || undefined}
+      data-dragging={isDragging || undefined}
       aria-current={selected ? "true" : undefined}
-      // A row can be dragged onto a project in the sidebar to send it there.
-      draggable
-      onDragStart={(event) => {
-        writeTaskDrag(event.dataTransfer, task);
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setDragImage(event.currentTarget, 16, 16);
+      onPointerDown={(event) => {
+        if ((event.target as HTMLElement).closest("button, select, input, textarea")) {
+          return;
+        }
+        listeners?.onPointerDown?.(event);
       }}
     >
       <div className="task-row__main">

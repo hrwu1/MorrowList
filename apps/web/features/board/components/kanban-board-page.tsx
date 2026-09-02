@@ -1,18 +1,6 @@
 "use client";
 
-import {
-  closestCorners,
-  DndContext,
-  DragOverlay,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type CollisionDetection,
-  type DragEndEvent,
-  type DragStartEvent,
-} from "@dnd-kit/core";
-import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { useDndMonitor, type DragEndEvent } from "@dnd-kit/core";
 import type { TaskDto, WorkflowStatusDto } from "@morrowlist/contracts";
 import { Alert, Button, Select, Spinner } from "@morrowlist/ui";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -42,16 +30,6 @@ const SORT_LABELS: Record<BoardSort, string> = {
   priority: "Priority",
 };
 
-const boardCollisionDetection: CollisionDetection = (args) =>
-  closestCorners({
-    ...args,
-    // A sortable card is also a droppable target. Excluding the active card keeps
-    // empty-column drops from resolving back onto the card as it follows the pointer.
-    droppableContainers: args.droppableContainers.filter(
-      (container) => container.id !== args.active.id,
-    ),
-  });
-
 export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -62,14 +40,9 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   const stageView = readBoardStageView(new URLSearchParams(searchParams.toString()));
   const selectedTaskKey = searchParams.get("task");
   const [mobileStatusId, setMobileStatusId] = useState<string | null>(null);
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const lastOpenTask = useRef<string | null>(selectedTaskKey);
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
 
   const closeTaskPanel = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -101,11 +74,14 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
     visibleStatuses.find((status) => status.id === mobileStatusId) ??
     visibleStatuses.find((status) => status.id === defaultStatus?.id) ??
     visibleStatuses[0];
-  const activeTask = tasks.find((task) => task.id === activeTaskId) ?? null;
   const manuallyOrderedTasks = useMemo(
     () => statuses.flatMap((status) => tasksInStatus(tasks, status.id, "manual")),
     [statuses, tasks],
   );
+
+  // The drag session belongs to the workspace shell (cards can also be dropped on a
+  // sidebar project); the board only interprets drops on its own columns and cards.
+  useDndMonitor({ onDragEnd });
 
   function changeSort(next: BoardSort) {
     const params = new URLSearchParams(searchParams.toString());
@@ -158,13 +134,7 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
     void commitMove(task, destination, placement);
   }
 
-  function onDragStart(event: DragStartEvent) {
-    if (sort !== "manual") return;
-    setActiveTaskId(String(event.active.id));
-  }
-
   function onDragEnd(event: DragEndEvent) {
-    setActiveTaskId(null);
     if (sort !== "manual" || !event.over) return;
 
     const task = tasks.find((candidate) => candidate.id === String(event.active.id));
@@ -297,8 +267,8 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
             </label>
             <p className="board-toolbar__hint" id="board-drag-hint">
               {sort === "manual"
-                ? "Drag cards or press Space on a drag handle, then use arrow keys."
-                : "Drag is off while automatically sorted. Move menus still work."}
+                ? "Drag cards or press Space on a drag handle, then use arrow keys. Drop a card on a project in the sidebar to move it there."
+                : "Drag between stages is off while automatically sorted. Move menus and dragging to a sidebar project still work."}
               <br />
               Blocked and Review appear automatically when they contain work.
             </p>
@@ -374,38 +344,23 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
               </Select>
             </label>
 
-            <DndContext
-              sensors={sensors}
-              collisionDetection={boardCollisionDetection}
-              onDragStart={onDragStart}
-              onDragCancel={() => setActiveTaskId(null)}
-              onDragEnd={onDragEnd}
-            >
-              <div className="kanban-board" aria-label={`${project.name} board`}>
-                {visibleStatuses.map((status) => (
-                  <KanbanColumn
-                    key={status.id}
-                    status={status}
-                    tasks={tasksInStatus(tasks, status.id, sort)}
-                    statuses={statuses}
-                    selectedTaskKey={selectedTaskKey}
-                    mobileActive={status.id === selectedMobileStatus?.id}
-                    dragDisabled={sort !== "manual" || moveTask.isPending}
-                    moveDisabled={moveTask.isPending}
-                    hrefForTask={hrefForTask}
-                    onMove={moveFromMenu}
-                  />
-                ))}
-              </div>
-              <DragOverlay>
-                {activeTask ? (
-                  <div className="board-card board-card--overlay">
-                    <span className="board-card__title">{activeTask.title}</span>
-                    <span className="task-row__key">{activeTask.key}</span>
-                  </div>
-                ) : null}
-              </DragOverlay>
-            </DndContext>
+            <div className="kanban-board" aria-label={`${project.name} board`}>
+              {visibleStatuses.map((status) => (
+                <KanbanColumn
+                  key={status.id}
+                  status={status}
+                  tasks={tasksInStatus(tasks, status.id, sort)}
+                  statuses={statuses}
+                  selectedTaskKey={selectedTaskKey}
+                  mobileActive={status.id === selectedMobileStatus?.id}
+                  dragDisabled={moveTask.isPending}
+                  reorderDisabled={sort !== "manual"}
+                  moveDisabled={moveTask.isPending}
+                  hrefForTask={hrefForTask}
+                  onMove={moveFromMenu}
+                />
+              ))}
+            </div>
           </div>
 
           {selectedTaskKey ? (

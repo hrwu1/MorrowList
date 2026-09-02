@@ -12,7 +12,10 @@ export interface KanbanColumnProps {
   readonly statuses: readonly WorkflowStatusDto[];
   readonly selectedTaskKey: string | null;
   readonly mobileActive: boolean;
+  /** No card may start a drag (a move is in flight). */
   readonly dragDisabled: boolean;
+  /** Columns accept no drops (automatic sort); cards can still be dragged to the sidebar. */
+  readonly reorderDisabled: boolean;
   readonly moveDisabled: boolean;
   readonly hrefForTask: (taskKey: string) => string;
   readonly onMove: (task: TaskDto, statusId: string) => void;
@@ -25,12 +28,14 @@ export function KanbanColumn({
   selectedTaskKey,
   mobileActive,
   dragDisabled,
+  reorderDisabled,
   moveDisabled,
   hrefForTask,
   onMove,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `status:${status.id}`,
+    disabled: reorderDisabled,
     data: { type: "status", statusId: status.id },
   });
   const overLimit = status.wipLimit !== null && tasks.length > status.wipLimit;
@@ -86,6 +91,7 @@ export function KanbanColumn({
                 detailHref={hrefForTask(task.key)}
                 selected={task.key === selectedTaskKey}
                 dragDisabled={dragDisabled}
+                reorderDisabled={reorderDisabled}
                 moveDisabled={moveDisabled}
                 onMove={onMove}
               />

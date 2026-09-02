@@ -1,5 +1,17 @@
 "use client";
 
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { ProjectDto, TaskDto } from "@morrowlist/contracts";
 import { Alert, Button, Spinner } from "@morrowlist/ui";
 import Link from "next/link";
@@ -10,7 +22,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type DragEvent,
   type FormEvent,
   type ReactNode,
   type SVGProps,
@@ -19,7 +30,13 @@ import {
 import { useCreateProject, useProjects } from "@/features/projects/hooks/use-projects";
 import { QuickAdd } from "@/features/tasks/components/quick-add";
 import { useMoveTaskToProject, useTaskList } from "@/features/tasks/hooks/use-tasks";
-import { carriesTask, readTaskDrag } from "@/features/tasks/lib/task-drag";
+import {
+  destinationDroppableId,
+  readDestination,
+  readDraggedTask,
+  taskDropCollision,
+  type DestinationDropData,
+} from "@/features/tasks/lib/task-dnd";
 import { authClient } from "@/lib/auth-client";
 
 export interface WorkspaceUser {
@@ -50,7 +67,7 @@ export function WorkspaceShell({
   });
   const [inboxOpen, setInboxOpen] = useState(false);
   const restoreFocusTo = useRef<HTMLElement | null>(null);
-  const drop = useTaskDropTargets();
+  const dnd = useWorkspaceDragAndDrop();
 
   const inboxCount = inbox.data?.data.length ?? 0;
   const inboxUnavailable = inbox.isError && !inbox.data;
@@ -103,142 +120,163 @@ export function WorkspaceShell({
   const historyCurrent = pathname === "/completed" || pathname === "/trash";
 
   return (
-    <div className="app-shell">
-      <aside className="workspace-sidebar" aria-label="Workspace">
-        <Brand />
+    <DndContext
+      sensors={dnd.sensors}
+      collisionDetection={taskDropCollision}
+      onDragStart={dnd.onDragStart}
+      onDragCancel={dnd.onDragCancel}
+      onDragEnd={dnd.onDragEnd}
+    >
+      <div className="app-shell">
+        <aside className="workspace-sidebar" aria-label="Workspace">
+          <Brand />
 
-        <button
-          type="button"
-          className="workspace-capture"
-          aria-label="Capture a new Inbox task"
-          onClick={openInbox}
-        >
-          <Icon name="plus" />
-          <span>New task</span>
-          <kbd aria-hidden="true">N</kbd>
-        </button>
-
-        <nav className="workspace-nav" aria-label="Primary">
-          <div className="workspace-inbox-link">
-            <button
-              type="button"
-              className="workspace-nav__link workspace-nav__link--button"
-              aria-label={
-                inboxUnavailable
-                  ? "Open Inbox tray, Inbox unavailable"
-                  : `Open Inbox tray, ${inboxCountLabel} task${inboxCount === 1 ? "" : "s"}`
-              }
-              data-current={pathname === "/inbox" || undefined}
-              onClick={openInbox}
-              {...drop.propsFor({ projectId: null, name: "Inbox" })}
-            >
-              <Icon name="inbox" />
-              <span>Inbox</span>
-              <span className="workspace-nav__count" aria-hidden="true">
-                {inbox.isPending ? "·" : inboxCountLabel}
-              </span>
-            </button>
-            <Link
-              className="workspace-inbox-link__full"
-              href="/inbox"
-              aria-label="Open full Inbox"
-              title="Open full Inbox"
-            >
-              <Icon name="arrow-up-right" />
-            </Link>
-          </div>
-
-          <div className="workspace-nav__section">
-            <ProjectSection
-              projects={projectItems}
-              pending={projects.isPending}
-              error={projectsUnavailable}
-              pathname={pathname}
-              onRetry={() => void projects.refetch()}
-              dropPropsFor={drop.propsFor}
-            />
-            {drop.error ? (
-              <p className="workspace-drop-note" role="alert">
-                {drop.error}
-              </p>
-            ) : null}
-          </div>
-
-          <Link
-            className="workspace-nav__link"
-            href="/completed"
-            aria-current={pathname === "/completed" ? "page" : undefined}
-            data-current={historyCurrent || undefined}
+          <button
+            type="button"
+            className="workspace-capture"
+            aria-label="Capture a new Inbox task"
+            onClick={openInbox}
           >
-            <Icon name="history" />
-            <span>History</span>
-          </Link>
-        </nav>
+            <Icon name="plus" />
+            <span>New task</span>
+            <kbd aria-hidden="true">N</kbd>
+          </button>
 
-        <div className="workspace-sidebar__utilities">
-          <Link
-            className="workspace-nav__link workspace-nav__link--quiet"
-            href="/projects"
-            aria-current={pathname === "/projects" ? "page" : undefined}
-          >
-            <Icon name="settings" />
-            <span>Manage projects</span>
-          </Link>
-
-          <details className="workspace-account" key={`account-${pathname}`}>
-            <summary>
-              <UserMark user={user} />
-              <span className="workspace-account__identity">
-                <strong>{user.name ?? "Your account"}</strong>
-                <span>{user.email}</span>
-              </span>
-              <Icon name="chevron-up" />
-            </summary>
-            <div className="workspace-account__menu">
-              <button type="button" onClick={() => void signOut()}>
-                <Icon name="sign-out" />
-                Sign out
-              </button>
+          <nav className="workspace-nav" aria-label="Primary">
+            <div className="workspace-inbox-link">
+              <DropDestination destination={{ projectId: null, name: "Inbox" }}>
+                {(drop) => (
+                  <button
+                    type="button"
+                    className="workspace-nav__link workspace-nav__link--button"
+                    aria-label={
+                      inboxUnavailable
+                        ? "Open Inbox tray, Inbox unavailable"
+                        : `Open Inbox tray, ${inboxCountLabel} task${inboxCount === 1 ? "" : "s"}`
+                    }
+                    data-current={pathname === "/inbox" || undefined}
+                    onClick={openInbox}
+                    {...drop}
+                  >
+                    <Icon name="inbox" />
+                    <span>Inbox</span>
+                    <span className="workspace-nav__count" aria-hidden="true">
+                      {inbox.isPending ? "·" : inboxCountLabel}
+                    </span>
+                  </button>
+                )}
+              </DropDestination>
+              <Link
+                className="workspace-inbox-link__full"
+                href="/inbox"
+                aria-label="Open full Inbox"
+                title="Open full Inbox"
+              >
+                <Icon name="arrow-up-right" />
+              </Link>
             </div>
-          </details>
-        </div>
-      </aside>
 
-      <MobileHeader
-        inboxCount={inboxCountLabel}
-        inboxUnavailable={inboxUnavailable}
-        pathname={pathname}
-        projects={projectItems}
-        projectsPending={projects.isPending}
-        projectsError={projectsUnavailable}
-        user={user}
-        onCapture={openInbox}
-        onProjectsRetry={() => void projects.refetch()}
-        onSignOut={() => void signOut()}
-      />
+            <div className="workspace-nav__section">
+              <ProjectSection
+                projects={projectItems}
+                pending={projects.isPending}
+                error={projectsUnavailable}
+                pathname={pathname}
+                onRetry={() => void projects.refetch()}
+                droppable
+              />
+              {dnd.error ? (
+                <p className="workspace-drop-note" role="alert">
+                  {dnd.error}
+                </p>
+              ) : null}
+            </div>
 
-      <main id="main" className="app-shell__main">
-        {children}
-      </main>
+            <Link
+              className="workspace-nav__link"
+              href="/completed"
+              aria-current={pathname === "/completed" ? "page" : undefined}
+              data-current={historyCurrent || undefined}
+            >
+              <Icon name="history" />
+              <span>History</span>
+            </Link>
+          </nav>
 
-      <output className="ml-visually-hidden" aria-live="polite">
-        {drop.announcement}
-      </output>
+          <div className="workspace-sidebar__utilities">
+            <Link
+              className="workspace-nav__link workspace-nav__link--quiet"
+              href="/projects"
+              aria-current={pathname === "/projects" ? "page" : undefined}
+            >
+              <Icon name="settings" />
+              <span>Manage projects</span>
+            </Link>
 
-      {inboxOpen ? (
-        <InboxTray
-          tasks={inbox.data?.data ?? []}
+            <details className="workspace-account" key={`account-${pathname}`}>
+              <summary>
+                <UserMark user={user} />
+                <span className="workspace-account__identity">
+                  <strong>{user.name ?? "Your account"}</strong>
+                  <span>{user.email}</span>
+                </span>
+                <Icon name="chevron-up" />
+              </summary>
+              <div className="workspace-account__menu">
+                <button type="button" onClick={() => void signOut()}>
+                  <Icon name="sign-out" />
+                  Sign out
+                </button>
+              </div>
+            </details>
+          </div>
+        </aside>
+
+        <MobileHeader
+          inboxCount={inboxCountLabel}
+          inboxUnavailable={inboxUnavailable}
+          pathname={pathname}
           projects={projectItems}
-          tasksPending={inbox.isPending}
-          tasksError={inbox.isError ? inbox.error : null}
           projectsPending={projects.isPending}
           projectsError={projectsUnavailable}
-          hasMore={inbox.data?.page.hasMore ?? false}
-          onRetry={() => void inbox.refetch()}
-          onDismiss={closeInbox}
+          user={user}
+          onCapture={openInbox}
+          onProjectsRetry={() => void projects.refetch()}
+          onSignOut={() => void signOut()}
         />
-      ) : null}
-    </div>
+
+        <main id="main" className="app-shell__main">
+          {children}
+        </main>
+
+        <output className="ml-visually-hidden" aria-live="polite">
+          {dnd.announcement}
+        </output>
+
+        <DragOverlay>
+          {dnd.active ? (
+            <div className="board-card board-card--overlay">
+              <span className="board-card__title">{dnd.active.title}</span>
+              <span className="task-row__key">{dnd.active.key}</span>
+            </div>
+          ) : null}
+        </DragOverlay>
+
+        {inboxOpen ? (
+          <InboxTray
+            tasks={inbox.data?.data ?? []}
+            projects={projectItems}
+            tasksPending={inbox.isPending}
+            tasksError={inbox.isError ? inbox.error : null}
+            projectsPending={projects.isPending}
+            projectsError={projectsUnavailable}
+            hasMore={inbox.data?.page.hasMore ?? false}
+            onRetry={() => void inbox.refetch()}
+            onDismiss={closeInbox}
+          />
+        ) : null}
+      </div>
+    </DndContext>
   );
 }
 
@@ -261,7 +299,7 @@ function ProjectLinks({
   pathname,
   onNavigate,
   onRetry,
-  dropPropsFor,
+  droppable,
 }: {
   readonly projects: readonly ProjectDto[];
   readonly pending: boolean;
@@ -269,7 +307,8 @@ function ProjectLinks({
   readonly pathname: string;
   readonly onNavigate?: (() => void) | undefined;
   readonly onRetry: () => void;
-  readonly dropPropsFor?: DropPropsFor | undefined;
+  /** Only the desktop sidebar accepts dropped tasks; the mobile menu never sees a drag. */
+  readonly droppable?: boolean | undefined;
 }) {
   if (pending) {
     return (
@@ -308,20 +347,32 @@ function ProjectLinks({
       {projects.map((project) => {
         const href = `/projects/${project.id}/board`;
         const current = pathname === href;
+        const link = (drop?: {
+          readonly ref: (node: HTMLElement | null) => void;
+          readonly "data-drop-target": true | undefined;
+        }) => (
+          <Link
+            className="workspace-project-link"
+            href={href}
+            aria-current={current ? "page" : undefined}
+            {...(onNavigate ? { onClick: onNavigate } : {})}
+            {...drop}
+          >
+            <span className="workspace-project-link__mark" aria-hidden="true" />
+            <span>{project.name}</span>
+          </Link>
+        );
         return (
           <li key={project.id}>
-            <Link
-              className="workspace-project-link"
-              href={href}
-              aria-current={current ? "page" : undefined}
-              {...(onNavigate ? { onClick: onNavigate } : {})}
-              {...(dropPropsFor
-                ? dropPropsFor({ projectId: project.id, name: project.name })
-                : {})}
-            >
-              <span className="workspace-project-link__mark" aria-hidden="true" />
-              <span>{project.name}</span>
-            </Link>
+            {droppable ? (
+              <DropDestination
+                destination={{ projectId: project.id, name: project.name }}
+              >
+                {link}
+              </DropDestination>
+            ) : (
+              link()
+            )}
           </li>
         );
       })}
@@ -336,7 +387,7 @@ function ProjectSection({
   pathname,
   onNavigate,
   onRetry,
-  dropPropsFor,
+  droppable,
 }: {
   readonly projects: readonly ProjectDto[];
   readonly pending: boolean;
@@ -344,7 +395,7 @@ function ProjectSection({
   readonly pathname: string;
   readonly onNavigate?: (() => void) | undefined;
   readonly onRetry: () => void;
-  readonly dropPropsFor?: DropPropsFor | undefined;
+  readonly droppable?: boolean | undefined;
 }) {
   const router = useRouter();
   const createProject = useCreateProject();
@@ -469,74 +520,102 @@ function ProjectSection({
         pathname={pathname}
         onNavigate={onNavigate}
         onRetry={onRetry}
-        dropPropsFor={dropPropsFor}
+        droppable={droppable}
       />
     </>
   );
 }
 
-interface DropDestination {
+interface Destination {
   /** Null is the Inbox. */
   readonly projectId: string | null;
   readonly name: string;
 }
 
-type DropPropsFor = (destination: DropDestination) => {
-  readonly "data-drop-target": true | undefined;
-  readonly onDragOver: (event: DragEvent<HTMLElement>) => void;
-  readonly onDragLeave: (event: DragEvent<HTMLElement>) => void;
-  readonly onDrop: (event: DragEvent<HTMLElement>) => void;
-};
+/** Registers one sidebar destination with the workspace DndContext. */
+function DropDestination({
+  destination,
+  children,
+}: {
+  readonly destination: Destination;
+  readonly children: (props: {
+    readonly ref: (node: HTMLElement | null) => void;
+    readonly "data-drop-target": true | undefined;
+  }) => ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: destinationDroppableId(destination.projectId),
+    data: { type: "destination", ...destination } satisfies DestinationDropData,
+  });
+  return <>{children({ ref: setNodeRef, "data-drop-target": isOver || undefined })}</>;
+}
 
 /**
- * Sidebar destinations accept a task dragged from a board card or a list row (native
- * drag, see `task-drag.ts`). A drop on the task's current location is a no-op, and the
- * move lands in the destination's default stage exactly like the Inbox tray's send.
+ * The one drag-and-drop session for the workspace. Cards and rows are dragged the same
+ * way wherever they are grabbed; the board decides what a drop on a column means, and
+ * this decides what a drop on a sidebar destination means.
  */
-function useTaskDropTargets(): {
-  readonly propsFor: DropPropsFor;
-  readonly announcement: string;
-  readonly error: string | null;
-} {
+function useWorkspaceDragAndDrop() {
   const move = useMoveTaskToProject();
-  const [over, setOver] = useState<string | null>(null);
+  const [active, setActive] = useState<TaskDto | null>(null);
   const [announcement, setAnnouncement] = useState("");
-  const keyOf = (destination: DropDestination) => destination.projectId ?? "inbox";
+  const suppressClick = useRef(false);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
-  const propsFor: DropPropsFor = (destination) => ({
-    "data-drop-target": over === keyOf(destination) || undefined,
-    onDragOver: (event) => {
-      if (!carriesTask(event.dataTransfer)) return;
+  // A pointer drag that starts on a title link and is released in place still ends with
+  // a click on that link. dnd-kit keeps the click from React, which would leave the
+  // browser's own navigation; the click after a drag is swallowed here instead.
+  useEffect(() => {
+    function onClick(event: MouseEvent) {
+      if (!suppressClick.current) return;
+      suppressClick.current = false;
       event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
-      if (over !== keyOf(destination)) setOver(keyOf(destination));
-    },
-    onDragLeave: (event) => {
-      // Moving between a link and its own children fires leave/over pairs; only a real
-      // exit clears the highlight.
-      if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
-      setOver((current) => (current === keyOf(destination) ? null : current));
-    },
-    onDrop: (event) => {
-      setOver(null);
-      const task = readTaskDrag(event.dataTransfer);
-      if (!task) return;
-      event.preventDefault();
-      if (task.projectId === destination.projectId) return;
-      move.mutate(
-        { task, projectId: destination.projectId },
-        {
-          onSuccess: () =>
-            setAnnouncement(`Moved ${task.title} to ${destination.name}.`),
-          onError: () =>
-            setAnnouncement(`Could not move ${task.title}. It stayed where it was.`),
-        },
-      );
-    },
-  });
+    }
+    function onPointerDown() {
+      suppressClick.current = false;
+    }
+    document.addEventListener("click", onClick, true);
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      document.removeEventListener("click", onClick, true);
+      document.removeEventListener("pointerdown", onPointerDown, true);
+    };
+  }, []);
+
+  function onDragStart(event: DragStartEvent) {
+    setActive(readDraggedTask(event.active));
+  }
+
+  function onDragCancel() {
+    setActive(null);
+    suppressClick.current = true;
+  }
+
+  function onDragEnd(event: DragEndEvent) {
+    setActive(null);
+    suppressClick.current = true;
+    const task = readDraggedTask(event.active);
+    const destination = readDestination(event.over);
+    if (!task || !destination || task.projectId === destination.projectId) return;
+    move.mutate(
+      { task, projectId: destination.projectId },
+      {
+        onSuccess: () => setAnnouncement(`Moved ${task.title} to ${destination.name}.`),
+        onError: () =>
+          setAnnouncement(`Could not move ${task.title}. It stayed where it was.`),
+      },
+    );
+  }
 
   return {
-    propsFor,
+    sensors,
+    active,
+    onDragStart,
+    onDragCancel,
+    onDragEnd,
     announcement,
     error: move.isError ? "The task could not be moved. It stayed where it was." : null,
   };

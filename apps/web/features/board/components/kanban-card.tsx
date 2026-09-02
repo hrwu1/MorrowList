@@ -3,10 +3,10 @@
 import { useSortable } from "@dnd-kit/sortable";
 import type { TaskDto, WorkflowStatusDto } from "@morrowlist/contracts";
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import type { CSSProperties, KeyboardEventHandler } from "react";
 
 import { DueBadge, PriorityBadge } from "@/features/tasks/components/task-fields";
-import { writeTaskDrag } from "@/features/tasks/lib/task-drag";
+import type { TaskDragData } from "@/features/tasks/lib/task-dnd";
 
 export interface KanbanCardProps {
   readonly task: TaskDto;
@@ -14,6 +14,7 @@ export interface KanbanCardProps {
   readonly detailHref: string;
   readonly selected: boolean;
   readonly dragDisabled: boolean;
+  readonly reorderDisabled: boolean;
   readonly moveDisabled: boolean;
   readonly onMove: (task: TaskDto, statusId: string) => void;
 }
@@ -24,14 +25,15 @@ export function KanbanCard({
   detailHref,
   selected,
   dragDisabled,
+  reorderDisabled,
   moveDisabled,
   onMove,
 }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({
       id: task.id,
-      disabled: dragDisabled,
-      data: { type: "task", taskId: task.id, statusId: task.statusId },
+      disabled: { draggable: dragDisabled, droppable: reorderDisabled },
+      data: { type: "task", task, statusId: task.statusId } satisfies TaskDragData,
     });
   const style: CSSProperties = {
     transform: transform
@@ -48,18 +50,11 @@ export function KanbanCard({
       data-dragging={isDragging || undefined}
       data-done={task.isCompleted || undefined}
       aria-current={selected ? "true" : undefined}
-      // A card can also be dragged to a project in the sidebar. That is the browser's own
-      // drag, which must not start from the dnd-kit handle or it would cancel the board
-      // drag's pointer sequence.
-      draggable
-      onDragStart={(event) => {
-        if ((event.target as HTMLElement).closest(".board-card__drag")) {
-          event.preventDefault();
-          return;
-        }
-        writeTaskDrag(event.dataTransfer, task);
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setDragImage(event.currentTarget, 16, 16);
+      // The whole card is the pointer drag source; the handle is the keyboard one. The
+      // Move menu opens on press, so it never starts a drag.
+      onPointerDown={(event) => {
+        if ((event.target as HTMLElement).closest("select")) return;
+        listeners?.onPointerDown?.(event);
       }}
     >
       <div className="board-card__controls">
@@ -92,11 +87,13 @@ export function KanbanCard({
           disabled={dragDisabled}
           aria-label={
             dragDisabled
-              ? `Drag ${task.title} unavailable while automatically sorted`
+              ? `Drag ${task.title} unavailable while a move is saving`
               : `Drag ${task.title}. Press Space, then use arrow keys to move it.`
           }
           {...attributes}
-          {...listeners}
+          onKeyDown={
+            listeners?.onKeyDown as KeyboardEventHandler<HTMLButtonElement> | undefined
+          }
         >
           <span aria-hidden="true">⠿</span>
         </button>

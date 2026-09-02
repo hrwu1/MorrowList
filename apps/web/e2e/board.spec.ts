@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 const PASSWORD = "correct-horse-battery-staple";
 
@@ -10,6 +10,20 @@ async function signUp(page: Page) {
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Inbox" })).toBeVisible();
+}
+
+/** dnd-kit activates after a few pointer moves, so a drag is a stepped mouse path. */
+async function dragWithPointer(source: Locator, target: Locator, page: Page) {
+  const from = await source.boundingBox();
+  const to = await target.boundingBox();
+  expect(from).not.toBeNull();
+  expect(to).not.toBeNull();
+  if (!from || !to) return;
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2 + 12, from.y + from.height / 2 + 12);
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });
+  await page.mouse.up();
 }
 
 async function createProject(page: Page) {
@@ -143,11 +157,18 @@ test("automatic sort disables drag but keeps the Move menu", async ({ page }) =>
   await controls.locator("summary").click();
   await controls.getByLabel("Sort board").selectOption("priority");
   await expect(page).toHaveURL(/sort=priority/);
+
+  // Columns accept no drops while automatically sorted, but the card still drags (it can
+  // be dropped on a sidebar project), so a column drop simply leaves it where it was.
+  const ready = page.getByRole("region", { name: "Ready" });
+  await dragWithPointer(
+    ready.getByRole("listitem").filter({ hasText: "Review interview notes" }),
+    page.getByRole("region", { name: "In Progress" }),
+    page,
+  );
   await expect(
-    page.getByRole("button", {
-      name: /Drag Review interview notes unavailable while automatically sorted/,
-    }),
-  ).toBeDisabled();
+    ready.getByRole("link", { name: "Review interview notes" }),
+  ).toBeVisible();
 
   const move = page.getByLabel("Move Review interview notes");
   await expect(move).toBeEnabled();
@@ -305,10 +326,17 @@ test("dragging a card or row onto a sidebar destination moves it there", async (
   const card = ready
     .getByRole("listitem")
     .filter({ hasText: "Sketch onboarding flow" });
-  await card.dragTo(page.getByRole("link", { name: "Design System", exact: true }));
+  // Grabbing the title (a link) drags the card like anywhere else, and releasing it
+  // never follows the link.
+  await dragWithPointer(
+    card.getByRole("link", { name: "Sketch onboarding flow" }),
+    page.getByRole("link", { name: "Design System", exact: true }),
+    page,
+  );
   await expect(ready.getByRole("link", { name: "Sketch onboarding flow" })).toHaveCount(
     0,
   );
+  await expect(page).not.toHaveURL(/task=/);
 
   await page.getByRole("link", { name: "Design System", exact: true }).click();
   await expect(
@@ -318,11 +346,14 @@ test("dragging a card or row onto a sidebar destination moves it there", async (
   ).toBeVisible();
 
   // Back to the Inbox by dropping on the Inbox link, then into a project from a list row.
-  await page
-    .getByRole("region", { name: "Ready" })
-    .getByRole("listitem")
-    .filter({ hasText: "Sketch onboarding flow" })
-    .dragTo(page.getByRole("button", { name: /Open Inbox tray/ }));
+  await dragWithPointer(
+    page
+      .getByRole("region", { name: "Ready" })
+      .getByRole("listitem")
+      .filter({ hasText: "Sketch onboarding flow" }),
+    page.getByRole("button", { name: /Open Inbox tray/ }),
+    page,
+  );
   await expect(
     page
       .getByRole("region", { name: "Ready" })
@@ -332,7 +363,11 @@ test("dragging a card or row onto a sidebar destination moves it there", async (
   await page.getByRole("link", { name: "Open full Inbox" }).click();
   const row = page.getByRole("listitem").filter({ hasText: "Sketch onboarding flow" });
   await expect(row).toBeVisible();
-  await row.dragTo(page.getByRole("link", { name: "Research Launch", exact: true }));
+  await dragWithPointer(
+    row,
+    page.getByRole("link", { name: "Research Launch", exact: true }),
+    page,
+  );
   await expect(row).toHaveCount(0);
 
   await page.getByRole("link", { name: "Research Launch", exact: true }).click();
@@ -346,5 +381,36 @@ test("dragging a card or row onto a sidebar destination moves it there", async (
     page
       .getByRole("region", { name: "Ready" })
       .getByRole("link", { name: "Sketch onboarding flow" }),
+  ).toBeVisible();
+
+  // The keyboard drag reaches the sidebar too: Space lifts, arrows travel across the
+  // columns into the sidebar and up to the Inbox link, Enter drops.
+  const handle = page.getByRole("button", { name: /Drag Sketch onboarding flow/ });
+  await handle.focus();
+  await handle.press("Space");
+  // dnd-kit measures the drop targets right after pickup; a key pressed before that
+  // measurement lands is ignored, so wait for the pickup to be announced and pace keys.
+  await expect(page.locator("[id^=DndLiveRegion]")).toContainText("was moved over");
+  for (const key of [
+    "ArrowLeft",
+    "ArrowLeft",
+    "ArrowLeft",
+    "ArrowUp",
+    "ArrowUp",
+    "ArrowUp",
+  ]) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(100);
+  }
+  await page.keyboard.press("Enter");
+  await expect(
+    page
+      .getByRole("region", { name: "Ready" })
+      .getByRole("link", { name: "Sketch onboarding flow" }),
+  ).toHaveCount(0);
+  await page.getByRole("link", { name: "Open full Inbox" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Inbox" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Sketch onboarding flow" }),
   ).toBeVisible();
 });
