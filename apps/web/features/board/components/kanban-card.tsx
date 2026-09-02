@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 
 import { DueBadge, PriorityBadge } from "@/features/tasks/components/task-fields";
+import { writeTaskDrag } from "@/features/tasks/lib/task-drag";
 
 export interface KanbanCardProps {
   readonly task: TaskDto;
@@ -47,6 +48,19 @@ export function KanbanCard({
       data-dragging={isDragging || undefined}
       data-done={task.isCompleted || undefined}
       aria-current={selected ? "true" : undefined}
+      // A card can also be dragged to a project in the sidebar. That is the browser's own
+      // drag, which must not start from the dnd-kit handle or it would cancel the board
+      // drag's pointer sequence.
+      draggable
+      onDragStart={(event) => {
+        if ((event.target as HTMLElement).closest(".board-card__drag")) {
+          event.preventDefault();
+          return;
+        }
+        writeTaskDrag(event.dataTransfer, task);
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setDragImage(event.currentTarget, 16, 16);
+      }}
     >
       <div className="board-card__controls">
         <label>

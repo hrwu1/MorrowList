@@ -12,6 +12,7 @@ import {
   useRestoreTask,
   useUpdateTask,
 } from "../hooks/use-tasks";
+import { writeTaskDrag } from "../lib/task-drag";
 
 import { DueBadge, DueDateInput, PriorityBadge, PrioritySelect } from "./task-fields";
 
@@ -46,6 +47,13 @@ export function TaskRow({ task, detailHref, selected }: TaskRowProps) {
       data-busy={busy || undefined}
       data-done={task.isCompleted || undefined}
       aria-current={selected ? "true" : undefined}
+      // A row can be dragged onto a project in the sidebar to send it there.
+      draggable
+      onDragStart={(event) => {
+        writeTaskDrag(event.dataTransfer, task);
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setDragImage(event.currentTarget, 16, 16);
+      }}
     >
       <div className="task-row__main">
         <button

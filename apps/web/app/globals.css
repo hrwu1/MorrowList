@@ -513,6 +513,18 @@
     font-weight: 610;
     box-shadow: var(--shadow-sm);
   }
+  .workspace-nav__link[data-drop-target],
+  .workspace-project-link[data-drop-target] {
+    border-color: var(--accent);
+    background: var(--surface-raised);
+    color: var(--text-primary);
+  }
+  .workspace-drop-note {
+    margin: 0.35rem 0.65rem 0;
+    color: var(--danger);
+    font-size: 0.72rem;
+    line-height: 1.35;
+  }
   .workspace-nav__link--button {
     width: 100%;
     font: inherit;
