@@ -6,14 +6,16 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
+  type FormEvent,
   type ReactNode,
   type SVGProps,
 } from "react";
 
-import { useProjects } from "@/features/projects/hooks/use-projects";
+import { useCreateProject, useProjects } from "@/features/projects/hooks/use-projects";
 import { QuickAdd } from "@/features/tasks/components/quick-add";
 import { useAssignInboxTask, useTaskList } from "@/features/tasks/hooks/use-tasks";
 import { authClient } from "@/lib/auth-client";
@@ -143,8 +145,7 @@ export function WorkspaceShell({
           </div>
 
           <div className="workspace-nav__section">
-            <div className="workspace-nav__label">Projects</div>
-            <ProjectLinks
+            <ProjectSection
               projects={projectItems}
               pending={projects.isPending}
               error={projectsUnavailable}
@@ -309,6 +310,149 @@ function ProjectLinks({
   );
 }
 
+function ProjectSection({
+  projects,
+  pending,
+  error,
+  pathname,
+  onNavigate,
+  onRetry,
+}: {
+  readonly projects: readonly ProjectDto[];
+  readonly pending: boolean;
+  readonly error: boolean;
+  readonly pathname: string;
+  readonly onNavigate?: (() => void) | undefined;
+  readonly onRetry: () => void;
+}) {
+  const router = useRouter();
+  const createProject = useCreateProject();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [name, setName] = useState("");
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const inputId = useId();
+  const errorId = useId();
+
+  useEffect(() => {
+    if (!createOpen) return;
+    const focusFrame = window.requestAnimationFrame(() => inputRef.current?.focus());
+    return () => window.cancelAnimationFrame(focusFrame);
+  }, [createOpen]);
+
+  function openCreate() {
+    createProject.reset();
+    setCreateOpen(true);
+  }
+
+  function closeCreate() {
+    if (createProject.isPending) return;
+    createProject.reset();
+    setCreateOpen(false);
+    window.requestAnimationFrame(() => addButtonRef.current?.focus());
+  }
+
+  async function submitCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed || createProject.isPending) return;
+
+    try {
+      const detail = await createProject.mutateAsync({ name: trimmed });
+      setName("");
+      setCreateOpen(false);
+      onNavigate?.();
+      router.push(`/projects/${detail.project.id}/board`);
+    } catch {
+      window.requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }
+
+  return (
+    <>
+      <div className="workspace-projects__header">
+        <span className="workspace-nav__label">Projects</span>
+        <button
+          ref={addButtonRef}
+          type="button"
+          className="workspace-projects__add"
+          aria-label="Add project"
+          aria-expanded={createOpen}
+          aria-controls={`${inputId}-form`}
+          disabled={createProject.isPending}
+          onClick={() => (createOpen ? closeCreate() : openCreate())}
+        >
+          <Icon name={createOpen ? "close" : "plus"} />
+        </button>
+      </div>
+
+      {createOpen ? (
+        <form
+          id={`${inputId}-form`}
+          className="workspace-project-create"
+          aria-label="Quick add project"
+          aria-busy={createProject.isPending}
+          onSubmit={(event) => void submitCreate(event)}
+          onKeyDown={(event) => {
+            if (event.key !== "Escape") return;
+            event.preventDefault();
+            closeCreate();
+          }}
+        >
+          <label className="workspace-project-create__label" htmlFor={inputId}>
+            Project name
+          </label>
+          <input
+            ref={inputRef}
+            id={inputId}
+            className="workspace-project-create__input"
+            value={name}
+            maxLength={100}
+            autoComplete="off"
+            placeholder="Project name"
+            aria-invalid={createProject.isError || undefined}
+            aria-describedby={createProject.isError ? errorId : undefined}
+            disabled={createProject.isPending}
+            onChange={(event) => {
+              setName(event.target.value);
+              if (createProject.isError) createProject.reset();
+            }}
+          />
+          <button
+            type="submit"
+            className="workspace-project-create__submit"
+            aria-label="Create project"
+            title="Create project"
+            disabled={!name.trim() || createProject.isPending}
+          >
+            {createProject.isPending ? (
+              <Spinner label="Creating project" />
+            ) : (
+              <Icon name="check" />
+            )}
+          </button>
+          {createProject.isError ? (
+            <span id={errorId} className="workspace-project-create__error" role="alert">
+              {createProject.error instanceof Error
+                ? createProject.error.message
+                : "Project could not be created."}
+            </span>
+          ) : null}
+        </form>
+      ) : null}
+
+      <ProjectLinks
+        projects={projects}
+        pending={pending}
+        error={error}
+        pathname={pathname}
+        onNavigate={onNavigate}
+        onRetry={onRetry}
+      />
+    </>
+  );
+}
+
 function MobileHeader({
   inboxCount,
   inboxUnavailable,
@@ -406,8 +550,7 @@ function MobileHeader({
             Open full Inbox
           </Link>
           <nav aria-label="Mobile workspace">
-            <div className="workspace-nav__label">Projects</div>
-            <ProjectLinks
+            <ProjectSection
               projects={projects}
               pending={projectsPending}
               error={projectsError}

@@ -22,6 +22,59 @@ async function createProject(page: Page) {
   ).toBeVisible();
 }
 
+test("quickly creates projects from desktop and mobile navigation", async ({
+  page,
+}) => {
+  await signUp(page);
+
+  const desktopAdd = page.getByRole("button", { name: "Add project" });
+  await desktopAdd.click();
+  const desktopForm = page.getByRole("form", { name: "Quick add project" });
+  const desktopName = desktopForm.getByLabel("Project name");
+  await expect(desktopName).toBeFocused();
+  await desktopName.press("Escape");
+  await expect(desktopForm).toHaveCount(0);
+  await expect(desktopAdd).toBeFocused();
+
+  await desktopAdd.click();
+  await page
+    .getByRole("form", { name: "Quick add project" })
+    .getByLabel("Project name")
+    .fill("Sidebar Launch");
+  await page
+    .getByRole("form", { name: "Quick add project" })
+    .getByLabel("Project name")
+    .press("Enter");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Sidebar Launch" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Sidebar Launch", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+
+  await page.getByRole("button", { name: "Add project" }).click();
+  const retryForm = page.getByRole("form", { name: "Quick add project" });
+  const retryName = retryForm.getByLabel("Project name");
+  await retryName.fill("Sidebar Launch");
+  await retryName.press("Enter");
+  await expect(retryForm.getByRole("alert")).toContainText(
+    "A project with this name already exists.",
+  );
+  await expect(retryName).toHaveValue("Sidebar Launch");
+  await retryName.press("Escape");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByLabel("Open workspace navigation").click();
+  await page.getByRole("button", { name: "Add project" }).click();
+  const mobileForm = page.getByRole("form", { name: "Quick add project" });
+  await mobileForm.getByLabel("Project name").fill("Mobile Launch");
+  await mobileForm.getByRole("button", { name: "Create project" }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Mobile Launch" }),
+  ).toBeVisible();
+  await expect(page.getByRole("form", { name: "Quick add project" })).toHaveCount(0);
+});
+
 test("creates a project and moves a board task with pointer drag", async ({ page }) => {
   await signUp(page);
   await createProject(page);
