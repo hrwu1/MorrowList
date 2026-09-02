@@ -10,6 +10,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type DragEvent,
   type FormEvent,
   type ReactNode,
   type SVGProps,
@@ -17,7 +18,8 @@ import {
 
 import { useCreateProject, useProjects } from "@/features/projects/hooks/use-projects";
 import { QuickAdd } from "@/features/tasks/components/quick-add";
-import { useAssignInboxTask, useTaskList } from "@/features/tasks/hooks/use-tasks";
+import { useMoveTaskToProject, useTaskList } from "@/features/tasks/hooks/use-tasks";
+import { carriesTask, readTaskDrag } from "@/features/tasks/lib/task-drag";
 import { authClient } from "@/lib/auth-client";
 
 export interface WorkspaceUser {
@@ -48,6 +50,7 @@ export function WorkspaceShell({
   });
   const [inboxOpen, setInboxOpen] = useState(false);
   const restoreFocusTo = useRef<HTMLElement | null>(null);
+  const drop = useTaskDropTargets();
 
   const inboxCount = inbox.data?.data.length ?? 0;
   const inboxUnavailable = inbox.isError && !inbox.data;
@@ -127,6 +130,7 @@ export function WorkspaceShell({
               }
               data-current={pathname === "/inbox" || undefined}
               onClick={openInbox}
+              {...drop.propsFor({ projectId: null, name: "Inbox" })}
             >
               <Icon name="inbox" />
               <span>Inbox</span>
@@ -151,7 +155,13 @@ export function WorkspaceShell({
               error={projectsUnavailable}
               pathname={pathname}
               onRetry={() => void projects.refetch()}
+              dropPropsFor={drop.propsFor}
             />
+            {drop.error ? (
+              <p className="workspace-drop-note" role="alert">
+                {drop.error}
+              </p>
+            ) : null}
           </div>
 
           <Link
@@ -211,6 +221,10 @@ export function WorkspaceShell({
         {children}
       </main>
 
+      <output className="ml-visually-hidden" aria-live="polite">
+        {drop.announcement}
+      </output>
+
       {inboxOpen ? (
         <InboxTray
           tasks={inbox.data?.data ?? []}
@@ -247,6 +261,7 @@ function ProjectLinks({
   pathname,
   onNavigate,
   onRetry,
+  dropPropsFor,
 }: {
   readonly projects: readonly ProjectDto[];
   readonly pending: boolean;
@@ -254,6 +269,7 @@ function ProjectLinks({
   readonly pathname: string;
   readonly onNavigate?: (() => void) | undefined;
   readonly onRetry: () => void;
+  readonly dropPropsFor?: DropPropsFor | undefined;
 }) {
   if (pending) {
     return (
@@ -299,6 +315,9 @@ function ProjectLinks({
               href={href}
               aria-current={current ? "page" : undefined}
               {...(onNavigate ? { onClick: onNavigate } : {})}
+              {...(dropPropsFor
+                ? dropPropsFor({ projectId: project.id, name: project.name })
+                : {})}
             >
               <span className="workspace-project-link__mark" aria-hidden="true" />
               <span>{project.name}</span>
@@ -317,6 +336,7 @@ function ProjectSection({
   pathname,
   onNavigate,
   onRetry,
+  dropPropsFor,
 }: {
   readonly projects: readonly ProjectDto[];
   readonly pending: boolean;
@@ -324,6 +344,7 @@ function ProjectSection({
   readonly pathname: string;
   readonly onNavigate?: (() => void) | undefined;
   readonly onRetry: () => void;
+  readonly dropPropsFor?: DropPropsFor | undefined;
 }) {
   const router = useRouter();
   const createProject = useCreateProject();
@@ -448,9 +469,77 @@ function ProjectSection({
         pathname={pathname}
         onNavigate={onNavigate}
         onRetry={onRetry}
+        dropPropsFor={dropPropsFor}
       />
     </>
   );
+}
+
+interface DropDestination {
+  /** Null is the Inbox. */
+  readonly projectId: string | null;
+  readonly name: string;
+}
+
+type DropPropsFor = (destination: DropDestination) => {
+  readonly "data-drop-target": true | undefined;
+  readonly onDragOver: (event: DragEvent<HTMLElement>) => void;
+  readonly onDragLeave: (event: DragEvent<HTMLElement>) => void;
+  readonly onDrop: (event: DragEvent<HTMLElement>) => void;
+};
+
+/**
+ * Sidebar destinations accept a task dragged from a board card or a list row (native
+ * drag, see `task-drag.ts`). A drop on the task's current location is a no-op, and the
+ * move lands in the destination's default stage exactly like the Inbox tray's send.
+ */
+function useTaskDropTargets(): {
+  readonly propsFor: DropPropsFor;
+  readonly announcement: string;
+  readonly error: string | null;
+} {
+  const move = useMoveTaskToProject();
+  const [over, setOver] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState("");
+  const keyOf = (destination: DropDestination) => destination.projectId ?? "inbox";
+
+  const propsFor: DropPropsFor = (destination) => ({
+    "data-drop-target": over === keyOf(destination) || undefined,
+    onDragOver: (event) => {
+      if (!carriesTask(event.dataTransfer)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      if (over !== keyOf(destination)) setOver(keyOf(destination));
+    },
+    onDragLeave: (event) => {
+      // Moving between a link and its own children fires leave/over pairs; only a real
+      // exit clears the highlight.
+      if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+      setOver((current) => (current === keyOf(destination) ? null : current));
+    },
+    onDrop: (event) => {
+      setOver(null);
+      const task = readTaskDrag(event.dataTransfer);
+      if (!task) return;
+      event.preventDefault();
+      if (task.projectId === destination.projectId) return;
+      move.mutate(
+        { task, projectId: destination.projectId },
+        {
+          onSuccess: () =>
+            setAnnouncement(`Moved ${task.title} to ${destination.name}.`),
+          onError: () =>
+            setAnnouncement(`Could not move ${task.title}. It stayed where it was.`),
+        },
+      );
+    },
+  });
+
+  return {
+    propsFor,
+    announcement,
+    error: move.isError ? "The task could not be moved. It stayed where it was." : null,
+  };
 }
 
 function MobileHeader({
@@ -616,7 +705,7 @@ function InboxTray({
   readonly onDismiss: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
-  const assign = useAssignInboxTask();
+  const assign = useMoveTaskToProject();
   const [announcement, setAnnouncement] = useState("");
 
   useEffect(() => {

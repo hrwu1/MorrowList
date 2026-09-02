@@ -184,17 +184,29 @@ export function useCreateTask() {
   });
 }
 
-export interface AssignInboxTaskInput {
+export interface MoveTaskToProjectInput {
   readonly task: TaskDto;
-  readonly projectId: string;
+  /** Null returns the task to the Inbox (spec 11.5). */
+  readonly projectId: string | null;
 }
 
-/** Resolve the project's active default lane, then atomically move an Inbox task there. */
-export function useAssignInboxTask() {
+/**
+ * Send a task to another project's active default lane, or back to the Inbox, in one
+ * atomic move. This is the Inbox tray's "send to project", the detail's Project field,
+ * and the sidebar drop target, so every path lands the task in the same place.
+ */
+export function useMoveTaskToProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ task, projectId }: AssignInboxTaskInput) => {
+    mutationFn: async ({ task, projectId }: MoveTaskToProjectInput) => {
+      if (projectId === null) {
+        return apiClient.moveTask(task.id, {
+          projectId: null,
+          expectedVersion: task.version,
+        });
+      }
+
       const detail = await queryClient.fetchQuery({
         queryKey: projectKeys.detail(projectId),
         queryFn: () => apiClient.getProject(projectId),

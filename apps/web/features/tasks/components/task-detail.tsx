@@ -2,13 +2,22 @@
 
 import { ApiClientError } from "@morrowlist/api-client";
 import type { Priority, TaskDto, UpdateTaskRequest } from "@morrowlist/contracts";
-import { Alert, Button, Field, Spinner, TextArea, TextInput } from "@morrowlist/ui";
+import {
+  Alert,
+  Button,
+  Field,
+  Select,
+  Spinner,
+  TextArea,
+  TextInput,
+} from "@morrowlist/ui";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   useCompleteTask,
   useDeleteTask,
+  useMoveTaskToProject,
   useReopenTask,
   useRestoreTask,
   useTask,
@@ -17,6 +26,8 @@ import {
 
 import { Markdown } from "./markdown";
 import { DueDateInput, DueTimeInput, PrioritySelect } from "./task-fields";
+
+import { useProjects } from "@/features/projects/hooks/use-projects";
 
 /**
  * Task detail (TASK-011, spec 10.2).
@@ -104,6 +115,8 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
   const reopen = useReopenTask();
   const remove = useDeleteTask();
   const restore = useRestoreTask();
+  const move = useMoveTaskToProject();
+  const projects = useProjects();
 
   const [draft, setDraft] = useState(() => toDraft(task));
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -201,12 +214,41 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
     queue(request, immediate);
   }
 
+  /**
+   * A project change is a move, not a field patch, so it goes through the move command
+   * (landing in the destination's default stage). It still runs on the save queue: a
+   * move and a field save in flight together would otherwise conflict on the version.
+   */
+  function changeProject(projectId: string | null) {
+    if (projectId === task.projectId) return;
+    move.reset();
+    const { mutateAsync } = move;
+    queueTail.current = queueTail.current.then(async () => {
+      try {
+        const moved = await mutateAsync({
+          task: { ...taskRef.current, version: version.current },
+          projectId,
+        });
+        version.current = moved.version;
+      } catch {
+        // Reported through `move.isError`; the select falls back to the server's value.
+      }
+    });
+  }
+
+  const projectItems = projects.data?.data ?? [];
+  const currentProjectKnown =
+    task.projectId === null || projectItems.some((item) => item.id === task.projectId);
+
   return (
     <div className="task-detail">
       <header className="task-detail__header">
         <div className="task-detail__identity">
           <span className="task-row__key">{task.key}</span>
-          <SaveStatus state={saveState} pendingChanges={update.isPending} />
+          <SaveStatus
+            state={saveState}
+            pendingChanges={update.isPending || move.isPending}
+          />
         </div>
         {onClose ? (
           <Button onClick={onClose} variant="ghost" aria-label="Close task details">
@@ -288,6 +330,20 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
         ) : null}
       </div>
 
+      {move.isError ? (
+        <Alert tone="error" title="This task could not be moved">
+          <p>
+            {move.error instanceof ApiClientError &&
+            move.error.code === "TASK_VERSION_CONFLICT"
+              ? "It changed somewhere else first. Reload it, then choose the project again."
+              : move.error instanceof Error
+                ? move.error.message
+                : "It stayed where it was."}
+          </p>
+          <Button onClick={() => move.reset()}>Dismiss</Button>
+        </Alert>
+      ) : null}
+
       <Field label="Title" htmlFor={fieldId("title")}>
         <TextInput
           id={fieldId("title")}
@@ -299,6 +355,31 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
           }
           onBlur={flush}
         />
+      </Field>
+
+      <Field
+        label="Project"
+        htmlFor={fieldId("project")}
+        hint="A moved task starts in the project's default stage."
+      >
+        <Select
+          id={fieldId("project")}
+          value={task.projectId ?? ""}
+          disabled={!editable || projects.isPending || move.isPending}
+          onChange={(event) =>
+            changeProject(event.target.value === "" ? null : event.target.value)
+          }
+        >
+          <option value="">Inbox</option>
+          {currentProjectKnown ? null : (
+            <option value={task.projectId ?? ""}>Current project</option>
+          )}
+          {projectItems.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name}
+            </option>
+          ))}
+        </Select>
       </Field>
 
       <div className="task-detail__row">
