@@ -229,3 +229,122 @@ test("captures globally, sorts into a project, and keeps board history current",
       .getByRole("link", { name: "Shape the launch narrative" }),
   ).toBeVisible();
 });
+
+async function addSecondProject(page: Page) {
+  await page.getByRole("button", { name: "Add project" }).click();
+  const form = page.getByRole("form", { name: "Quick add project" });
+  await form.getByLabel("Project name").fill("Design System");
+  await form.getByLabel("Project name").press("Enter");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Design System" }),
+  ).toBeVisible();
+}
+
+async function addReadyTask(page: Page, title: string) {
+  await page.getByRole("button", { name: "+ Add to Ready" }).click();
+  const capture = page.getByPlaceholder("Add to Ready and press Enter");
+  await capture.fill(title);
+  await capture.press("Enter");
+  await expect(
+    page.getByRole("region", { name: "Ready" }).getByRole("link", { name: title }),
+  ).toBeVisible();
+}
+
+test("the Project field moves a task to another project or back to the Inbox", async ({
+  page,
+}) => {
+  await signUp(page);
+  await createProject(page);
+  await addSecondProject(page);
+  await page.getByRole("link", { name: "Research Launch", exact: true }).click();
+  await addReadyTask(page, "Write launch FAQ");
+
+  const ready = page.getByRole("region", { name: "Ready" });
+  await ready.getByRole("link", { name: "Write launch FAQ" }).click();
+  const panel = page.getByRole("complementary", { name: /Task details for/ });
+  await panel.getByLabel("Project").selectOption({ label: "Design System" });
+  await expect(ready.getByRole("link", { name: "Write launch FAQ" })).toHaveCount(0);
+  await expect(panel.getByLabel("Project")).toHaveValue(/./);
+
+  await page.getByRole("link", { name: "Design System", exact: true }).click();
+  await expect(
+    page
+      .getByRole("region", { name: "Ready" })
+      .getByRole("link", { name: "Write launch FAQ" }),
+  ).toBeVisible();
+  await page.reload();
+  await page
+    .getByRole("region", { name: "Ready" })
+    .getByRole("link", { name: "Write launch FAQ" })
+    .click();
+  await page
+    .getByRole("complementary", { name: /Task details for/ })
+    .getByLabel("Project")
+    .selectOption({ label: "Inbox" });
+  await expect(
+    page
+      .getByRole("region", { name: "Ready" })
+      .getByRole("link", { name: "Write launch FAQ" }),
+  ).toHaveCount(0);
+
+  await page.getByRole("link", { name: "Open full Inbox" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Inbox" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Write launch FAQ" })).toBeVisible();
+});
+
+test("dragging a card or row onto a sidebar destination moves it there", async ({
+  page,
+}) => {
+  await signUp(page);
+  await createProject(page);
+  await addSecondProject(page);
+  await page.getByRole("link", { name: "Research Launch", exact: true }).click();
+  await addReadyTask(page, "Sketch onboarding flow");
+
+  const ready = page.getByRole("region", { name: "Ready" });
+  const card = ready
+    .getByRole("listitem")
+    .filter({ hasText: "Sketch onboarding flow" });
+  await card.dragTo(page.getByRole("link", { name: "Design System", exact: true }));
+  await expect(ready.getByRole("link", { name: "Sketch onboarding flow" })).toHaveCount(
+    0,
+  );
+
+  await page.getByRole("link", { name: "Design System", exact: true }).click();
+  await expect(
+    page
+      .getByRole("region", { name: "Ready" })
+      .getByRole("link", { name: "Sketch onboarding flow" }),
+  ).toBeVisible();
+
+  // Back to the Inbox by dropping on the Inbox link, then into a project from a list row.
+  await page
+    .getByRole("region", { name: "Ready" })
+    .getByRole("listitem")
+    .filter({ hasText: "Sketch onboarding flow" })
+    .dragTo(page.getByRole("button", { name: /Open Inbox tray/ }));
+  await expect(
+    page
+      .getByRole("region", { name: "Ready" })
+      .getByRole("link", { name: "Sketch onboarding flow" }),
+  ).toHaveCount(0);
+
+  await page.getByRole("link", { name: "Open full Inbox" }).click();
+  const row = page.getByRole("listitem").filter({ hasText: "Sketch onboarding flow" });
+  await expect(row).toBeVisible();
+  await row.dragTo(page.getByRole("link", { name: "Research Launch", exact: true }));
+  await expect(row).toHaveCount(0);
+
+  await page.getByRole("link", { name: "Research Launch", exact: true }).click();
+  await expect(
+    page
+      .getByRole("region", { name: "Ready" })
+      .getByRole("link", { name: "Sketch onboarding flow" }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page
+      .getByRole("region", { name: "Ready" })
+      .getByRole("link", { name: "Sketch onboarding flow" }),
+  ).toBeVisible();
+});
