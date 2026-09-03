@@ -67,11 +67,26 @@ export {
   type UpdateTaskFieldsInput,
 } from "./task/policies.js";
 export {
+  DAY_PLAN_SOURCES,
+  TODAY_REASONS,
+  todayReasons,
+  todaySections,
+  upcomingGroups,
+  type DayPlan,
+  type DayPlanSource,
+  type TodayEntry,
+  type TodayReason,
+  type TodaySection,
+  type UpcomingGroup,
+} from "./task/today.js";
+export {
   PRIORITIES,
   TITLE_MAX_LENGTH,
+  addDays,
   isPriority,
   normalizeDescription,
   normalizeTitle,
+  toLocalDate,
   toPlainDate,
   toPlainTime,
   toTimezone,

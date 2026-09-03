@@ -22,6 +22,7 @@ import {
   resolveReopenStatus,
   restoreTask,
   systemClock,
+  toLocalDate,
   updateTaskFields,
   uuidv7,
   type Clock,
@@ -684,12 +685,7 @@ export class TaskService {
   }
 
   /** The workspace's local calendar date, used by the `due` filter (spec 12.3). */
-  private workspaceToday(timezone: string): string {
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(this.clock.now());
+  private workspaceToday(timezone: string): PlainDate {
+    return toLocalDate(this.clock.now(), timezone);
   }
 }

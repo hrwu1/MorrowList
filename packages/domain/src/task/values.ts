@@ -86,3 +86,25 @@ export function normalizeDescription(raw: string | null): string | null {
   const trimmed = raw.trim();
   return trimmed.length === 0 ? null : trimmed;
 }
+
+/**
+ * The calendar date of an instant in an IANA timezone (spec 12.3). Date-only tasks are
+ * evaluated against the workspace's local date, never against UTC, so a task due "today"
+ * in Auckland is still today at 23:30 there even though UTC has moved on.
+ */
+export function toLocalDate(instant: Date, timezone: string): PlainDate {
+  // en-CA formats as YYYY-MM-DD, which is exactly the PlainDate shape.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(instant) as PlainDate;
+}
+
+/** Calendar arithmetic on a plain date; unaffected by DST because it never leaves UTC. */
+export function addDays(date: PlainDate, days: number): PlainDate {
+  const [year, month, day] = date.split("-").map(Number) as [number, number, number];
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  return shifted.toISOString().slice(0, 10) as PlainDate;
+}
