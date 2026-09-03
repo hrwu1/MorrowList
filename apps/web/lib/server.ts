@@ -5,6 +5,7 @@ import {
   ActivityService,
   ProjectService,
   TaskService,
+  ViewService,
   bootstrapUser,
 } from "@morrowlist/application";
 import { createAuth, createAuthPort, type AuthPort } from "@morrowlist/auth";
@@ -83,6 +84,7 @@ export function getContainer(): Container {
     projectService: new ProjectService({ unitOfWork }),
     taskService: new TaskService({ unitOfWork, cursorSecret }),
     activityService: new ActivityService({ unitOfWork, cursorSecret }),
+    viewService: new ViewService({ unitOfWork }),
     logger,
     checkHealth: () => checkDatabaseHealth(database),
   };

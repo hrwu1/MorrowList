@@ -1,5 +1,6 @@
 import {
   activityQuerySchema,
+  addTaskToDayRequestSchema,
   completeTaskRequestSchema,
   createTaskRequestSchema,
   listTasksQuerySchema,
@@ -9,6 +10,7 @@ import {
   updateTaskRequestSchema,
 } from "@morrowlist/contracts";
 import { Hono } from "hono";
+import type { z } from "zod";
 
 import type { ApiDependencies, ApiEnv } from "../context.js";
 import { ApiError } from "../errors.js";
@@ -144,6 +146,29 @@ export function taskRoutes(deps: ApiDependencies) {
         expectedVersionFrom(c.req.query("expectedVersion")),
       );
       return c.json({ data: task });
+    })
+
+    .post("/tasks/:id/today", async (c) => {
+      const actor = c.get("actor");
+      const body = await parseOptionalBody(c, addTaskToDayRequestSchema);
+      const task = await deps.taskService.addToDay(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("id"),
+        body,
+      );
+      return c.json({ data: task });
+    })
+
+    .delete("/tasks/:id/today/:date", async (c) => {
+      const actor = c.get("actor");
+      const task = await deps.taskService.removeFromDay(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("id"),
+        parseQuery({ date: c.req.param("date") }, addTaskToDayRequestSchema).date ?? "",
+      );
+      return c.json({ data: task });
     });
 }
 
@@ -163,17 +188,17 @@ function expectedVersionFrom(raw: string | undefined): number | undefined {
 }
 
 /** POST bodies on action endpoints are optional; an absent body means "no options". */
-async function parseOptionalBody<T extends { parse: (value: unknown) => unknown }>(
+async function parseOptionalBody<T extends z.ZodType>(
   c: { req: { text(): Promise<string> } },
   schema: T,
-): Promise<{ expectedVersion?: number }> {
+): Promise<z.infer<T>> {
   const raw = await c.req.text();
-  if (raw.trim().length === 0) return {};
+  if (raw.trim().length === 0) return parseQuery({}, schema);
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
     throw new ApiError("VALIDATION_FAILED", "Request body must be valid JSON.");
   }
-  return schema.parse(parsed) as { expectedVersion?: number };
+  return parseQuery(parsed as Record<string, string | undefined>, schema);
 }

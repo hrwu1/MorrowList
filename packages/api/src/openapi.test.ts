@@ -29,4 +29,18 @@ describe("board OpenAPI surface", () => {
     expect(document.paths["/projects/{projectId}/activity"]).toHaveProperty("get");
     expect(document.components.schemas).toHaveProperty("ActivityList");
   });
+
+  it("publishes My Day and the Today and Upcoming views", () => {
+    const document = buildOpenApiDocument() as {
+      paths: Record<string, Record<string, unknown>>;
+      components: { schemas: Record<string, unknown> };
+    };
+
+    expect(document.paths["/tasks/{id}/today"]).toHaveProperty("post");
+    expect(document.paths["/tasks/{id}/today/{date}"]).toHaveProperty("delete");
+    expect(document.paths["/views/today"]).toHaveProperty("get");
+    expect(document.paths["/views/upcoming"]).toHaveProperty("get");
+    expect(document.components.schemas).toHaveProperty("TodayView");
+    expect(document.components.schemas).toHaveProperty("UpcomingView");
+  });
 });

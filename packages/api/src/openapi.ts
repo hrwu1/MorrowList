@@ -1,6 +1,7 @@
 import {
   activityListResponseSchema,
   activityQuerySchema,
+  addTaskToDayRequestSchema,
   completeTaskRequestSchema,
   createProjectRequestSchema,
   createTaskRequestSchema,
@@ -15,6 +16,10 @@ import {
   reorderTaskRequestSchema,
   taskListResponseSchema,
   taskResponseSchema,
+  todayViewQuerySchema,
+  todayViewResponseSchema,
+  upcomingViewQuerySchema,
+  upcomingViewResponseSchema,
   updateTaskRequestSchema,
 } from "@morrowlist/contracts";
 import { z } from "zod";
@@ -41,6 +46,9 @@ const registry = {
   MoveTaskRequest: moveTaskRequestSchema,
   ReorderTaskRequest: reorderTaskRequestSchema,
   CompleteTaskRequest: completeTaskRequestSchema,
+  AddTaskToDayRequest: addTaskToDayRequestSchema,
+  TodayView: todayViewResponseSchema,
+  UpcomingView: upcomingViewResponseSchema,
   MeResponse: meResponseSchema,
   ErrorResponse: errorResponseSchema,
 } as const;
@@ -395,6 +403,74 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
           parameters: [taskIdParam, workspaceIdParam],
           responses: {
             "200": { description: "The restored task", ...jsonContent(ref("Task")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/tasks/{id}/today": {
+        post: {
+          summary: "Add a task to My Day",
+          description:
+            "The date defaults to the workspace's current date. Adding a task to a day it is already planned for changes nothing. The task itself is untouched: no version bump, no due date or status change.",
+          parameters: [taskIdParam, workspaceIdParam],
+          requestBody: { required: false, ...jsonContent(ref("AddTaskToDayRequest")) },
+          responses: {
+            "200": {
+              description: "The task with its day plans",
+              ...jsonContent(ref("Task")),
+            },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/tasks/{id}/today/{date}": {
+        delete: {
+          summary: "Remove a My Day selection",
+          parameters: [
+            taskIdParam,
+            {
+              name: "date",
+              in: "path",
+              required: true,
+              description: "The plan date to remove, as YYYY-MM-DD.",
+              schema: { type: "string", format: "date" },
+            },
+            workspaceIdParam,
+          ],
+          responses: {
+            "200": {
+              description: "The task with its day plans",
+              ...jsonContent(ref("Task")),
+            },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/views/today": {
+        get: {
+          summary: "Today projection",
+          description:
+            "The de-duplicated union of overdue, due-today, and My Day tasks in the workspace timezone, each task once under its highest-precedence section with badges for every reason, plus yesterday's unfinished manual selections for review.",
+          parameters: [workspaceIdParam, ...queryParameters(todayViewQuerySchema)],
+          responses: {
+            "200": { description: "The Today view", ...jsonContent(ref("TodayView")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/views/upcoming": {
+        get: {
+          summary: "Upcoming projection",
+          description:
+            "Open tasks due after the start date, grouped by due date within a 7, 14, 30-day, or open horizon.",
+          parameters: [workspaceIdParam, ...queryParameters(upcomingViewQuerySchema)],
+          responses: {
+            "200": {
+              description: "The Upcoming view",
+              ...jsonContent(ref("UpcomingView")),
+            },
             ...commonErrors,
           },
         },

@@ -4,6 +4,7 @@ import type {
   ProjectService,
   TaskService,
   UnitOfWork,
+  ViewService,
 } from "@morrowlist/application";
 import type { AuthPort } from "@morrowlist/auth";
 import type { Logger, Metrics } from "@morrowlist/observability";
@@ -18,6 +19,7 @@ export interface ApiDependencies {
   readonly projectService: ProjectService;
   readonly taskService: TaskService;
   readonly activityService: ActivityService;
+  readonly viewService: ViewService;
   readonly logger: Logger;
   readonly metrics?: Metrics;
   /** Readiness probe backing `GET /ready` (spec FND-006). */

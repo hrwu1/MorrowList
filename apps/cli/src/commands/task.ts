@@ -127,6 +127,7 @@ export function taskCommand(): Command {
     .option("--completed", "completed tasks only")
     .option("--project <id>", "restrict to a project")
     .option("--priority <priority>", "restrict to a priority")
+    .option("--due <filter>", "overdue | today | future | none")
     .option("--limit <n>", "page size, 1-200", "50")
     .action(async (options, command: Command) => {
       const globals = globalsOf(command);
@@ -138,6 +139,7 @@ export function taskCommand(): Command {
             isCompleted: Boolean(options.completed),
             ...(options.project ? { projectId: options.project } : {}),
             ...(options.priority ? { priority: options.priority } : {}),
+            ...(options.due ? { due: options.due } : {}),
             limit: Number(options.limit),
           } as never),
         );

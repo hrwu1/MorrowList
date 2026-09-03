@@ -9,6 +9,7 @@ import { healthRoutes } from "./routes/health.js";
 import { meRoutes } from "./routes/me.js";
 import { projectRoutes } from "./routes/projects.js";
 import { taskRoutes } from "./routes/tasks.js";
+import { viewRoutes } from "./routes/views.js";
 
 /**
  * The `/api/v1` application (FND-006). Mounted inside Next.js today; the same Hono app can
@@ -39,10 +40,12 @@ export function createApiApp(deps: ApiDependencies) {
   app.use("/tasks/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/projects", authenticate(deps.auth, listWorkspaceIds));
   app.use("/projects/*", authenticate(deps.auth, listWorkspaceIds));
+  app.use("/views/*", authenticate(deps.auth, listWorkspaceIds));
 
   app.route("/", meRoutes(deps));
   app.route("/", projectRoutes(deps));
   app.route("/", taskRoutes(deps));
+  app.route("/", viewRoutes(deps));
 
   app.notFound((c) => {
     const { status, body } = toErrorBody(

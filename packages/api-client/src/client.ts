@@ -1,6 +1,7 @@
 import type {
   ActivityListResponse,
   ActivityQuery,
+  AddTaskToDayRequest,
   CreateProjectRequest,
   CreateTaskRequest,
   ErrorCode,
@@ -16,6 +17,10 @@ import type {
   ReorderTaskRequest,
   TaskDto,
   TaskListResponse,
+  TodayViewQuery,
+  TodayViewResponse,
+  UpcomingViewQuery,
+  UpcomingViewResponse,
   UpdateTaskRequest,
 } from "@morrowlist/contracts";
 
@@ -268,6 +273,59 @@ export class ApiClient {
       options,
     );
     return response.data;
+  }
+
+  /** Add a task to My Day; the date defaults to the workspace's current day. */
+  async addTaskToDay(
+    id: string,
+    body: AddTaskToDayRequest = {},
+    options: RequestOptions = {},
+  ): Promise<TaskDto> {
+    const response = await this.send<{ data: TaskDto }>(
+      "POST",
+      `/tasks/${encodeURIComponent(id)}/today${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async removeTaskFromDay(
+    id: string,
+    date: string,
+    options: RequestOptions = {},
+  ): Promise<TaskDto> {
+    const response = await this.send<{ data: TaskDto }>(
+      "DELETE",
+      `/tasks/${encodeURIComponent(id)}/today/${encodeURIComponent(date)}${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+    return response.data;
+  }
+
+  async getTodayView(
+    query: Partial<TodayViewQuery> = {},
+    options: RequestOptions = {},
+  ): Promise<TodayViewResponse> {
+    return this.send<TodayViewResponse>(
+      "GET",
+      `/views/today${this.queryString(query, options)}`,
+      undefined,
+      options,
+    );
+  }
+
+  async getUpcomingView(
+    query: Partial<UpcomingViewQuery> = {},
+    options: RequestOptions = {},
+  ): Promise<UpcomingViewResponse> {
+    return this.send<UpcomingViewResponse>(
+      "GET",
+      `/views/upcoming${this.queryString(query, options)}`,
+      undefined,
+      options,
+    );
   }
 
   private queryString(query: Record<string, unknown>, options: RequestOptions): string {

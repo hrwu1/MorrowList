@@ -2,6 +2,7 @@ import { Command } from "commander";
 
 import { authCommand } from "./commands/auth.js";
 import { taskCommand } from "./commands/task.js";
+import { todayCommand } from "./commands/today.js";
 import { EXIT, printError } from "./formatters/output.js";
 
 /**
@@ -27,6 +28,7 @@ const program = new Command()
 
 program.addCommand(authCommand());
 program.addCommand(taskCommand());
+program.addCommand(todayCommand());
 
 try {
   await program.parseAsync(process.argv);

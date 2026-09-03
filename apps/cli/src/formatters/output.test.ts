@@ -1,7 +1,13 @@
 import type { ActivityEntryDto, TaskDto } from "@morrowlist/contracts";
 import { describe, expect, it } from "vitest";
 
-import { EXIT, exitCodeFor, formatActivity, formatTaskTable } from "./output.js";
+import {
+  EXIT,
+  exitCodeFor,
+  formatActivity,
+  formatTaskTable,
+  formatTodayView,
+} from "./output.js";
 
 function task(overrides: Partial<TaskDto> = {}): TaskDto {
   return {
@@ -27,6 +33,7 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     createdAt: "2026-08-29T09:00:00.000Z",
     updatedAt: "2026-08-29T09:00:00.000Z",
     deletedAt: null,
+    dayPlans: [],
     ...overrides,
   };
 }
@@ -102,5 +109,61 @@ describe("formatActivity", () => {
     );
     expect(output).not.toContain("never printed");
     expect(formatActivity([])).toBe("No activity.");
+describe("formatTodayView", () => {
+  it("prints non-empty sections with the extra badges and the review", () => {
+    const output = formatTodayView({
+      date: "2026-09-03",
+      sections: [
+        {
+          id: "overdue",
+          tasks: [
+            {
+              task: task({ title: "Overdue and chosen", dueDate: "2026-09-01" }),
+              reasons: ["overdue", "my_day"],
+            },
+          ],
+        },
+        { id: "due_today", tasks: [] },
+        {
+          id: "my_day",
+          tasks: [
+            { task: task({ key: "ML-2", title: "Chosen" }), reasons: ["my_day"] },
+          ],
+        },
+      ],
+      review: {
+        date: "2026-09-02",
+        tasks: [task({ key: "ML-3", title: "Left over" })],
+      },
+    });
+
+    expect(output).toBe(
+      [
+        "2026-09-03",
+        "",
+        "Overdue",
+        "[ ] ML-1    Overdue and chosen  (due 2026-09-01)  [My Day]",
+        "",
+        "My Day",
+        "[ ] ML-2    Chosen",
+        "",
+        "Left over from 2026-09-02",
+        "[ ] ML-3    Left over",
+      ].join("\n"),
+    );
+  });
+
+  it("says so when the day is empty", () => {
+    expect(
+      formatTodayView({
+        date: "2026-09-03",
+        sections: [
+          { id: "overdue", tasks: [] },
+          { id: "due_today", tasks: [] },
+          { id: "my_day", tasks: [] },
+        ],
+        review: null,
+      }),
+    ).toBe("Nothing planned for 2026-09-03.");
   });
 });

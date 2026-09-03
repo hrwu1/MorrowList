@@ -1,4 +1,9 @@
-import type { ActivityEntryDto, TaskDto } from "@morrowlist/contracts";
+import type {
+  ActivityEntryDto,
+  TaskDto,
+  TodayReason,
+  TodayViewDto,
+} from "@morrowlist/contracts";
 
 /**
  * Output envelope and exit codes (spec 21.5, 21.6).
@@ -114,6 +119,36 @@ export function formatActivity(entries: readonly ActivityEntryDto[]): string {
 
 function formatValue(value: string | null): string {
   return value === null ? "(none)" : JSON.stringify(value);
+const TODAY_SECTION_LABELS: Record<TodayReason, string> = {
+  overdue: "Overdue",
+  due_today: "Due today",
+  my_day: "My Day",
+};
+
+/** The Today projection: one heading per non-empty section, then yesterday's leftovers. */
+export function formatTodayView(view: TodayViewDto): string {
+  const blocks = view.sections
+    .filter((section) => section.tasks.length > 0)
+    .map((section) => {
+      const rows = section.tasks.map((entry) => {
+        const badges = entry.reasons
+          .filter((reason) => reason !== section.id)
+          .map((reason) => TODAY_SECTION_LABELS[reason]);
+        const line = formatTaskTable([entry.task]);
+        return badges.length > 0 ? `${line}  [${badges.join(", ")}]` : line;
+      });
+      return `${TODAY_SECTION_LABELS[section.id]}\n${rows.join("\n")}`;
+    });
+
+  if (view.review) {
+    blocks.push(
+      `Left over from ${view.review.date}\n${formatTaskTable(view.review.tasks)}`,
+    );
+  }
+
+  return blocks.length === 0
+    ? `Nothing planned for ${view.date}.`
+    : `${view.date}\n\n${blocks.join("\n\n")}`;
 }
 
 export function formatTaskDetail(task: TaskDto): string {
@@ -123,6 +158,7 @@ export function formatTaskDetail(task: TaskDto): string {
     `  priority    ${task.priority}`,
     `  project     ${task.projectId ?? "Inbox"}`,
     `  due         ${task.dueDate ?? "none"}${task.dueTime ? ` ${task.dueTime}` : ""}`,
+    `  my day      ${task.dayPlans.length > 0 ? task.dayPlans.join(", ") : "no"}`,
     `  version     ${task.version}`,
     `  created     ${task.createdAt}`,
   ];

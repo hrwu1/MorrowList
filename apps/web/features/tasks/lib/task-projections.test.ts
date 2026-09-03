@@ -51,6 +51,7 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     createdAt: "2026-08-30T12:00:00.000Z",
     updatedAt: "2026-08-30T12:00:00.000Z",
     deletedAt: null,
+    dayPlans: [],
     ...overrides,
   };
 }

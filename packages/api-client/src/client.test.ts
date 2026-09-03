@@ -121,3 +121,36 @@ describe("task movement requests", () => {
     await expect(requests[0]?.json()).resolves.toEqual({ afterTaskId: STATUS_ID });
   });
 });
+
+describe("My Day and view requests", () => {
+  it("adds to and removes from a day, unwrapping the task", async () => {
+    const task = { id: TASK_ID, dayPlans: ["2026-09-03"] };
+    const { client, requests } = recordingClient({ data: task });
+
+    await expect(
+      client.addTaskToDay(TASK_ID, { date: "2026-09-03" }, { idempotencyKey: "day-1" }),
+    ).resolves.toEqual(task);
+    await client.removeTaskFromDay(TASK_ID, "2026-09-03");
+
+    expect(requests[0]?.method).toBe("POST");
+    expect(requests[0]?.url).toContain(`/tasks/${TASK_ID}/today?workspaceId=`);
+    expect(requests[0]?.headers.get("idempotency-key")).toBe("day-1");
+    await expect(requests[0]?.json()).resolves.toEqual({ date: "2026-09-03" });
+    expect(requests[1]?.method).toBe("DELETE");
+    expect(requests[1]?.url).toContain(
+      `/tasks/${TASK_ID}/today/2026-09-03?workspaceId=`,
+    );
+  });
+
+  it("requests the Today and Upcoming projections", async () => {
+    const { client, requests } = recordingClient({ data: {} });
+
+    await client.getTodayView({ date: "2026-09-03" });
+    await client.getUpcomingView({ horizon: "30" });
+
+    expect(requests[0]?.url).toContain("/views/today?workspaceId=");
+    expect(requests[0]?.url).toContain("date=2026-09-03");
+    expect(requests[1]?.url).toContain("/views/upcoming?workspaceId=");
+    expect(requests[1]?.url).toContain("horizon=30");
+  });
+});

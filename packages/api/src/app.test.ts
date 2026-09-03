@@ -2,6 +2,7 @@ import {
   ActivityService,
   ProjectService,
   TaskService,
+  ViewService,
   bootstrapUser,
 } from "@morrowlist/application";
 import type { AuthPort, AuthenticatedUser } from "@morrowlist/auth";
@@ -73,6 +74,7 @@ beforeEach(async () => {
       cursorSecret: "test-secret",
     }),
     activityService: new ActivityService({ unitOfWork, cursorSecret: "test-secret" }),
+    viewService: new ViewService({ unitOfWork, clock: fixedClock(NOW) }),
     logger: silentLogger,
     checkHealth: async () =>
       healthy
@@ -526,5 +528,117 @@ describe("project and board endpoints", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "VALIDATION_FAILED" },
     });
+  });
+});
+
+describe("My Day and view endpoints", () => {
+  it("adds a task to today, shows it in the Today view, and removes it again", async () => {
+    const created = await (
+      await jsonRequest("/api/v1/tasks", "POST", { title: "Chosen for today" })
+    ).json();
+    await jsonRequest("/api/v1/tasks", "POST", {
+      title: "Overdue",
+      dueDate: "2026-08-20",
+    });
+
+    const added = await jsonRequest(`/api/v1/tasks/${created.data.id}/today`, "POST");
+    expect(added.status).toBe(200);
+    await expect(added.json()).resolves.toMatchObject({
+      data: { id: created.data.id, dayPlans: ["2026-08-29"], version: 1 },
+    });
+
+    const today = await request("/api/v1/views/today");
+    expect(today.status).toBe(200);
+    const view = await today.json();
+    expect(view.data.date).toBe("2026-08-29");
+    expect(view.data.sections.map((s: { id: string }) => s.id)).toEqual([
+      "overdue",
+      "due_today",
+      "my_day",
+    ]);
+    expect(view.data.sections[0].tasks[0]).toMatchObject({
+      task: { title: "Overdue" },
+      reasons: ["overdue"],
+    });
+    expect(view.data.sections[2].tasks[0]).toMatchObject({
+      task: { id: created.data.id },
+      reasons: ["my_day"],
+    });
+    expect(view.data.review).toBeNull();
+
+    const removed = await request(`/api/v1/tasks/${created.data.id}/today/2026-08-29`, {
+      method: "DELETE",
+    });
+    expect(removed.status).toBe(200);
+    await expect(removed.json()).resolves.toMatchObject({ data: { dayPlans: [] } });
+  });
+
+  it("surfaces yesterday's unfinished selection in the review, not the sections", async () => {
+    const created = await (
+      await jsonRequest("/api/v1/tasks", "POST", { title: "Left over" })
+    ).json();
+    await jsonRequest(`/api/v1/tasks/${created.data.id}/today`, "POST", {
+      date: "2026-08-28",
+    });
+
+    const view = await (await request("/api/v1/views/today")).json();
+
+    expect(view.data.review).toMatchObject({
+      date: "2026-08-28",
+      tasks: [{ id: created.data.id }],
+    });
+    expect(
+      view.data.sections.every((s: { tasks: unknown[] }) => s.tasks.length === 0),
+    ).toBe(true);
+  });
+
+  it("validates the day plan date and the view queries", async () => {
+    const created = await (
+      await jsonRequest("/api/v1/tasks", "POST", { title: "Dated" })
+    ).json();
+
+    const badBody = await jsonRequest(
+      `/api/v1/tasks/${created.data.id}/today`,
+      "POST",
+      {
+        date: "tomorrow",
+      },
+    );
+    expect(badBody.status).toBe(422);
+    const badPath = await request(`/api/v1/tasks/${created.data.id}/today/nope`, {
+      method: "DELETE",
+    });
+    expect(badPath.status).toBe(422);
+    expect((await request("/api/v1/views/today?date=2026-13-01")).status).toBe(422);
+    expect((await request("/api/v1/views/upcoming?horizon=9")).status).toBe(422);
+  });
+
+  it("groups upcoming tasks by date within the requested horizon", async () => {
+    await jsonRequest("/api/v1/tasks", "POST", {
+      title: "Soon",
+      dueDate: "2026-08-30",
+    });
+    await jsonRequest("/api/v1/tasks", "POST", {
+      title: "Later",
+      dueDate: "2026-09-20",
+    });
+
+    const fortnight = await (await request("/api/v1/views/upcoming")).json();
+    const all = await (await request("/api/v1/views/upcoming?horizon=all")).json();
+
+    expect(fortnight.data).toMatchObject({ from: "2026-08-29", horizon: "14" });
+    expect(fortnight.data.groups.map((g: { date: string }) => g.date)).toEqual([
+      "2026-08-30",
+    ]);
+    expect(all.data.groups.map((g: { date: string }) => g.date)).toEqual([
+      "2026-08-30",
+      "2026-09-20",
+    ]);
+  });
+
+  it("requires authentication for the views", async () => {
+    currentUser = null;
+
+    expect((await request("/api/v1/views/today")).status).toBe(401);
   });
 });
