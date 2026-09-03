@@ -3,10 +3,12 @@
 import { useDndMonitor, type DragEndEvent } from "@dnd-kit/core";
 import type { TaskDto, WorkflowStatusDto } from "@morrowlist/contracts";
 import { Alert, Button, Select, Spinner } from "@morrowlist/ui";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { isMoveConflict, useMoveBoardTask, useProjectBoard } from "../hooks/use-board";
+import { useCollapsedColumns } from "../hooks/use-collapsed-columns";
 import {
   placementChangesTask,
   placementForDrop,
@@ -20,9 +22,14 @@ import {
   type BoardStageView,
 } from "../lib/board-view";
 
-import { KanbanColumn } from "./kanban-column";
+import { KanbanColumn, type ColumnEditing } from "./kanban-column";
 
 import { ActivityList } from "@/features/activity/components/activity-list";
+import {
+  describeWorkflowError,
+  useArchiveStatus,
+  useUpdateStatus,
+} from "@/features/projects/hooks/use-workflow";
 import { QuickAdd } from "@/features/tasks/components/quick-add";
 import { TaskPanel } from "@/features/tasks/components/task-panel";
 
@@ -36,6 +43,10 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const updateStatus = useUpdateStatus(projectId);
+  const archiveStatus = useArchiveStatus(projectId);
+  const collapsedColumns = useCollapsedColumns(projectId);
+  const [editError, setEditError] = useState<ColumnEditing["error"]>(null);
   const sort = readBoardSort(new URLSearchParams(searchParams.toString()));
   const stageView = readBoardStageView(new URLSearchParams(searchParams.toString()));
   const showSubtasks = readBoardSubtasks(new URLSearchParams(searchParams.toString()));
@@ -133,6 +144,44 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
     }
   }
 
+  const editing: ColumnEditing = {
+    busy: updateStatus.isPending || archiveStatus.isPending,
+    error: editError,
+    onUpdate: (status, patch) => {
+      setEditError(null);
+      updateStatus.mutate(
+        { status, patch },
+        {
+          onSuccess: (next) =>
+            setAnnouncement(
+              patch.name !== undefined
+                ? `Renamed ${status.name} to ${next.name}.`
+                : `Updated ${next.name}.`,
+            ),
+          onError: (error) =>
+            setEditError({
+              statusId: status.id,
+              message: describeWorkflowError(error),
+            }),
+        },
+      );
+    },
+    onArchive: (status, request) => {
+      setEditError(null);
+      archiveStatus.mutate(
+        { status, request },
+        {
+          onSuccess: () => setAnnouncement(`Archived ${status.name}.`),
+          onError: (error) =>
+            setEditError({
+              statusId: status.id,
+              message: describeWorkflowError(error),
+            }),
+        },
+      );
+    },
+  };
+
   function moveFromMenu(task: TaskDto, statusId: string) {
     const destination = statuses.find((status) => status.id === statusId);
     if (!destination) return;
@@ -210,11 +259,19 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
             {statuses.length} stages
           </p>
         </div>
-        {defaultStatus ? (
-          <Button variant="primary" onClick={() => setShowQuickAdd((open) => !open)}>
-            {showQuickAdd ? "Close" : `+ Add to ${defaultStatus.name}`}
-          </Button>
-        ) : null}
+        <div className="board-page__actions">
+          <Link
+            className="ml-button ml-button--ghost"
+            href={`/projects/${project.id}/settings`}
+          >
+            Project settings
+          </Link>
+          {defaultStatus ? (
+            <Button variant="primary" onClick={() => setShowQuickAdd((open) => !open)}>
+              {showQuickAdd ? "Close" : `+ Add to ${defaultStatus.name}`}
+            </Button>
+          ) : null}
+        </div>
       </header>
 
       {showQuickAdd && defaultStatus ? (
@@ -385,8 +442,11 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
                   dragDisabled={moveTask.isPending}
                   reorderDisabled={sort !== "manual"}
                   moveDisabled={moveTask.isPending}
+                  collapsed={collapsedColumns.collapsed.includes(status.id)}
                   hrefForTask={hrefForTask}
                   onMove={moveFromMenu}
+                  onToggleCollapse={collapsedColumns.toggle}
+                  editing={editing}
                 />
               ))}
             </div>

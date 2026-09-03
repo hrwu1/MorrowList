@@ -5,13 +5,22 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
-import { useCreateProject, useProjects } from "../hooks/use-projects";
+import {
+  useCreateProject,
+  useProjects,
+  useRestoreProject,
+} from "../hooks/use-projects";
 
 export function ProjectListPage() {
   const router = useRouter();
-  const projects = useProjects();
+  const projects = useProjects({ includeArchived: true });
   const createProject = useCreateProject();
+  const restoreProject = useRestoreProject();
   const [name, setName] = useState("");
+  const active =
+    projects.data?.data.filter((project) => project.archivedAt === null) ?? [];
+  const archived =
+    projects.data?.data.filter((project) => project.archivedAt !== null) ?? [];
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -84,15 +93,15 @@ export function ProjectListPage() {
           </p>
           <Button onClick={() => void projects.refetch()}>Try again</Button>
         </Alert>
-      ) : projects.data.data.length === 0 ? (
+      ) : active.length === 0 ? (
         <EmptyState
           title="Start with one meaningful project"
           description="Name it above. MorrowList will give it a calm six-stage workflow that you can use immediately."
         />
       ) : (
         <ul className="project-list" aria-label="Projects">
-          {projects.data.data.map((project) => (
-            <li key={project.id}>
+          {active.map((project) => (
+            <li key={project.id} className="project-list__item">
               <Link
                 className="project-list__link"
                 href={`/projects/${project.id}/board`}
@@ -104,10 +113,54 @@ export function ProjectListPage() {
                 </span>
                 <span aria-hidden="true">→</span>
               </Link>
+              <Link
+                className="ml-button ml-button--ghost"
+                href={`/projects/${project.id}/settings`}
+                aria-label={`Settings for ${project.name}`}
+              >
+                Settings
+              </Link>
             </li>
           ))}
         </ul>
       )}
+
+      {archived.length > 0 ? (
+        <section aria-labelledby="archived-projects-heading" className="stack-tight">
+          <h2 id="archived-projects-heading" className="section-heading">
+            Archived projects
+          </h2>
+          {restoreProject.isError ? (
+            <Alert tone="error" title="The project could not be restored">
+              {restoreProject.error instanceof Error
+                ? restoreProject.error.message
+                : "Something went wrong."}
+            </Alert>
+          ) : null}
+          <ul className="project-list" aria-label="Archived projects">
+            {archived.map((project) => (
+              <li key={project.id} className="project-list__item">
+                <span className="project-list__link project-list__link--archived">
+                  <span className="project-list__mark" aria-hidden="true" />
+                  <span>
+                    <strong>{project.name}</strong>
+                    <span className="project-list__hint">Archived, tasks kept</span>
+                  </span>
+                </span>
+                <Button
+                  aria-label={`Restore ${project.name}`}
+                  loading={
+                    restoreProject.isPending && restoreProject.variables === project.id
+                  }
+                  onClick={() => restoreProject.mutate(project.id)}
+                >
+                  Restore
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }
