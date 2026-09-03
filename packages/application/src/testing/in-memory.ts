@@ -6,6 +6,7 @@ import {
   isDeferred,
   type DayPlan,
   type PlainDate,
+  type Reminder,
   type StatusInterval,
   type Tag,
   type Task,
@@ -20,13 +21,20 @@ import type {
   AggregateType,
   Cursor,
   DayPlanRepository,
+  Notification,
+  NotificationPreferenceRepository,
+  NotificationPreferences,
+  NotificationRepository,
   OutboxEventInput,
   OutboxRepository,
   Page,
   Project,
   ProjectRepository,
+  PushSubscription,
+  PushSubscriptionRepository,
   RankScope,
   RelationEdge,
+  ReminderRepository,
   StatusIntervalInput,
   StatusIntervalRepository,
   SavedView,
@@ -68,6 +76,13 @@ export interface InMemoryData {
   intervals: InMemoryInterval[];
   workspaces: Map<string, Workspace>;
   memberships: WorkspaceMembership[];
+  /** Keyed by task id: a task has at most one reminder. */
+  reminders: Map<string, Reminder>;
+  notifications: Map<string, Notification>;
+  /** Keyed by `${userId}:${workspaceId}`. */
+  notificationPreferences: Map<string, NotificationPreferences>;
+  /** Keyed by `${userId}:${endpoint}`. */
+  pushSubscriptions: Map<string, PushSubscription>;
   activity: ActivityEvent[];
   outbox: OutboxEventInput[];
 }
@@ -89,6 +104,10 @@ export function emptyData(): InMemoryData {
     intervals: [],
     workspaces: new Map(),
     memberships: [],
+    reminders: new Map(),
+    notifications: new Map(),
+    notificationPreferences: new Map(),
+    pushSubscriptions: new Map(),
     activity: [],
     outbox: [],
   };
@@ -846,6 +865,132 @@ function workspaceRepository(data: InMemoryData): WorkspaceRepository {
         ) ?? null
       );
     },
+    async listMembers(workspaceId) {
+      return data.memberships.filter((m) => m.workspaceId === workspaceId);
+    },
+  };
+}
+
+function reminderRepository(data: InMemoryData): ReminderRepository {
+  return {
+    async upsert(reminder) {
+      data.reminders.set(reminder.taskId, reminder);
+    },
+    async delete(taskId) {
+      data.reminders.delete(taskId);
+    },
+    async findByTask(taskId) {
+      return data.reminders.get(taskId) ?? null;
+    },
+    async claimDue(now, limit) {
+      const due = [...data.reminders.values()]
+        .filter((r) => r.deliveredAt === null && r.remindAt.getTime() <= now.getTime())
+        .sort((a, b) => a.remindAt.getTime() - b.remindAt.getTime())
+        .slice(0, limit)
+        .map((r) => ({ ...r, deliveredAt: now }));
+      for (const reminder of due) data.reminders.set(reminder.taskId, reminder);
+      return due;
+    },
+  };
+}
+
+function notificationRepository(data: InMemoryData): NotificationRepository {
+  const forUser = (workspaceId: string, userId: string) =>
+    [...data.notifications.values()].filter(
+      (n) => n.workspaceId === workspaceId && n.userId === userId,
+    );
+  return {
+    async insert(notification) {
+      data.notifications.set(notification.id, notification);
+    },
+    async findById(workspaceId, userId, notificationId) {
+      const found = data.notifications.get(notificationId);
+      return found && found.workspaceId === workspaceId && found.userId === userId
+        ? found
+        : null;
+    },
+    async list(workspaceId, userId, cursor, unreadOnly) {
+      let items = forUser(workspaceId, userId)
+        .filter((n) => !unreadOnly || n.readAt === null)
+        .sort((left, right) => {
+          const byTime = right.createdAt.getTime() - left.createdAt.getTime();
+          if (byTime !== 0) return byTime;
+          return left.id < right.id ? 1 : -1;
+        });
+      if (cursor.after) {
+        const index = items.findIndex((n) => n.id === cursor.after);
+        if (index >= 0) items = items.slice(index + 1);
+      }
+      return {
+        items: items.slice(0, cursor.limit),
+        hasMore: items.length > cursor.limit,
+        nextCursor: null,
+      };
+    },
+    async markRead(workspaceId, userId, notificationId, readAt) {
+      const found = data.notifications.get(notificationId);
+      if (!found || found.workspaceId !== workspaceId || found.userId !== userId) {
+        return false;
+      }
+      if (found.readAt === null) data.notifications.set(found.id, { ...found, readAt });
+      return true;
+    },
+    async countUnread(workspaceId, userId) {
+      return forUser(workspaceId, userId).filter((n) => n.readAt === null).length;
+    },
+  };
+}
+
+function preferenceKey(userId: string, workspaceId: string): string {
+  return `${userId}:${workspaceId}`;
+}
+
+function notificationPreferenceRepository(
+  data: InMemoryData,
+): NotificationPreferenceRepository {
+  return {
+    async find(userId, workspaceId) {
+      return (
+        data.notificationPreferences.get(preferenceKey(userId, workspaceId)) ?? null
+      );
+    },
+    async upsert(preferences) {
+      data.notificationPreferences.set(
+        preferenceKey(preferences.userId, preferences.workspaceId),
+        preferences,
+      );
+    },
+    async listWithDigest() {
+      return [...data.notificationPreferences.values()].filter(
+        (p) => p.digestTime !== null,
+      );
+    },
+    async claimDigest(userId, workspaceId, date) {
+      const key = preferenceKey(userId, workspaceId);
+      const current = data.notificationPreferences.get(key);
+      if (!current) return false;
+      if (current.lastDigestDate !== null && current.lastDigestDate >= date)
+        return false;
+      data.notificationPreferences.set(key, { ...current, lastDigestDate: date });
+      return true;
+    },
+  };
+}
+
+function pushSubscriptionRepository(data: InMemoryData): PushSubscriptionRepository {
+  return {
+    async upsert(subscription) {
+      data.pushSubscriptions.set(
+        `${subscription.userId}:${subscription.endpoint}`,
+        subscription,
+      );
+    },
+    async delete(userId, endpoint) {
+      return data.pushSubscriptions.delete(`${userId}:${endpoint}`);
+    },
+    async listForUser(userId) {
+      return [...data.pushSubscriptions.values()].filter((s) => s.userId === userId);
+    },
   };
 }
 
@@ -952,6 +1097,10 @@ export function createInMemoryUnitOfWork(
     intervals: [...source.intervals],
     workspaces: new Map(source.workspaces),
     memberships: [...source.memberships],
+    reminders: new Map(source.reminders),
+    notifications: new Map(source.notifications),
+    notificationPreferences: new Map(source.notificationPreferences),
+    pushSubscriptions: new Map(source.pushSubscriptions),
     activity: [...source.activity],
     outbox: [...source.outbox],
   });
@@ -969,6 +1118,10 @@ export function createInMemoryUnitOfWork(
     target.intervals = source.intervals;
     target.workspaces = source.workspaces;
     target.memberships = source.memberships;
+    target.reminders = source.reminders;
+    target.notifications = source.notifications;
+    target.notificationPreferences = source.notificationPreferences;
+    target.pushSubscriptions = source.pushSubscriptions;
     target.activity = source.activity;
     target.outbox = source.outbox;
   };
@@ -993,6 +1146,10 @@ export function createInMemoryUnitOfWork(
         statusIntervals: statusIntervalRepository(working),
         savedViews: savedViewRepository(working),
         workspaces: workspaceRepository(working),
+        reminders: reminderRepository(working),
+        notifications: notificationRepository(working),
+        notificationPreferences: notificationPreferenceRepository(working),
+        pushSubscriptions: pushSubscriptionRepository(working),
         activity: activityRepository(working),
         outbox: outboxRepository(working),
       };

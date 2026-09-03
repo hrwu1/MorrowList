@@ -95,5 +95,13 @@ export function createWorkspaceRepository(db: Database): WorkspaceRepository {
         .limit(1);
       return row ?? null;
     },
+
+    async listMembers(workspaceId) {
+      return db
+        .select()
+        .from(workspaceMembers)
+        .where(eq(workspaceMembers.workspaceId, workspaceId))
+        .orderBy(workspaceMembers.joinedAt, workspaceMembers.userId);
+    },
   };
 }

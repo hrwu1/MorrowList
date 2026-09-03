@@ -17,6 +17,18 @@ export {
   type UpcomingTaskQuery,
 } from "./tasks.js";
 export type { DayPlanRepository } from "./day-plans.js";
+export {
+  NOTIFICATION_KINDS,
+  type Notification,
+  type NotificationChannels,
+  type NotificationKind,
+  type NotificationPreferenceRepository,
+  type NotificationPreferences,
+  type NotificationRepository,
+  type PushSubscription,
+  type PushSubscriptionRepository,
+  type ReminderRepository,
+} from "./notifications.js";
 export type {
   Project,
   ProjectRepository,

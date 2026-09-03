@@ -8,6 +8,12 @@ import {
 } from "./repositories/events.js";
 import { createStatusIntervalRepository } from "./repositories/flow.js";
 import {
+  createNotificationPreferenceRepository,
+  createNotificationRepository,
+  createPushSubscriptionRepository,
+  createReminderRepository,
+} from "./repositories/notifications.js";
+import {
   createProjectRepository,
   createWorkflowStatusRepository,
 } from "./repositories/projects.js";
@@ -37,6 +43,10 @@ export function buildTransactionContext(db: Database): TransactionContext {
     statusIntervals: createStatusIntervalRepository(db),
     savedViews: createSavedViewRepository(db),
     workspaces: createWorkspaceRepository(db),
+    reminders: createReminderRepository(db),
+    notifications: createNotificationRepository(db),
+    notificationPreferences: createNotificationPreferenceRepository(db),
+    pushSubscriptions: createPushSubscriptionRepository(db),
     activity: createActivityRepository(db),
     outbox: createOutboxRepository(db),
   };

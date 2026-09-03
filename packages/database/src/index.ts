@@ -14,6 +14,12 @@ export {
   createOutboxRepository,
 } from "./repositories/events.js";
 export {
+  createNotificationPreferenceRepository,
+  createNotificationRepository,
+  createPushSubscriptionRepository,
+  createReminderRepository,
+} from "./repositories/notifications.js";
+export {
   createProjectRepository,
   createWorkflowStatusRepository,
 } from "./repositories/projects.js";

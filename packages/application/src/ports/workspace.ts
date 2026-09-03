@@ -34,4 +34,6 @@ export interface WorkspaceRepository {
     workspaceId: string,
     userId: string,
   ): Promise<WorkspaceMembership | null>;
+  /** Everyone in the workspace: the recipients of its reminders (GAP-13). */
+  listMembers(workspaceId: string): Promise<readonly WorkspaceMembership[]>;
 }
