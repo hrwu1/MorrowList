@@ -21,6 +21,7 @@ import {
 
 import { KanbanColumn } from "./kanban-column";
 
+import { ActivityList } from "@/features/activity/components/activity-list";
 import { QuickAdd } from "@/features/tasks/components/quick-add";
 import { TaskPanel } from "@/features/tasks/components/task-panel";
 
@@ -41,6 +42,7 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   const selectedTaskKey = searchParams.get("task");
   const [mobileStatusId, setMobileStatusId] = useState<string | null>(null);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const lastOpenTask = useRef<string | null>(selectedTaskKey);
 
@@ -368,6 +370,24 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
           ) : null}
         </div>
       )}
+
+      <details
+        className="task-detail__disclosure board-page__activity"
+        onToggle={(event) => setShowActivity(event.currentTarget.open)}
+      >
+        <summary className="task-detail__disclosure-summary">
+          <span>Project activity</span>
+          <span className="task-detail__hint">Recent changes across this project</span>
+        </summary>
+        <div className="task-detail__disclosure-body">
+          {showActivity ? (
+            <ActivityList
+              source={{ kind: "project", projectId: project.id }}
+              label={`Activity for ${project.name}`}
+            />
+          ) : null}
+        </div>
+      </details>
 
       <output className="ml-visually-hidden" aria-live="polite">
         {announcement}

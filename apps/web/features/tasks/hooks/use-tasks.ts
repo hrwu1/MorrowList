@@ -16,6 +16,7 @@ import {
   type QueryKey,
 } from "@tanstack/react-query";
 
+import { activityKeys } from "../../activity/hooks/use-activity";
 import { projectKeys } from "../../projects/hooks/use-projects";
 import { patchTaskInBoard, selectInboxDestination } from "../lib/task-projections";
 import { matchesFilters } from "../lib/task-view";
@@ -145,6 +146,8 @@ function invalidateLists(queryClient: QueryClient): void {
 function invalidateTaskProjections(queryClient: QueryClient): void {
   invalidateLists(queryClient);
   void queryClient.invalidateQueries({ queryKey: projectKeys.boards() });
+  // Every mutation records history, so any open activity list is now behind.
+  void queryClient.invalidateQueries({ queryKey: activityKeys.all });
 }
 
 async function cancelTaskProjections(queryClient: QueryClient): Promise<void> {

@@ -27,6 +27,7 @@ import {
 import { Markdown } from "./markdown";
 import { DueDateInput, DueTimeInput, PrioritySelect } from "./task-fields";
 
+import { ActivityList } from "@/features/activity/components/activity-list";
 import { useProjects } from "@/features/projects/hooks/use-projects";
 
 /**
@@ -122,6 +123,9 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [conflict, setConflict] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
+  // History is fetched only once its disclosure is open: on the task's own page that is
+  // immediately, in the side panel on demand.
+  const [showActivity, setShowActivity] = useState(variant === "page");
 
   // Refs, not state: the debounce callback must read the newest values without being
   // rescheduled every keystroke.
@@ -474,6 +478,25 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
                 <p className="task-detail__hint">Nothing to preview yet.</p>
               )}
             </div>
+          ) : null}
+        </div>
+      </details>
+
+      <details
+        className="task-detail__disclosure"
+        open={variant === "page"}
+        onToggle={(event) => setShowActivity(event.currentTarget.open)}
+      >
+        <summary className="task-detail__disclosure-summary">
+          <span>Activity</span>
+          <span className="task-detail__hint">Who changed what, and when</span>
+        </summary>
+        <div className="task-detail__disclosure-body">
+          {showActivity ? (
+            <ActivityList
+              source={{ kind: "task", idOrKey: task.key }}
+              label={`Activity for ${task.key}`}
+            />
           ) : null}
         </div>
       </details>

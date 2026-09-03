@@ -11,6 +11,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { projectKeys } from "../../projects/hooks/use-projects";
 import { moveTaskInBoard, type BoardPlacement } from "../lib/board-view";
 
+import { activityKeys } from "@/features/activity/hooks/use-activity";
 import { taskKeys } from "@/features/tasks/hooks/use-tasks";
 import { apiClient } from "@/lib/api-client";
 
@@ -87,6 +88,7 @@ export function useMoveBoardTask(projectId: string) {
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: boardKey });
       void queryClient.invalidateQueries({ queryKey: taskKeys.all });
+      void queryClient.invalidateQueries({ queryKey: activityKeys.all });
     },
   });
 }

@@ -1,0 +1,19 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`describeEntry > renders a readable line for every event type in the catalogue 1`] = `
+{
+  "project.archived": "Archived project",
+  "project.created": "Created project Launch",
+  "project.restored": "Restored project",
+  "project.updated": "Updated project",
+  "task.completed": "Completed task",
+  "task.created": "Created task ML-1",
+  "task.deleted": "Moved task to Trash",
+  "task.moved": "Moved task to another status",
+  "task.reopened": "Reopened task",
+  "task.reordered": "Reordered task",
+  "task.restored": "Restored task from Trash",
+  "task.updated": "Updated task fields · Title: Draft brief → Draft the brief · Priority: none → high · Due date: none → 2026-09-15 · Description: none → ## Notes",
+  "workspace.created": "Created workspace Alex's Workspace",
+}
+`;
