@@ -3,6 +3,7 @@ import { fixedClock, uuidv7 } from "@morrowlist/domain";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { ProjectService } from "../projects/service.js";
+import { TagService } from "../tags/service.js";
 import { TaskService } from "../tasks/service.js";
 import {
   createInMemoryUnitOfWork,
@@ -22,6 +23,7 @@ let unitOfWork: InMemoryUnitOfWork;
 let seeded: SeededWorkspace;
 let tasks: TaskService;
 let projects: ProjectService;
+let tags: TagService;
 let activity: ActivityService;
 
 const query = (overrides: { limit?: number; cursor?: string } = {}) => ({
@@ -38,6 +40,7 @@ beforeEach(() => {
     cursorSecret: CURSOR_SECRET,
   });
   projects = new ProjectService({ unitOfWork, clock: fixedClock(NOW) });
+  tags = new TagService({ unitOfWork, clock: fixedClock(NOW) });
   activity = new ActivityService({ unitOfWork, cursorSecret: CURSOR_SECRET });
 });
 
@@ -65,6 +68,9 @@ async function taskWithFullHistory(): Promise<TaskDto> {
   });
   task = await tasks.complete(seeded.context, workspaceId, task.id);
   task = await tasks.reopen(seeded.context, workspaceId, task.id);
+  const focus = await tags.create(seeded.context, workspaceId, { name: "Focus" });
+  task = await tasks.addTag(seeded.context, workspaceId, task.id, focus.id);
+  task = await tasks.removeTag(seeded.context, workspaceId, task.id, focus.id);
   task = await tasks.addToDay(seeded.context, workspaceId, task.id, {
     date: "2026-08-29",
   });
@@ -95,6 +101,8 @@ describe("ActivityService.listForTask", () => {
       TASK_EVENTS.parentChanged,
       TASK_EVENTS.dayRemoved,
       TASK_EVENTS.dayAdded,
+      TASK_EVENTS.tagRemoved,
+      TASK_EVENTS.tagAdded,
       TASK_EVENTS.reopened,
       TASK_EVENTS.completed,
       TASK_EVENTS.reordered,
@@ -111,6 +119,11 @@ describe("ActivityService.listForTask", () => {
         .filter((entry) => entry.eventType === TASK_EVENTS.parentChanged)
         .map((entry) => entry.summary),
     ).toEqual(["Detached task from its parent", "Made task a subtask"]);
+    expect(
+      data
+        .filter((entry) => entry.eventType.startsWith("task.tag_"))
+        .map((entry) => entry.summary),
+    ).toEqual(["Removed tag Focus", "Added tag Focus"]);
     for (const entry of data) {
       expect(entry.summary.length).toBeGreaterThan(0);
       expect(entry.actorDisplayName).toBe("Test User");
@@ -165,8 +178,8 @@ describe("ActivityService.listForTask", () => {
       seen.push(...next.data);
       cursor = next.page.nextCursor;
     }
-    expect(seen).toHaveLength(12);
-    expect(new Set(seen.map((entry) => entry.id)).size).toBe(12);
+    expect(seen).toHaveLength(14);
+    expect(new Set(seen.map((entry) => entry.id)).size).toBe(14);
 
     const [body] = (first.page.nextCursor as string).split(".");
     await expect(

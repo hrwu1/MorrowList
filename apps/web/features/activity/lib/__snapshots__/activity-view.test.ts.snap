@@ -16,6 +16,8 @@ exports[`describeEntry > renders a readable line for every event type in the cat
   "task.reopened": "Reopened task",
   "task.reordered": "Reordered task",
   "task.restored": "Restored task from Trash",
+  "task.tag_added": "Added tag Focus",
+  "task.tag_removed": "Removed tag Focus",
   "task.updated": "Updated task fields · Title: Draft brief → Draft the brief · Priority: none → high · Due date: none → 2026-09-15 · Description: none → ## Notes",
   "workspace.created": "Created workspace Alex's Workspace",
 }

@@ -53,6 +53,8 @@ const CATALOGUE: Record<string, Partial<ActivityEntryDto>> = {
   [TASK_EVENTS.dayAdded]: { summary: "Added task to My Day for 2026-08-29" },
   [TASK_EVENTS.dayRemoved]: { summary: "Removed task from My Day for 2026-08-29" },
   [TASK_EVENTS.parentChanged]: { summary: "Made task a subtask" },
+  [TASK_EVENTS.tagAdded]: { summary: "Added tag Focus" },
+  [TASK_EVENTS.tagRemoved]: { summary: "Removed tag Focus" },
   [PROJECT_EVENTS.created]: {
     aggregateType: "project",
     summary: "Created project Launch",
