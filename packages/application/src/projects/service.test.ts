@@ -261,3 +261,104 @@ function buildTask(
     deletedBy: null,
   };
 }
+
+describe("ProjectService editing", () => {
+  it("updates the name, description, colour, and icon with one event", async () => {
+    const updated = await service.update(
+      seeded.context,
+      seeded.workspace.id,
+      seeded.project.id,
+      { name: "  Test Project Two ", descriptionMd: "Why", colorToken: "violet" },
+    );
+
+    expect(updated).toMatchObject({
+      name: "Test Project Two",
+      slug: "test-project",
+      descriptionMd: "Why",
+      colorToken: "violet",
+      version: 2,
+    });
+    expect(unitOfWork.data.activity.at(-1)).toMatchObject({
+      aggregateType: "project",
+      aggregateId: seeded.project.id,
+      eventType: "project.updated",
+      payload: { changes: { name: { from: "Test Project", to: "Test Project Two" } } },
+    });
+    expect(unitOfWork.data.outbox.at(-1)?.eventType).toBe("project.updated");
+  });
+
+  it("keeps names unique but allows a project to keep its own", async () => {
+    await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      name: "Alpha",
+    });
+    await expect(
+      service.update(seeded.context, seeded.workspace.id, seeded.project.id, {
+        name: "alpha",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    await expect(
+      service.update(seeded.context, seeded.workspace.id, seeded.project.id, {
+        name: "TEST PROJECT",
+      }),
+    ).resolves.toMatchObject({ name: "TEST PROJECT" });
+  });
+
+  it("rejects a stale expected version and records nothing", async () => {
+    const before = unitOfWork.data.activity.length;
+    await expect(
+      service.update(seeded.context, seeded.workspace.id, seeded.project.id, {
+        name: "Later",
+        expectedVersion: 3,
+      }),
+    ).rejects.toMatchObject({ code: "VERSION_CONFLICT" });
+    expect(unitOfWork.data.activity).toHaveLength(before);
+  });
+
+  it("archives and restores, hiding archived projects from the default list", async () => {
+    const archived = await service.archive(
+      seeded.context,
+      seeded.workspace.id,
+      seeded.project.id,
+    );
+    expect(archived.archivedAt).toBe(NOW.toISOString());
+    expect(unitOfWork.data.activity.at(-1)?.eventType).toBe("project.archived");
+
+    const visible = await service.list(seeded.context, {
+      workspaceId: seeded.workspace.id,
+    });
+    expect(visible.data).toEqual([]);
+    const all = await service.list(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      includeArchived: true,
+    });
+    expect(all.data.map((project) => project.archivedAt)).toEqual([NOW.toISOString()]);
+    await expect(
+      service.get(seeded.context, seeded.workspace.id, seeded.project.id),
+    ).rejects.toMatchObject({ code: "PROJECT_NOT_FOUND" });
+
+    // Archiving twice is a no-op, not an error.
+    await expect(
+      service.archive(seeded.context, seeded.workspace.id, seeded.project.id),
+    ).resolves.toMatchObject({ version: 2 });
+
+    const restored = await service.restore(
+      seeded.context,
+      seeded.workspace.id,
+      seeded.project.id,
+    );
+    expect(restored).toMatchObject({ archivedAt: null, version: 3 });
+    expect(unitOfWork.data.activity.at(-1)?.eventType).toBe("project.restored");
+    expect(unitOfWork.data.outbox.at(-1)?.eventType).toBe("project.restored");
+  });
+
+  it("rolls back an archive together with its event rows", async () => {
+    const before = unitOfWork.data.activity.length;
+    unitOfWork.failNextCommit();
+    await expect(
+      service.archive(seeded.context, seeded.workspace.id, seeded.project.id),
+    ).rejects.toThrow(/simulated commit failure/);
+    expect(unitOfWork.data.projects.get(seeded.project.id)?.archivedAt).toBeNull();
+    expect(unitOfWork.data.activity).toHaveLength(before);
+  });
+});

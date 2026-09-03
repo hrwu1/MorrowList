@@ -74,6 +74,13 @@ export const PROJECT_EVENTS = {
   restored: "project.restored",
 } as const;
 
+export const WORKFLOW_STATUS_EVENTS = {
+  created: "workflow_status.created",
+  updated: "workflow_status.updated",
+  reordered: "workflow_status.reordered",
+  archived: "workflow_status.archived",
+} as const;
+
 export type AggregateType = z.infer<typeof aggregateTypeSchema>;
 export type DomainEvent = z.infer<typeof domainEventSchema>;
 

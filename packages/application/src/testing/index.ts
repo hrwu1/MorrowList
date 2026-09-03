@@ -17,6 +17,7 @@ export {
   buildActorContext,
   buildDefaultWorkflow,
   buildProject,
+  buildTask,
   buildWorkspace,
   seedWorkspace,
   statusByCategory,

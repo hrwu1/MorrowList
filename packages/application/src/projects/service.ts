@@ -1,14 +1,16 @@
 import type {
   CreateProjectRequest,
+  ListProjectsQuery,
   ProjectBoardQuery,
   ProjectBoardResponse,
   ProjectDetailDto,
+  ProjectDto,
   ProjectListResponse,
+  UpdateProjectRequest,
 } from "@morrowlist/contracts";
 import { PROJECT_EVENTS } from "@morrowlist/contracts";
 import {
   DEFAULT_WORKFLOW,
-  DomainError,
   ValidationError,
   ranksBetween,
   systemClock,
@@ -34,6 +36,13 @@ import { recordEvent } from "../shared/event-recorder.js";
 import { toTaskDto } from "../tasks/mappers.js";
 import { slugify } from "../workspace/bootstrap.js";
 
+import {
+  assertVersion,
+  requireActiveProject,
+  requireProject,
+  requireWorkspace,
+  versionConflict,
+} from "./lookup.js";
 import { toProjectDto, toWorkflowStatusDto } from "./mappers.js";
 
 export interface ProjectServiceOptions {
@@ -43,6 +52,28 @@ export interface ProjectServiceOptions {
 
 export interface WorkspaceProjectRequest {
   readonly workspaceId: string;
+}
+
+/**
+ * Case-insensitive name uniqueness within the workspace (spec 18.2), ignoring the
+ * project being edited so a rename to its own name in another case is allowed.
+ */
+function assertProjectNameAvailable(
+  name: string,
+  existing: readonly Project[],
+  ownId: string | null,
+): void {
+  if (
+    existing.some(
+      (project) =>
+        project.id !== ownId && project.name.toLowerCase() === name.toLowerCase(),
+    )
+  ) {
+    throw new ValidationError("A project with this name already exists.", {
+      field: "name",
+      name,
+    });
+  }
 }
 
 /**
@@ -60,14 +91,16 @@ export class ProjectService {
 
   async list(
     context: ActorContext,
-    request: WorkspaceProjectRequest,
+    request: WorkspaceProjectRequest & Partial<ListProjectsQuery>,
   ): Promise<ProjectListResponse> {
     assertWorkspaceAccess(context, request.workspaceId);
     assertScope(context, SCOPES.projectsRead);
 
     return this.unitOfWork.execute(async (tx) => {
-      await this.requireWorkspace(tx, request.workspaceId);
-      const projects = await tx.projects.listByWorkspace(request.workspaceId);
+      await requireWorkspace(tx, request.workspaceId);
+      const projects = await tx.projects.listByWorkspace(request.workspaceId, {
+        includeArchived: request.includeArchived ?? false,
+      });
       return {
         data: projects.map(toProjectDto),
         page: { nextCursor: null, hasMore: false },
@@ -83,19 +116,12 @@ export class ProjectService {
     assertScope(context, SCOPES.projectsWrite);
 
     return this.unitOfWork.execute(async (tx) => {
-      await this.requireWorkspace(tx, request.workspaceId);
+      await requireWorkspace(tx, request.workspaceId);
       const existing = await tx.projects.listByWorkspace(request.workspaceId, {
         includeArchived: true,
       });
       const name = normalizeProjectName(request.name);
-      if (
-        existing.some((project) => project.name.toLowerCase() === name.toLowerCase())
-      ) {
-        throw new ValidationError("A project with this name already exists.", {
-          field: "name",
-          name,
-        });
-      }
+      assertProjectNameAvailable(name, existing, null);
 
       const now = this.clock.now();
       const project: Project = {
@@ -144,13 +170,128 @@ export class ProjectService {
     assertScope(context, SCOPES.projectsRead);
 
     return this.unitOfWork.execute(async (tx) => {
-      await this.requireWorkspace(tx, workspaceId);
-      const project = await this.requireActiveProject(tx, workspaceId, projectId);
+      await requireWorkspace(tx, workspaceId);
+      const project = await requireActiveProject(tx, workspaceId, projectId);
       const statuses = await tx.statuses.listByProject(project.id);
       return {
         project: toProjectDto(project),
         statuses: statuses.map(toWorkflowStatusDto),
       };
+    });
+  }
+
+  /** Edit name, description, colour, or icon; the slug and the workflow stay put. */
+  async update(
+    context: ActorContext,
+    workspaceId: string,
+    projectId: string,
+    request: UpdateProjectRequest,
+  ): Promise<ProjectDto> {
+    assertWorkspaceAccess(context, workspaceId);
+    assertScope(context, SCOPES.projectsWrite);
+
+    return this.unitOfWork.execute(async (tx) => {
+      await requireWorkspace(tx, workspaceId);
+      const previous = await requireActiveProject(tx, workspaceId, projectId);
+      assertVersion(previous, request.expectedVersion, "project");
+
+      const name =
+        request.name === undefined ? previous.name : normalizeProjectName(request.name);
+      if (name !== previous.name) {
+        const existing = await tx.projects.listByWorkspace(workspaceId, {
+          includeArchived: true,
+        });
+        assertProjectNameAvailable(name, existing, previous.id);
+      }
+
+      const next: Project = {
+        ...previous,
+        name,
+        descriptionMd:
+          request.descriptionMd === undefined
+            ? previous.descriptionMd
+            : normalizeOptionalText(request.descriptionMd),
+        colorToken:
+          request.colorToken === undefined
+            ? previous.colorToken
+            : normalizeColorToken(request.colorToken),
+        icon:
+          request.icon === undefined
+            ? previous.icon
+            : normalizeOptionalText(request.icon),
+        version: previous.version + 1,
+        updatedAt: this.clock.now(),
+      };
+      if (Object.keys(projectChanges(next, previous)).length === 0) {
+        // Nothing material changed: no version bump, no event.
+        return toProjectDto(previous);
+      }
+
+      await this.persist(tx, context, next, previous, {
+        eventType: PROJECT_EVENTS.updated,
+        summary: `Updated project ${next.name}`,
+      });
+      return toProjectDto(next);
+    });
+  }
+
+  /** Archive hides the project from navigation but keeps every task (spec 8.6). */
+  async archive(
+    context: ActorContext,
+    workspaceId: string,
+    projectId: string,
+    expectedVersion?: number,
+  ): Promise<ProjectDto> {
+    assertWorkspaceAccess(context, workspaceId);
+    assertScope(context, SCOPES.projectsWrite);
+
+    return this.unitOfWork.execute(async (tx) => {
+      await requireWorkspace(tx, workspaceId);
+      const previous = await requireProject(tx, workspaceId, projectId);
+      assertVersion(previous, expectedVersion, "project");
+      if (previous.archivedAt !== null) return toProjectDto(previous);
+
+      const now = this.clock.now();
+      const next: Project = {
+        ...previous,
+        archivedAt: now,
+        version: previous.version + 1,
+        updatedAt: now,
+      };
+      await this.persist(tx, context, next, previous, {
+        eventType: PROJECT_EVENTS.archived,
+        summary: `Archived project ${previous.name}`,
+      });
+      return toProjectDto(next);
+    });
+  }
+
+  async restore(
+    context: ActorContext,
+    workspaceId: string,
+    projectId: string,
+    expectedVersion?: number,
+  ): Promise<ProjectDto> {
+    assertWorkspaceAccess(context, workspaceId);
+    assertScope(context, SCOPES.projectsWrite);
+
+    return this.unitOfWork.execute(async (tx) => {
+      await requireWorkspace(tx, workspaceId);
+      const previous = await requireProject(tx, workspaceId, projectId);
+      assertVersion(previous, expectedVersion, "project");
+      if (previous.archivedAt === null) return toProjectDto(previous);
+
+      const next: Project = {
+        ...previous,
+        archivedAt: null,
+        version: previous.version + 1,
+        updatedAt: this.clock.now(),
+      };
+      await this.persist(tx, context, next, previous, {
+        eventType: PROJECT_EVENTS.restored,
+        summary: `Restored project ${previous.name}`,
+      });
+      return toProjectDto(next);
     });
   }
 
@@ -164,8 +305,8 @@ export class ProjectService {
     assertScope(context, SCOPES.projectsRead);
 
     return this.unitOfWork.execute(async (tx) => {
-      const workspace = await this.requireWorkspace(tx, workspaceId);
-      const project = await this.requireActiveProject(tx, workspaceId, projectId);
+      const workspace = await requireWorkspace(tx, workspaceId);
+      const project = await requireActiveProject(tx, workspaceId, projectId);
       const statuses = await tx.statuses.listByProject(project.id);
       const tasks = await tx.tasks.listBoard({
         workspaceId,
@@ -204,27 +345,54 @@ export class ProjectService {
     });
   }
 
-  private async requireWorkspace(tx: TransactionContext, workspaceId: string) {
-    const workspace = await tx.workspaces.findById(workspaceId);
-    if (!workspace) {
-      throw new DomainError("WORKSPACE_NOT_FOUND", "Workspace not found.", {
-        workspaceId,
-      });
-    }
-    return workspace;
-  }
-
-  private async requireActiveProject(
+  /** Persist with the version guard and record the activity and outbox rows. */
+  private async persist(
     tx: TransactionContext,
-    workspaceId: string,
-    projectId: string,
-  ): Promise<Project> {
-    const project = await tx.projects.findById(workspaceId, projectId);
-    if (!project || project.archivedAt !== null) {
-      throw new DomainError("PROJECT_NOT_FOUND", "Project not found.", { projectId });
-    }
-    return project;
+    context: ActorContext,
+    next: Project,
+    previous: Project,
+    event: { readonly eventType: string; readonly summary: string },
+  ): Promise<void> {
+    const persisted = await tx.projects.update(next, previous.version);
+    if (!persisted) throw versionConflict(previous, "project");
+
+    await recordEvent(tx, context, this.clock, {
+      workspaceId: next.workspaceId,
+      aggregateType: "project",
+      aggregateId: next.id,
+      eventType: event.eventType,
+      summary: event.summary,
+      payload: { projectId: next.id, changes: projectChanges(next, previous) },
+    });
   }
+}
+
+const PROJECT_FIELDS = [
+  "name",
+  "descriptionMd",
+  "colorToken",
+  "icon",
+  "archivedAt",
+] as const satisfies readonly (keyof Project)[];
+
+function projectChanges(
+  next: Project,
+  previous: Project,
+): Record<string, { from: unknown; to: unknown }> {
+  const changes: Record<string, { from: unknown; to: unknown }> = {};
+  for (const field of PROJECT_FIELDS) {
+    const a = next[field];
+    const b = previous[field];
+    const changed =
+      a instanceof Date && b instanceof Date ? a.getTime() !== b.getTime() : a !== b;
+    if (changed) {
+      changes[field] = {
+        from: b instanceof Date ? b.toISOString() : b,
+        to: a instanceof Date ? a.toISOString() : a,
+      };
+    }
+  }
+  return changes;
 }
 
 function buildDefaultWorkflow(projectId: string): WorkflowStatus[] {

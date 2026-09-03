@@ -41,6 +41,86 @@ export const createProjectRequestSchema = z.object({
   icon: z.string().max(80).nullish(),
 });
 
+/** PATCH semantics: an omitted field is untouched, an explicit null clears (spec 20.4). */
+export const updateProjectRequestSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100).optional(),
+    descriptionMd: z.string().max(50_000).nullable().optional(),
+    colorToken: z.string().max(50).optional(),
+    icon: z.string().max(80).nullable().optional(),
+    expectedVersion: z.number().int().positive().optional(),
+  })
+  .refine((body) => Object.keys(body).some((key) => key !== "expectedVersion"), {
+    message: "at least one field must be supplied",
+  });
+
+export const projectVersionRequestSchema = z.object({
+  expectedVersion: z.number().int().positive().optional(),
+});
+
+/** Archived projects stay out of navigation unless asked for (spec 8.6). */
+export const listProjectsQuerySchema = z.object({
+  includeArchived: z.stringbool().default(false),
+});
+
+export const listStatusesQuerySchema = z.object({
+  includeArchived: z.stringbool().default(false),
+});
+
+export const statusNameSchema = z.string().trim().min(1).max(80);
+const policyMdSchema = z.string().max(10_000);
+
+export const createStatusRequestSchema = z.object({
+  name: statusNameSchema,
+  category: statusCategorySchema,
+  colorToken: z.string().max(50).optional(),
+  wipLimit: z.number().int().positive().nullish(),
+  policyMd: policyMdSchema.nullish(),
+});
+
+export const updateStatusRequestSchema = z
+  .object({
+    name: statusNameSchema.optional(),
+    category: statusCategorySchema.optional(),
+    colorToken: z.string().max(50).optional(),
+    wipLimit: z.number().int().positive().nullable().optional(),
+    isDefault: z.boolean().optional(),
+    policyMd: policyMdSchema.nullable().optional(),
+    expectedVersion: z.number().int().positive().optional(),
+  })
+  .refine((body) => Object.keys(body).some((key) => key !== "expectedVersion"), {
+    message: "at least one field must be supplied",
+  });
+
+/** Neighbours describe the intended position; the server computes the rank (spec 24.1). */
+export const reorderStatusRequestSchema = z
+  .object({
+    beforeStatusId: uuidSchema.nullish(),
+    afterStatusId: uuidSchema.nullish(),
+    expectedVersion: z.number().int().positive().optional(),
+  })
+  .refine(
+    (body) =>
+      body.beforeStatusId == null ||
+      body.afterStatusId == null ||
+      body.beforeStatusId !== body.afterStatusId,
+    {
+      message: "beforeStatusId and afterStatusId must be different statuses",
+      path: ["afterStatusId"],
+    },
+  );
+
+/**
+ * Move every task of the column to `destinationStatusId`, then archive it, atomically
+ * (spec 11.4). `newDefaultStatusId` is needed when the default column is archived and
+ * the destination should not become the default.
+ */
+export const archiveStatusRequestSchema = z.object({
+  destinationStatusId: uuidSchema.nullish(),
+  newDefaultStatusId: uuidSchema.nullish(),
+  expectedVersion: z.number().int().positive().optional(),
+});
+
 export const PROJECT_BOARD_TASK_LIMIT = 500;
 
 /**
@@ -71,6 +151,10 @@ export const projectBoardSchema = projectDetailSchema.extend({
 export const projectResponseSchema = z.object({
   data: projectDetailSchema,
 });
+export const workflowStatusResponseSchema = z.object({ data: workflowStatusSchema });
+export const workflowStatusListResponseSchema = z.object({
+  data: z.array(workflowStatusSchema),
+});
 export const projectListResponseSchema = paginated(projectSchema);
 export const projectBoardResponseSchema = z.object({
   data: projectBoardSchema,
@@ -83,6 +167,18 @@ export const projectBoardResponseSchema = z.object({
 export type ProjectDto = z.infer<typeof projectSchema>;
 export type WorkflowStatusDto = z.infer<typeof workflowStatusSchema>;
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
+export type UpdateProjectRequest = z.infer<typeof updateProjectRequestSchema>;
+export type ProjectVersionRequest = z.infer<typeof projectVersionRequestSchema>;
+export type ListProjectsQuery = z.infer<typeof listProjectsQuerySchema>;
+export type ListStatusesQuery = z.infer<typeof listStatusesQuerySchema>;
+export type CreateStatusRequest = z.infer<typeof createStatusRequestSchema>;
+export type UpdateStatusRequest = z.infer<typeof updateStatusRequestSchema>;
+export type ReorderStatusRequest = z.infer<typeof reorderStatusRequestSchema>;
+export type ArchiveStatusRequest = z.infer<typeof archiveStatusRequestSchema>;
+export type WorkflowStatusResponse = z.infer<typeof workflowStatusResponseSchema>;
+export type WorkflowStatusListResponse = z.infer<
+  typeof workflowStatusListResponseSchema
+>;
 export type ProjectBoardQuery = z.infer<typeof projectBoardQuerySchema>;
 export type ProjectDetailDto = z.infer<typeof projectDetailSchema>;
 export type ProjectBoardDto = z.infer<typeof projectBoardSchema>;

@@ -3,6 +3,7 @@ import {
   INITIAL_RANK,
   rankBetween,
   uuidv7,
+  type Task,
   type WorkflowStatus,
 } from "@morrowlist/domain";
 
@@ -123,6 +124,40 @@ export function seedWorkspace(
     statuses,
     context: buildActorContext({ userId, workspaceIds: [workspace.id] }),
   };
+}
+
+/** A project task in `statusId`, numbered after the tasks already seeded. */
+export function buildTask(
+  seeded: SeededWorkspace,
+  data: InMemoryData,
+  overrides: Partial<Task> & { readonly statusId: string; readonly title: string },
+): Task {
+  const now = new Date("2026-08-29T08:00:00.000Z");
+  const task: Task = {
+    id: uuidv7(),
+    workspaceId: seeded.workspace.id,
+    taskNumber: data.tasks.size + 1,
+    projectId: seeded.project.id,
+    descriptionMd: null,
+    priority: "none",
+    dueDate: null,
+    dueTime: null,
+    dueTimezone: null,
+    parentTaskId: null,
+    rank: INITIAL_RANK,
+    lastActiveStatusId: null,
+    completedAt: null,
+    version: 1,
+    createdBy: { kind: "user", id: seeded.userId },
+    lastActor: { kind: "user", id: seeded.userId },
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+    deletedBy: null,
+    ...overrides,
+  };
+  data.tasks.set(task.id, task);
+  return task;
 }
 
 export function statusByCategory(
