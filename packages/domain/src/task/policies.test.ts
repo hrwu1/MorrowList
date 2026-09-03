@@ -10,6 +10,7 @@ import {
 import { TEST_INSTANT, testContext, testStatus } from "./fixtures.js";
 import {
   assertExpectedVersion,
+  childProgress,
   completeTask,
   createTask,
   deleteTask,
@@ -19,6 +20,7 @@ import {
   reorderTask,
   resolveReopenStatus,
   restoreTask,
+  setParent,
   updateTaskFields,
 } from "./policies.js";
 import { isInboxTask, type Task } from "./task.js";
@@ -448,6 +450,120 @@ describe("deleteTask and restoreTask", () => {
     const deleted = deleteTask(inboxTask(), testContext());
 
     expect(deleteTask(deleted, testContext())).toBe(deleted);
+  });
+});
+
+describe("setParent", () => {
+  it("attaches a task to a parent and bumps the version", () => {
+    const parent = inboxTask({ id: "parent" });
+    const task = inboxTask({ id: "child", taskNumber: 143 });
+
+    const attached = setParent(task, { parent }, testContext());
+
+    expect(attached.parentTaskId).toBe("parent");
+    expect(attached.version).toBe(2);
+    // A subtask stays a normal task: nothing else about it changes (spec 8.3).
+    expect(attached.projectId).toBe(task.projectId);
+    expect(attached.rank).toBe(task.rank);
+  });
+
+  it("detaches a task and is a no-op when already detached", () => {
+    const parent = inboxTask({ id: "parent" });
+    const attached = setParent(inboxTask({ id: "child" }), { parent }, testContext());
+
+    const detached = setParent(attached, { parent: null }, testContext());
+    expect(detached.parentTaskId).toBeNull();
+    expect(detached.version).toBe(3);
+    expect(setParent(detached, { parent: null }, testContext())).toBe(detached);
+  });
+
+  it("allows three nesting levels and rejects a fourth", () => {
+    const level2 = inboxTask({ id: "level-2" });
+    const level3 = inboxTask({ id: "level-3" });
+    const task = inboxTask({ id: "level-4" });
+
+    expect(
+      setParent(task, { parent: level2, ancestorIds: ["root"] }, testContext())
+        .parentTaskId,
+    ).toBe("level-2");
+
+    expect(() =>
+      setParent(
+        task,
+        { parent: level3, ancestorIds: ["level-2", "root"] },
+        testContext(),
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        code: "TASK_NESTING_LIMIT_EXCEEDED",
+      }) as DomainError,
+    );
+
+    // Depth counts the levels already hanging below the task being moved.
+    expect(() =>
+      setParent(
+        task,
+        { parent: level2, ancestorIds: ["root"], descendantDepth: 1 },
+        testContext(),
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        code: "TASK_NESTING_LIMIT_EXCEEDED",
+      }) as DomainError,
+    );
+  });
+
+  it("rejects a cycle and self-parenting", () => {
+    const task = inboxTask({ id: "task" });
+    const child = inboxTask({ id: "child" });
+
+    expect(() =>
+      setParent(task, { parent: child, ancestorIds: ["task"] }, testContext()),
+    ).toThrow(expect.objectContaining({ code: "TASK_RELATION_CYCLE" }) as DomainError);
+    expect(() => setParent(task, { parent: task }, testContext())).toThrow(
+      expect.objectContaining({ code: "TASK_RELATION_CYCLE" }) as DomainError,
+    );
+  });
+
+  it("rejects a parent from another workspace or in the Trash", () => {
+    const task = inboxTask({ id: "task" });
+
+    expect(() =>
+      setParent(
+        task,
+        { parent: inboxTask({ id: "foreign", workspaceId: "workspace-2" }) },
+        testContext(),
+      ),
+    ).toThrow(expect.objectContaining({ code: "TASK_NOT_FOUND" }) as DomainError);
+    expect(() =>
+      setParent(
+        task,
+        { parent: deleteTask(inboxTask({ id: "gone" }), testContext()) },
+        testContext(),
+      ),
+    ).toThrow(expect.objectContaining({ code: "TASK_NOT_FOUND" }) as DomainError);
+  });
+
+  it("refuses to change a deleted task", () => {
+    const deleted = deleteTask(inboxTask(), testContext());
+
+    expect(() =>
+      setParent(deleted, { parent: inboxTask({ id: "p" }) }, testContext()),
+    ).toThrow(ValidationError);
+  });
+});
+
+describe("childProgress", () => {
+  it("counts completed over total direct children, ignoring deleted ones", () => {
+    const open = inboxTask({ id: "open" });
+    const done = completeTask(inboxTask({ id: "done" }), {}, testContext());
+    const deleted = deleteTask(
+      completeTask(inboxTask({ id: "deleted" }), {}, testContext()),
+      testContext(),
+    );
+
+    expect(childProgress([open, done, deleted])).toEqual({ completed: 1, total: 2 });
+    expect(childProgress([])).toEqual({ completed: 0, total: 0 });
   });
 });
 

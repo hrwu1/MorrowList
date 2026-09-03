@@ -9,6 +9,7 @@ import {
 
 import {
   assertCompletionConsistency,
+  assertParentIsAssignable,
   assertStatusBelongsToProject,
   assertTaskInvariants,
 } from "./invariants.js";
@@ -342,6 +343,66 @@ export function resolveReopenStatus(
       (status) => status.isDefault && isActive(status) && !isTerminal(status),
     ) ?? null
   );
+}
+
+export interface SetParentInput {
+  /** The new parent, or null to detach the task from its current parent. */
+  readonly parent: Task | null;
+  /** Ancestor chain of the new parent, nearest first; irrelevant when detaching. */
+  readonly ancestorIds?: readonly string[];
+  /** Levels already hanging below this task: 0 when it has no children. */
+  readonly descendantDepth?: number;
+}
+
+/**
+ * Attach a task to a parent or detach it (spec 8.3). A subtask stays a normal task: its
+ * project, status, rank, and completion are untouched, so every existing view keeps
+ * working on it. The parent must be a live task of the same workspace, the chain must
+ * stay acyclic, and the resulting tree may not exceed `MAX_NESTING_DEPTH`.
+ */
+export function setParent(
+  task: Task,
+  input: SetParentInput,
+  context: PolicyContext,
+): Task {
+  assertMutable(task);
+
+  if (input.parent === null) {
+    return touch({ ...task, parentTaskId: null }, task, context);
+  }
+
+  const parent = input.parent;
+  if (parent.workspaceId !== task.workspaceId || isDeleted(parent)) {
+    throw new DomainError("TASK_NOT_FOUND", "Parent task not found.", {
+      taskId: task.id,
+      parentTaskId: parent.id,
+    });
+  }
+  assertParentIsAssignable(
+    task.id,
+    parent.id,
+    input.ancestorIds ?? [],
+    input.descendantDepth ?? 0,
+  );
+
+  return touch({ ...task, parentTaskId: parent.id }, task, context);
+}
+
+export interface ChildProgress {
+  readonly completed: number;
+  readonly total: number;
+}
+
+/**
+ * Parent progress is completed direct children over total direct children (spec 8.3).
+ * Deleted children are excluded: they are out of every normal view until restored.
+ */
+export function childProgress(children: readonly Task[]): ChildProgress {
+  const live = children.filter((child) => !isDeleted(child));
+  return {
+    completed: live.filter(isCompleted).length,
+    total: live.length,
+  };
 }
 
 /** Soft deletion moves the task to Trash and keeps it restorable (spec 8.6). */

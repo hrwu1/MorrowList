@@ -48,6 +48,7 @@ export {
 } from "./task/invariants.js";
 export {
   assertExpectedVersion,
+  childProgress,
   completeTask,
   createTask,
   deleteTask,
@@ -57,13 +58,16 @@ export {
   reorderTask,
   resolveReopenStatus,
   restoreTask,
+  setParent,
   updateTaskFields,
+  type ChildProgress,
   type CompleteTaskInput,
   type CreateTaskInput,
   type MoveTaskInput,
   type Patch,
   type PolicyContext,
   type ReopenTaskInput,
+  type SetParentInput,
   type UpdateTaskFieldsInput,
 } from "./task/policies.js";
 export {
