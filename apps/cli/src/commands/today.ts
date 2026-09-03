@@ -1,70 +1,13 @@
-import { randomUUID } from "node:crypto";
-
-import { ApiClient, ApiClientError } from "@morrowlist/api-client";
 import { Command } from "commander";
 
-import { readConfig, resolveProfile, type ResolveOptions } from "../config/profile.js";
-import {
-  EXIT,
-  exitCodeFor,
-  formatTodayView,
-  printError,
-  printJson,
-} from "../formatters/output.js";
+import { formatTodayView, printJson } from "../formatters/output.js";
+
+import { fail, globalsOf, idempotency, withClient } from "./shared.js";
 
 /**
  * `morrow today …` (spec 21.3): the daily loop from the terminal. `list` is the same
  * projection the web Today view renders; `add` and `remove` are the My Day commands.
  */
-
-interface GlobalOptions extends ResolveOptions {
-  readonly json?: boolean;
-}
-
-function globalsOf(command: Command): GlobalOptions {
-  return ((command.parent?.parent ?? command.parent)?.opts() ?? {}) as GlobalOptions;
-}
-
-async function withClient<T>(
-  options: GlobalOptions,
-  fn: (client: ApiClient) => Promise<T>,
-): Promise<T> {
-  const config = await readConfig();
-  const profile = resolveProfile(config, options);
-  const client = new ApiClient({
-    baseUrl: profile.baseUrl,
-    apiKey: profile.apiKey,
-    workspaceId: profile.workspaceId,
-  });
-  return fn(client);
-}
-
-function fail(error: unknown, json: boolean): never {
-  if (error instanceof ApiClientError) {
-    if (json) {
-      printJson({
-        ok: false,
-        error: {
-          code: error.code,
-          message: error.message,
-          ...(error.details ? { details: error.details } : {}),
-        },
-      });
-    } else {
-      printError(`error: ${error.message}`);
-      if (error.requestId) printError(`request: ${error.requestId}`);
-    }
-    process.exit(exitCodeFor(error.code));
-  }
-
-  const message = error instanceof Error ? error.message : String(error);
-  if (json) {
-    printJson({ ok: false, error: { code: "NETWORK_ERROR", message } });
-  } else {
-    printError(`error: ${message}`);
-  }
-  process.exit(EXIT.network);
-}
 
 export function todayCommand(): Command {
   const today = new Command("today").description("Plan and review today's work");
@@ -105,7 +48,7 @@ export function todayCommand(): Command {
         try {
           const task = await withClient(globals, async (client) => {
             const current = await client.getTask(idOrKey);
-            const request = { idempotencyKey: randomUUID() };
+            const request = idempotency();
             if (name === "add") {
               return client.addTaskToDay(
                 current.id,

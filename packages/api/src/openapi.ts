@@ -4,6 +4,7 @@ import {
   addTaskToDayRequestSchema,
   completeTaskRequestSchema,
   createProjectRequestSchema,
+  createTagRequestSchema,
   createTaskRequestSchema,
   errorResponseSchema,
   listTasksQuerySchema,
@@ -15,12 +16,15 @@ import {
   projectResponseSchema,
   reorderTaskRequestSchema,
   setTaskParentRequestSchema,
+  tagListResponseSchema,
+  tagResponseSchema,
   taskListResponseSchema,
   taskResponseSchema,
   todayViewQuerySchema,
   todayViewResponseSchema,
   upcomingViewQuerySchema,
   upcomingViewResponseSchema,
+  updateTagRequestSchema,
   updateTaskRequestSchema,
 } from "@morrowlist/contracts";
 import { z } from "zod";
@@ -41,6 +45,10 @@ const registry = {
   ProjectList: projectListResponseSchema,
   ProjectBoard: projectBoardResponseSchema,
   ActivityList: activityListResponseSchema,
+  Tag: tagResponseSchema,
+  TagList: tagListResponseSchema,
+  CreateTagRequest: createTagRequestSchema,
+  UpdateTagRequest: updateTagRequestSchema,
   CreateProjectRequest: createProjectRequestSchema,
   CreateTaskRequest: createTaskRequestSchema,
   UpdateTaskRequest: updateTaskRequestSchema,
@@ -92,6 +100,13 @@ const taskIdParam = {
 
 const projectIdParam = {
   name: "projectId",
+  in: "path",
+  required: true,
+  schema: { type: "string", format: "uuid" },
+};
+
+const tagIdParam = {
+  name: "tagId",
   in: "path",
   required: true,
   schema: { type: "string", format: "uuid" },
@@ -235,6 +250,90 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
             "200": {
               description: "A page of activity",
               ...jsonContent(ref("ActivityList")),
+            },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/tags": {
+        get: {
+          summary: "List tags",
+          description:
+            "Every tag in the workspace, ordered case-insensitively by name, with the number of live tasks carrying each.",
+          parameters: [workspaceIdParam],
+          responses: {
+            "200": {
+              description: "The workspace's tags",
+              ...jsonContent(ref("TagList")),
+            },
+            ...commonErrors,
+          },
+        },
+        post: {
+          summary: "Create a tag",
+          description: "Names are unique per workspace, case-insensitively.",
+          parameters: [workspaceIdParam],
+          requestBody: { required: true, ...jsonContent(ref("CreateTagRequest")) },
+          responses: {
+            "201": { description: "The created tag", ...jsonContent(ref("Tag")) },
+            "409": {
+              description: "A tag with this name already exists",
+              ...jsonContent(ref("ErrorResponse")),
+            },
+            ...commonErrors,
+          },
+        },
+      },
+      "/tags/{id}": {
+        patch: {
+          summary: "Rename, recolour, or describe a tag",
+          parameters: [taskIdParam, workspaceIdParam],
+          requestBody: { required: true, ...jsonContent(ref("UpdateTagRequest")) },
+          responses: {
+            "200": { description: "The updated tag", ...jsonContent(ref("Tag")) },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            "409": {
+              description: "A tag with this name already exists",
+              ...jsonContent(ref("ErrorResponse")),
+            },
+            ...commonErrors,
+          },
+        },
+        delete: {
+          summary: "Delete a tag",
+          description:
+            "Removes the tag from every task; the tasks themselves are untouched.",
+          parameters: [taskIdParam, workspaceIdParam],
+          responses: {
+            "204": { description: "The tag was deleted" },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/tasks/{id}/tags/{tagId}": {
+        post: {
+          summary: "Add a tag to a task",
+          description:
+            "The task's version is unchanged: tags are a relation, not a task column. Adding a tag the task already carries is a no-op.",
+          parameters: [taskIdParam, tagIdParam, workspaceIdParam],
+          responses: {
+            "200": {
+              description: "The task with its tags",
+              ...jsonContent(ref("Task")),
+            },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+        delete: {
+          summary: "Remove a tag from a task",
+          parameters: [taskIdParam, tagIdParam, workspaceIdParam],
+          responses: {
+            "200": {
+              description: "The task with its tags",
+              ...jsonContent(ref("Task")),
             },
             "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
             ...commonErrors,

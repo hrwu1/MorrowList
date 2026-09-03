@@ -46,4 +46,20 @@ describe("board OpenAPI surface", () => {
     expect(document.components.schemas).toHaveProperty("TodayView");
     expect(document.components.schemas).toHaveProperty("UpcomingView");
   });
+
+  it("publishes tag management and task tagging", () => {
+    const document = buildOpenApiDocument() as {
+      paths: Record<string, Record<string, unknown>>;
+      components: { schemas: Record<string, unknown> };
+    };
+
+    expect(document.paths["/tags"]).toHaveProperty("get");
+    expect(document.paths["/tags"]).toHaveProperty("post");
+    expect(document.paths["/tags/{id}"]).toHaveProperty("patch");
+    expect(document.paths["/tags/{id}"]).toHaveProperty("delete");
+    expect(document.paths["/tasks/{id}/tags/{tagId}"]).toHaveProperty("post");
+    expect(document.paths["/tasks/{id}/tags/{tagId}"]).toHaveProperty("delete");
+    expect(document.components.schemas).toHaveProperty("TagList");
+    expect(document.components.schemas).toHaveProperty("CreateTagRequest");
+  });
 });

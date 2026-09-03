@@ -2,6 +2,7 @@ import type {
   ActivityService,
   ActorContext,
   ProjectService,
+  TagService,
   TaskService,
   UnitOfWork,
   ViewService,
@@ -20,6 +21,7 @@ export interface ApiDependencies {
   readonly taskService: TaskService;
   readonly activityService: ActivityService;
   readonly viewService: ViewService;
+  readonly tagService: TagService;
   readonly logger: Logger;
   readonly metrics?: Metrics;
   /** Readiness probe backing `GET /ready` (spec FND-006). */

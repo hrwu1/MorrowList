@@ -8,6 +8,7 @@ import { bodyLimit } from "./middleware/validate.js";
 import { healthRoutes } from "./routes/health.js";
 import { meRoutes } from "./routes/me.js";
 import { projectRoutes } from "./routes/projects.js";
+import { tagRoutes } from "./routes/tags.js";
 import { taskRoutes } from "./routes/tasks.js";
 import { viewRoutes } from "./routes/views.js";
 
@@ -41,9 +42,12 @@ export function createApiApp(deps: ApiDependencies) {
   app.use("/projects", authenticate(deps.auth, listWorkspaceIds));
   app.use("/projects/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/views/*", authenticate(deps.auth, listWorkspaceIds));
+  app.use("/tags", authenticate(deps.auth, listWorkspaceIds));
+  app.use("/tags/*", authenticate(deps.auth, listWorkspaceIds));
 
   app.route("/", meRoutes(deps));
   app.route("/", projectRoutes(deps));
+  app.route("/", tagRoutes(deps));
   app.route("/", taskRoutes(deps));
   app.route("/", viewRoutes(deps));
 

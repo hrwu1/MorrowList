@@ -5,6 +5,7 @@ import {
   EXIT,
   exitCodeFor,
   formatActivity,
+  formatTagTable,
   formatTaskDetail,
   formatTaskTable,
   formatTodayView,
@@ -29,6 +30,7 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     isCompleted: false,
     completedAt: null,
     version: 1,
+    tags: [],
     createdBy: { kind: "user", id: "u1" },
     lastActor: { kind: "user", id: "u1" },
     createdAt: "2026-08-29T09:00:00.000Z",
@@ -191,5 +193,43 @@ describe("formatTaskDetail", () => {
 
   it("omits the subtask lines for a childless task", () => {
     expect(formatTaskDetail(task())).not.toContain("subtasks");
+  });
+});
+
+describe("formatTagTable", () => {
+  it("lists tags with colour and task counts", () => {
+    expect(formatTagTable([])).toBe("No tags.");
+    const lines = formatTagTable([
+      {
+        id: "01a04e0f-0000-7000-8000-000000000009",
+        workspaceId: "01a04e0f-0000-7000-8000-000000000002",
+        name: "Deep Work",
+        colorToken: "teal",
+        description: "Focus blocks",
+        createdAt: "2026-09-03T09:00:00.000Z",
+        updatedAt: "2026-09-03T09:00:00.000Z",
+        taskCount: 1,
+      },
+    ]).split("\n");
+    expect(lines[0]).toBe("Deep Work  teal     1 task  Focus blocks");
+  });
+
+  it("shows tags after the title in the task table", () => {
+    const output = formatTaskTable([
+      task({
+        tags: [
+          {
+            id: "01a04e0f-0000-7000-8000-000000000009",
+            workspaceId: "01a04e0f-0000-7000-8000-000000000002",
+            name: "Deep Work",
+            colorToken: "teal",
+            description: null,
+            createdAt: "2026-09-03T09:00:00.000Z",
+            updatedAt: "2026-09-03T09:00:00.000Z",
+          },
+        ],
+      }),
+    ]);
+    expect(output).toContain("#Deep Work");
   });
 });

@@ -176,3 +176,35 @@ describe("subtask requests", () => {
     expect(requests[1]?.url).toContain("expectedVersion=3");
   });
 });
+
+describe("tag requests", () => {
+  const TAG_ID = "0198f0a0-0000-7000-8000-000000000004";
+
+  it("attaches a tag to a task and unwraps the task", async () => {
+    const task = { id: TASK_ID, tags: [{ id: TAG_ID, name: "Focus" }] };
+    const { client, requests } = recordingClient({ data: task });
+
+    await expect(
+      client.addTaskTag(TASK_ID, TAG_ID, { idempotencyKey: "tag-1" }),
+    ).resolves.toEqual(task);
+
+    expect(requests[0]?.method).toBe("POST");
+    expect(requests[0]?.url).toContain(`/tasks/${TASK_ID}/tags/${TAG_ID}?workspaceId=`);
+    expect(requests[0]?.headers.get("idempotency-key")).toBe("tag-1");
+  });
+
+  it("deletes a tag and resolves without a body", async () => {
+    const requests: Request[] = [];
+    const client = new ApiClient({
+      baseUrl: "https://example.test/api/v1",
+      fetch: async (input, init) => {
+        requests.push(new Request(input, init));
+        return new Response(null, { status: 204 });
+      },
+    });
+
+    await expect(client.deleteTag(TAG_ID)).resolves.toBeUndefined();
+    expect(requests[0]?.method).toBe("DELETE");
+    expect(requests[0]?.url).toBe(`https://example.test/api/v1/tags/${TAG_ID}`);
+  });
+});

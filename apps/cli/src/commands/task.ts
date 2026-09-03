@@ -1,13 +1,7 @@
-import { randomUUID } from "node:crypto";
-
-import { ApiClient, ApiClientError } from "@morrowlist/api-client";
 import type { CreateTaskRequest, UpdateTaskRequest } from "@morrowlist/contracts";
 import { Command } from "commander";
 
-import { readConfig, resolveProfile, type ResolveOptions } from "../config/profile.js";
 import {
-  EXIT,
-  exitCodeFor,
   formatActivity,
   formatTaskDetail,
   formatTaskTable,
@@ -15,73 +9,15 @@ import {
   printJson,
 } from "../formatters/output.js";
 
+import { fail, globalsOf, idempotency, withClient } from "./shared.js";
+import { findTag, resolveTags } from "./tag.js";
+
 /**
  * `morrow task …` (CLI-002, CLI-003).
  *
  * The CLI is a product interface, not a debugging aid (ADR-005): it goes through the same
  * public REST API the web app uses and never touches the database.
  */
-
-interface GlobalOptions extends ResolveOptions {
-  readonly json?: boolean;
-}
-
-/**
- * Global flags live on the root command, two levels above a subcommand action. Commander
- * types `parent` loosely, so the cast is confined to this one helper.
- */
-function globalsOf(command: Command): GlobalOptions {
-  return ((command.parent?.parent ?? command.parent)?.opts() ?? {}) as GlobalOptions;
-}
-
-async function withClient<T>(
-  options: GlobalOptions,
-  fn: (client: ApiClient) => Promise<T>,
-): Promise<T> {
-  const config = await readConfig();
-  const profile = resolveProfile(config, options);
-  const client = new ApiClient({
-    baseUrl: profile.baseUrl,
-    apiKey: profile.apiKey,
-    workspaceId: profile.workspaceId,
-  });
-  return fn(client);
-}
-
-/** Every mutating command carries an idempotency key so a retry cannot duplicate it. */
-function idempotency() {
-  return { idempotencyKey: randomUUID() };
-}
-
-function fail(error: unknown, json: boolean): never {
-  if (error instanceof ApiClientError) {
-    if (json) {
-      printJson({
-        ok: false,
-        error: {
-          code: error.code,
-          message: error.message,
-          ...(error.details ? { details: error.details } : {}),
-        },
-      });
-    } else {
-      printError(`error: ${error.message}`);
-      if (error.code === "TASK_VERSION_CONFLICT") {
-        printError("The task changed since you loaded it. Re-read it and try again.");
-      }
-      if (error.requestId) printError(`request: ${error.requestId}`);
-    }
-    process.exit(exitCodeFor(error.code));
-  }
-
-  const message = error instanceof Error ? error.message : String(error);
-  if (json) {
-    printJson({ ok: false, error: { code: "NETWORK_ERROR", message } });
-  } else {
-    printError(`error: ${message}`);
-  }
-  process.exit(EXIT.network);
-}
 
 export function taskCommand(): Command {
   const task = new Command("task").description("Create and manage tasks");
@@ -100,11 +36,25 @@ export function taskCommand(): Command {
       "--parent <idOrKey>",
       "make it a subtask of this task; it joins the parent's project unless --project is given",
     )
+    .option(
+      "-t, --tag <name>",
+      "tag to apply; repeatable",
+      (value: string, previous: string[]) => [...previous, value],
+      [] as string[],
+    )
+    .option("--create-tags", "create any --tag that does not exist yet")
     .action(async (titleParts: string[], options, command) => {
       const globals = globalsOf(command);
       const json = Boolean(globals.json);
       try {
         const created = await withClient(globals, async (client) => {
+          // Tags are resolved before the task exists so an unknown name fails cleanly.
+          const tags = await resolveTags(
+            client,
+            options.tag as string[],
+            Boolean(options.createTags),
+            json,
+          );
           const body: CreateTaskRequest = {
             title: titleParts.join(" "),
             ...(options.description ? { descriptionMd: options.description } : {}),
@@ -117,7 +67,11 @@ export function taskCommand(): Command {
               ? { parentTaskId: (await client.getTask(options.parent)).id }
               : {}),
           };
-          return client.createTask(body, idempotency());
+          let task = await client.createTask(body, idempotency());
+          for (const tag of tags) {
+            task = await client.addTaskTag(task.id, tag.id, idempotency());
+          }
+          return task;
         });
 
         if (json) printJson({ ok: true, data: created });
@@ -135,21 +89,27 @@ export function taskCommand(): Command {
     .option("--project <id>", "restrict to a project")
     .option("--priority <priority>", "restrict to a priority")
     .option("--due <filter>", "overdue | today | future | none")
+    .option("--tag <name>", "restrict to tasks carrying a tag")
     .option("--limit <n>", "page size, 1-200", "50")
     .action(async (options, command: Command) => {
       const globals = globalsOf(command);
       const json = Boolean(globals.json);
       try {
-        const page = await withClient(globals, (client) =>
-          client.listTasks({
+        const page = await withClient(globals, async (client) => {
+          const tag = options.tag ? await findTag(client, options.tag) : null;
+          if (options.tag && !tag) {
+            return { data: [], page: { nextCursor: null, hasMore: false } };
+          }
+          return client.listTasks({
             ...(options.inbox ? { inbox: true } : {}),
             isCompleted: Boolean(options.completed),
             ...(options.project ? { projectId: options.project } : {}),
             ...(options.priority ? { priority: options.priority } : {}),
             ...(options.due ? { due: options.due } : {}),
+            ...(tag ? { tagId: tag.id } : {}),
             limit: Number(options.limit),
-          } as never),
-        );
+          } as never);
+        });
 
         if (json) printJson({ ok: true, data: page });
         else process.stdout.write(`${formatTaskTable(page.data)}\n`);

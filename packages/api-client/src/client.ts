@@ -3,6 +3,7 @@ import type {
   ActivityQuery,
   AddTaskToDayRequest,
   CreateProjectRequest,
+  CreateTagRequest,
   CreateTaskRequest,
   ErrorCode,
   ErrorResponse,
@@ -16,12 +17,15 @@ import type {
   ProjectResponse,
   ReorderTaskRequest,
   SetTaskParentRequest,
+  TagDto,
+  TagListResponse,
   TaskDto,
   TaskListResponse,
   TodayViewQuery,
   TodayViewResponse,
   UpcomingViewQuery,
   UpcomingViewResponse,
+  UpdateTagRequest,
   UpdateTaskRequest,
 } from "@morrowlist/contracts";
 
@@ -355,6 +359,79 @@ export class ApiClient {
       undefined,
       options,
     );
+  }
+
+  async listTags(options: RequestOptions = {}): Promise<TagListResponse> {
+    return this.send<TagListResponse>(
+      "GET",
+      `/tags${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+  }
+
+  async createTag(
+    body: CreateTagRequest,
+    options: RequestOptions = {},
+  ): Promise<TagDto> {
+    const response = await this.send<{ data: TagDto }>(
+      "POST",
+      `/tags${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async updateTag(
+    id: string,
+    body: UpdateTagRequest,
+    options: RequestOptions = {},
+  ): Promise<TagDto> {
+    const response = await this.send<{ data: TagDto }>(
+      "PATCH",
+      `/tags/${encodeURIComponent(id)}${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async deleteTag(id: string, options: RequestOptions = {}): Promise<void> {
+    await this.send<void>(
+      "DELETE",
+      `/tags/${encodeURIComponent(id)}${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+  }
+
+  async addTaskTag(
+    taskId: string,
+    tagId: string,
+    options: RequestOptions = {},
+  ): Promise<TaskDto> {
+    const response = await this.send<{ data: TaskDto }>(
+      "POST",
+      `/tasks/${encodeURIComponent(taskId)}/tags/${encodeURIComponent(tagId)}${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+    return response.data;
+  }
+
+  async removeTaskTag(
+    taskId: string,
+    tagId: string,
+    options: RequestOptions = {},
+  ): Promise<TaskDto> {
+    const response = await this.send<{ data: TaskDto }>(
+      "DELETE",
+      `/tasks/${encodeURIComponent(taskId)}/tags/${encodeURIComponent(tagId)}${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+    return response.data;
   }
 
   private queryString(query: Record<string, unknown>, options: RequestOptions): string {

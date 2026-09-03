@@ -4,6 +4,7 @@ import { createApiApp, type ApiDependencies } from "@morrowlist/api";
 import {
   ActivityService,
   ProjectService,
+  TagService,
   TaskService,
   ViewService,
   bootstrapUser,
@@ -85,6 +86,7 @@ export function getContainer(): Container {
     taskService: new TaskService({ unitOfWork, cursorSecret }),
     activityService: new ActivityService({ unitOfWork, cursorSecret }),
     viewService: new ViewService({ unitOfWork }),
+    tagService: new TagService({ unitOfWork }),
     logger,
     checkHealth: () => checkDatabaseHealth(database),
   };

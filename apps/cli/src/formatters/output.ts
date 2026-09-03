@@ -1,5 +1,6 @@
 import type {
   ActivityEntryDto,
+  TagListItemDto,
   TaskDto,
   TodayReason,
   TodayViewDto,
@@ -54,9 +55,11 @@ export function exitCodeFor(errorCode: string): ExitCode {
     case "PROJECT_NOT_FOUND":
     case "STATUS_NOT_FOUND":
     case "WORKSPACE_NOT_FOUND":
+    case "TAG_NOT_FOUND":
     case "NOT_FOUND":
       return EXIT.notFound;
     case "TASK_VERSION_CONFLICT":
+    case "TAG_NAME_CONFLICT":
     case "IDEMPOTENCY_KEY_REUSED":
     case "STATUS_ARCHIVE_REQUIRES_DESTINATION":
       return EXIT.conflict;
@@ -89,7 +92,9 @@ export function formatTaskTable(tasks: readonly TaskDto[]): string {
       const key = task.key.padEnd(keyWidth);
       const mark = PRIORITY_MARK[task.priority] ?? "  ";
       const due = task.dueDate ? `  (due ${task.dueDate})` : "";
-      return `[${done}] ${key}  ${mark}${task.title}${due}`;
+      const tags =
+        task.tags.length > 0 ? `  #${task.tags.map((t) => t.name).join(" #")}` : "";
+      return `[${done}] ${key}  ${mark}${task.title}${due}${tags}`;
     })
     .join("\n");
 }
@@ -170,6 +175,7 @@ export function formatTaskDetail(
           `  subtasks    ${task.subtaskProgress.completed}/${task.subtaskProgress.total} done`,
         ]
       : []),
+    `  tags        ${task.tags.map((tag) => tag.name).join(", ") || "none"}`,
     `  version     ${task.version}`,
     `  created     ${task.createdAt}`,
   ];
@@ -186,4 +192,19 @@ export function formatTaskDetail(
     );
   }
   return lines.join("\n");
+}
+
+/** Tags with their colour and how many live tasks carry each. */
+export function formatTagTable(tags: readonly TagListItemDto[]): string {
+  if (tags.length === 0) return "No tags.";
+
+  const nameWidth = Math.max(...tags.map((tag) => tag.name.length));
+  return tags
+    .map((tag) => {
+      const name = tag.name.padEnd(nameWidth);
+      const count = `${tag.taskCount} task${tag.taskCount === 1 ? "" : "s"}`;
+      const description = tag.description ? `  ${tag.description}` : "";
+      return `${name}  ${tag.colorToken.padEnd(7)}  ${count}${description}`;
+    })
+    .join("\n");
 }

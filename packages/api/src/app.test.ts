@@ -1,6 +1,7 @@
 import {
   ActivityService,
   ProjectService,
+  TagService,
   TaskService,
   ViewService,
   bootstrapUser,
@@ -75,6 +76,7 @@ beforeEach(async () => {
     }),
     activityService: new ActivityService({ unitOfWork, cursorSecret: "test-secret" }),
     viewService: new ViewService({ unitOfWork, clock: fixedClock(NOW) }),
+    tagService: new TagService({ unitOfWork, clock: fixedClock(NOW) }),
     logger: silentLogger,
     checkHealth: async () =>
       healthy
@@ -721,5 +723,97 @@ describe("My Day and view endpoints", () => {
     currentUser = null;
 
     expect((await request("/api/v1/views/today")).status).toBe(401);
+  });
+});
+
+describe("tag endpoints", () => {
+  it("creates, lists, renames, attaches, filters by, detaches, and deletes a tag", async () => {
+    const createdResponse = await jsonRequest("/api/v1/tags", "POST", {
+      name: " Deep  Work ",
+      colorToken: "teal",
+    });
+    expect(createdResponse.status).toBe(201);
+    const tag = (await createdResponse.json()).data;
+    expect(tag).toMatchObject({ name: "Deep Work", colorToken: "teal" });
+
+    const task = (
+      await (
+        await jsonRequest("/api/v1/tasks", "POST", { title: "Focus block" })
+      ).json()
+    ).data;
+    await jsonRequest("/api/v1/tasks", "POST", { title: "Untagged" });
+
+    const attached = await jsonRequest(
+      `/api/v1/tasks/${task.id}/tags/${tag.id}`,
+      "POST",
+    );
+    expect(attached.status).toBe(200);
+    const attachedBody = await attached.json();
+    expect(attachedBody.data.tags.map((t: { name: string }) => t.name)).toEqual([
+      "Deep Work",
+    ]);
+    expect(attachedBody.data.version).toBe(task.version);
+
+    const listed = await (await request("/api/v1/tags")).json();
+    expect(listed.data).toEqual([
+      expect.objectContaining({ id: tag.id, taskCount: 1 }),
+    ]);
+
+    const filtered = await (await request(`/api/v1/tasks?tagId=${tag.id}`)).json();
+    expect(filtered.data.map((t: { title: string }) => t.title)).toEqual([
+      "Focus block",
+    ]);
+
+    const renamed = await jsonRequest(`/api/v1/tags/${tag.id}`, "PATCH", {
+      name: "Deep Focus",
+    });
+    expect(renamed.status).toBe(200);
+    const fetched = await (await request(`/api/v1/tasks/${task.id}`)).json();
+    expect(fetched.data.tags[0].name).toBe("Deep Focus");
+
+    const detached = await jsonRequest(
+      `/api/v1/tasks/${task.id}/tags/${tag.id}`,
+      "DELETE",
+    );
+    expect((await detached.json()).data.tags).toEqual([]);
+
+    const deleted = await request(`/api/v1/tags/${tag.id}`, { method: "DELETE" });
+    expect(deleted.status).toBe(204);
+    expect((await (await request("/api/v1/tags")).json()).data).toEqual([]);
+  });
+
+  it("maps a case-insensitive duplicate to 409 with a clear message", async () => {
+    await jsonRequest("/api/v1/tags", "POST", { name: "Deep Work" });
+
+    const response = await jsonRequest("/api/v1/tags", "POST", { name: "deep work" });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        code: "TAG_NAME_CONFLICT",
+        message: expect.stringContaining("already exists"),
+      },
+    });
+  });
+
+  it("maps an unknown tag to 404 and an unknown colour to 422", async () => {
+    const task = (
+      await (await jsonRequest("/api/v1/tasks", "POST", { title: "x" })).json()
+    ).data;
+
+    const missing = await jsonRequest(
+      `/api/v1/tasks/${task.id}/tags/${uuidv7()}`,
+      "POST",
+    );
+    expect(missing.status).toBe(404);
+    await expect(missing.json()).resolves.toMatchObject({
+      error: { code: "TAG_NOT_FOUND" },
+    });
+
+    const badColour = await jsonRequest("/api/v1/tags", "POST", {
+      name: "x",
+      colorToken: "magenta",
+    });
+    expect(badColour.status).toBe(422);
   });
 });

@@ -161,6 +161,28 @@ export function taskRoutes(deps: ApiDependencies) {
       return c.json({ data: task });
     })
 
+    .post("/tasks/:id/tags/:tagId", async (c) => {
+      const actor = c.get("actor");
+      const task = await deps.taskService.addTag(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("id"),
+        c.req.param("tagId"),
+      );
+      return c.json({ data: task });
+    })
+
+    .delete("/tasks/:id/tags/:tagId", async (c) => {
+      const actor = c.get("actor");
+      const task = await deps.taskService.removeTag(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("id"),
+        c.req.param("tagId"),
+      );
+      return c.json({ data: task });
+    })
+
     .post("/tasks/:id/restore", async (c) => {
       const actor = c.get("actor");
       const task = await deps.taskService.restore(
