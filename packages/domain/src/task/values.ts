@@ -93,13 +93,22 @@ export function normalizeDescription(raw: string | null): string | null {
  * in Auckland is still today at 23:30 there even though UTC has moved on.
  */
 export function toLocalDate(instant: Date, timezone: string): PlainDate {
+  return localDateFormatter(timezone)(instant);
+}
+
+/**
+ * The same conversion for many instants. Building the formatter once is what makes
+ * converting tens of thousands of interval boundaries affordable (flow metrics).
+ */
+export function localDateFormatter(timezone: string): (instant: Date) => PlainDate {
   // en-CA formats as YYYY-MM-DD, which is exactly the PlainDate shape.
-  return new Intl.DateTimeFormat("en-CA", {
+  const format = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(instant) as PlainDate;
+  });
+  return (instant) => format.format(instant) as PlainDate;
 }
 
 /** Calendar arithmetic on a plain date; unaffected by DST because it never leaves UTC. */
