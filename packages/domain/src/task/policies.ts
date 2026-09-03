@@ -13,6 +13,13 @@ import {
   assertStatusBelongsToProject,
   assertTaskInvariants,
 } from "./invariants.js";
+import {
+  nextOccurrenceAfter,
+  sameRecurrence,
+  toRecurrenceRule,
+  type RecurrenceRule,
+  type RecurrenceRuleInput,
+} from "./recurrence.js";
 import { normalizeBlockedReason } from "./relation.js";
 import { isCompleted, isDeleted, type Task } from "./task.js";
 import {
@@ -52,6 +59,9 @@ export interface CreateTaskInput {
   readonly dueTime?: PlainTime | null;
   readonly dueTimezone?: string | null;
   readonly parentTaskId?: string | null;
+  readonly recurrence?: RecurrenceRuleInput | null;
+  /** The series this task continues; a new repeating task starts its own. */
+  readonly seriesId?: string | null;
   /** Resolved destination. Omitted or null places the task in the Inbox (spec 9.1). */
   readonly project?: { readonly id: string; readonly status: WorkflowStatus } | null;
 }
@@ -83,6 +93,8 @@ export function createTask(input: CreateTaskInput, context: PolicyContext): Task
     dueTime: input.dueTime ?? null,
     dueTimezone: input.dueTime ? (input.dueTimezone ?? null) : null,
     parentTaskId: input.parentTaskId ?? null,
+    recurrence: input.recurrence ? toRecurrenceRule(input.recurrence) : null,
+    seriesId: input.seriesId ?? (input.recurrence ? input.id : null),
     rank: input.rank,
     lastActiveStatusId: null,
     completedAt: null,
@@ -108,6 +120,8 @@ export interface UpdateTaskFieldsInput {
   readonly dueDate?: Patch<PlainDate>;
   readonly dueTime?: Patch<PlainTime>;
   readonly dueTimezone?: Patch<string>;
+  /** Setting a rule on a task that never repeated starts a series with this task. */
+  readonly recurrence?: Patch<RecurrenceRuleInput>;
 }
 
 /**
@@ -128,6 +142,12 @@ export function updateTaskFields(
   const dueTime = dueDate === null ? null : requestedTime;
   const requestedZone =
     input.dueTimezone === undefined ? task.dueTimezone : input.dueTimezone;
+  const recurrence =
+    input.recurrence === undefined
+      ? task.recurrence
+      : input.recurrence === null
+        ? null
+        : toRecurrenceRule(input.recurrence);
 
   const next: Task = {
     ...task,
@@ -140,9 +160,79 @@ export function updateTaskFields(
     dueDate,
     dueTime,
     dueTimezone: dueTime === null ? null : requestedZone,
+    recurrence,
+    // Clearing a rule keeps the series link, so the history of a stopped series stays.
+    seriesId: task.seriesId ?? (recurrence ? task.id : null),
   };
 
   return touch(next, task, context);
+}
+
+/**
+ * The next occurrence of a repeating task as a new-task description, or null when the
+ * task does not repeat or the series ends here. The application layer allocates the id
+ * and number, resolves the project's default status, and copies the tags.
+ */
+export function spawnNextOccurrence(
+  task: Task,
+  completedOn: PlainDate,
+):
+  | (Omit<CreateTaskInput, "id" | "taskNumber" | "rank" | "project"> & {
+      readonly projectId: string | null;
+      readonly dueDate: PlainDate;
+      readonly recurrence: RecurrenceRule;
+      readonly seriesId: string;
+    })
+  | null {
+  const next = nextOccurrenceAfter(task, completedOn);
+  if (!next) return null;
+  return {
+    workspaceId: task.workspaceId,
+    title: task.title,
+    descriptionMd: task.descriptionMd,
+    priority: task.priority,
+    projectId: task.projectId,
+    parentTaskId: task.parentTaskId,
+    dueDate: next.dueDate,
+    dueTime: task.dueTime,
+    dueTimezone: task.dueTimezone,
+    recurrence: next.recurrence,
+    seriesId: task.seriesId ?? task.id,
+  };
+}
+
+/**
+ * Skip the current occurrence: the same task moves on to its next date and the rule's
+ * count advances, exactly as completion would have spawned it — but nothing is created.
+ * The last occurrence has nothing to skip to, so it is rejected rather than silently
+ * ended; completing or deleting it is the explicit way out.
+ */
+export function skipOccurrence(
+  task: Task,
+  on: PlainDate,
+  context: PolicyContext,
+): Task {
+  assertMutable(task);
+  if (task.recurrence === null) {
+    throw new ValidationError("This task does not repeat.", { taskId: task.id });
+  }
+  if (isCompleted(task)) {
+    throw new ValidationError("A completed occurrence cannot be skipped.", {
+      taskId: task.id,
+    });
+  }
+  const next = nextOccurrenceAfter(task, on);
+  if (!next) {
+    throw new ValidationError(
+      "This is the last occurrence of its series; there is nothing to skip to.",
+      { taskId: task.id },
+    );
+  }
+  return touch(
+    { ...task, dueDate: next.dueDate, recurrence: next.recurrence },
+    task,
+    context,
+  );
 }
 
 export interface MoveTaskInput {
@@ -508,6 +598,8 @@ const MATERIAL_FIELDS = [
   "dueTime",
   "dueTimezone",
   "parentTaskId",
+  "recurrence",
+  "seriesId",
   "rank",
   "lastActiveStatusId",
   "completedAt",
@@ -516,13 +608,21 @@ const MATERIAL_FIELDS = [
   "deletedAt",
 ] as const satisfies readonly (keyof Task)[];
 
+function fieldChanged(
+  field: (typeof MATERIAL_FIELDS)[number],
+  next: Task,
+  previous: Task,
+) {
+  if (field === "recurrence")
+    return !sameRecurrence(next.recurrence, previous.recurrence);
+  const a = next[field];
+  const b = previous[field];
+  if (a instanceof Date && b instanceof Date) return a.getTime() !== b.getTime();
+  return a !== b;
+}
+
 function hasMaterialChange(next: Task, previous: Task): boolean {
-  return MATERIAL_FIELDS.some((field) => {
-    const a = next[field];
-    const b = previous[field];
-    if (a instanceof Date && b instanceof Date) return a.getTime() !== b.getTime();
-    return a !== b;
-  });
+  return MATERIAL_FIELDS.some((field) => fieldChanged(field, next, previous));
 }
 
 /** The fields that changed, for the activity payload and event diff (spec 18.2). */
@@ -534,9 +634,7 @@ export function materialChanges(
   for (const field of MATERIAL_FIELDS) {
     const a = next[field];
     const b = previous[field];
-    const changed =
-      a instanceof Date && b instanceof Date ? a.getTime() !== b.getTime() : a !== b;
-    if (changed) {
+    if (fieldChanged(field, next, previous)) {
       changes[field] = {
         from: b instanceof Date ? b.toISOString() : b,
         to: a instanceof Date ? a.toISOString() : a,

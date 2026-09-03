@@ -1,5 +1,6 @@
 import type { ActorRef } from "../shared/actor.js";
 
+import type { RecurrenceRule } from "./recurrence.js";
 import type { Priority, PlainDate, PlainTime } from "./values.js";
 
 /**
@@ -22,6 +23,10 @@ export interface Task {
   readonly dueTime: PlainTime | null;
   readonly dueTimezone: string | null;
   readonly parentTaskId: string | null;
+  /** How the task repeats; completing it creates the next occurrence (GAP-12). */
+  readonly recurrence: RecurrenceRule | null;
+  /** Links every occurrence of one repeating task: the id of the first of them. */
+  readonly seriesId: string | null;
   readonly rank: string;
   readonly lastActiveStatusId: string | null;
   readonly completedAt: Date | null;

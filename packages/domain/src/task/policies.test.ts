@@ -23,6 +23,8 @@ import {
   resolveReopenStatus,
   restoreTask,
   setParent,
+  skipOccurrence,
+  spawnNextOccurrence,
   updateTaskFields,
 } from "./policies.js";
 import { isInboxTask, type Task } from "./task.js";
@@ -675,5 +677,126 @@ describe("flagBlocked and clearBlocked", () => {
     const done = completeTask(flagged, {}, testContext());
     expect(done.blockedReason).toBe("vendor");
     expect(reopenTask(done, {}, testContext()).blockedReason).toBe("vendor");
+  });
+});
+
+describe("recurrence", () => {
+  const weekly = { freq: "weekly" as const, weekdays: ["thu" as const] };
+
+  it("starts a series with the task itself when a rule is set on creation", () => {
+    const task = createTask({ ...baseInput, recurrence: weekly }, testContext());
+
+    expect(task.recurrence).toMatchObject({ freq: "weekly", weekdays: ["thu"] });
+    expect(task.seriesId).toBe("task-1");
+  });
+
+  it("assigns the series on the first rule and keeps it when the rule is cleared", () => {
+    const task = inboxTask();
+    const repeating = updateTaskFields(task, { recurrence: weekly }, testContext());
+    expect(repeating.seriesId).toBe("task-1");
+    expect(repeating.version).toBe(2);
+    expect(materialChanges(repeating, task)).toMatchObject({
+      recurrence: { from: null },
+      seriesId: { from: null, to: "task-1" },
+    });
+
+    const stopped = updateTaskFields(repeating, { recurrence: null }, testContext());
+    expect(stopped.recurrence).toBeNull();
+    expect(stopped.seriesId).toBe("task-1");
+
+    // The same rule in a different key order is not a change.
+    const same = updateTaskFields(
+      repeating,
+      { recurrence: { weekdays: ["thu"], freq: "weekly" } },
+      testContext(),
+    );
+    expect(same).toBe(repeating);
+  });
+
+  it("rejects an unusable rule", () => {
+    expect(() =>
+      updateTaskFields(inboxTask(), { recurrence: { freq: "weekly" } }, testContext()),
+    ).toThrow(ValidationError);
+  });
+
+  it("describes the next occurrence with the task's fields and the counted-down rule", () => {
+    const task = inboxTask({
+      projectId: "project-1",
+      statusId: "status-ready",
+      priority: "high",
+      descriptionMd: "Notes",
+      dueDate: toPlainDate("2026-09-03"),
+      dueTime: toPlainTime("09:00"),
+      dueTimezone: "Europe/Berlin",
+      parentTaskId: "parent-1",
+      recurrence: {
+        ...createTask(
+          { ...baseInput, recurrence: { ...weekly, count: 2 } },
+          testContext(),
+        ).recurrence!,
+      },
+      seriesId: "series-1",
+    });
+
+    expect(spawnNextOccurrence(task, toPlainDate("2026-09-03"))).toEqual({
+      workspaceId: "workspace-1",
+      title: task.title,
+      descriptionMd: "Notes",
+      priority: "high",
+      projectId: "project-1",
+      parentTaskId: "parent-1",
+      dueDate: "2026-09-10",
+      dueTime: "09:00",
+      dueTimezone: "Europe/Berlin",
+      recurrence: { ...task.recurrence, count: 1 },
+      seriesId: "series-1",
+    });
+  });
+
+  it("spawns nothing for a task that does not repeat or whose series is over", () => {
+    expect(spawnNextOccurrence(inboxTask(), toPlainDate("2026-09-03"))).toBeNull();
+    const last = createTask(
+      { ...baseInput, recurrence: { ...weekly, count: 1 } },
+      testContext(),
+    );
+    expect(spawnNextOccurrence(last, toPlainDate("2026-09-03"))).toBeNull();
+  });
+
+  it("skips to the next occurrence on the same task", () => {
+    const task = createTask(
+      {
+        ...baseInput,
+        dueDate: toPlainDate("2026-09-03"),
+        recurrence: { ...weekly, count: 3 },
+      },
+      testContext(),
+    );
+
+    const skipped = skipOccurrence(task, toPlainDate("2026-09-03"), testContext());
+    expect(skipped.id).toBe(task.id);
+    expect(skipped.dueDate).toBe("2026-09-10");
+    expect(skipped.recurrence?.count).toBe(2);
+    expect(skipped.version).toBe(2);
+  });
+
+  it("refuses to skip a non-repeating, completed, or last occurrence", () => {
+    expect(() =>
+      skipOccurrence(inboxTask(), toPlainDate("2026-09-03"), testContext()),
+    ).toThrow(/does not repeat/);
+    const last = createTask(
+      { ...baseInput, recurrence: { ...weekly, count: 1 } },
+      testContext(),
+    );
+    expect(() =>
+      skipOccurrence(last, toPlainDate("2026-09-03"), testContext()),
+    ).toThrow(/last occurrence/);
+    const done = completeTask(
+      createTask({ ...baseInput, recurrence: weekly }, testContext()),
+      {},
+      testContext(),
+    );
+    expect(() =>
+      skipOccurrence(done, toPlainDate("2026-09-03"), testContext()),
+    ).toThrow(/completed/);
   });
 });
