@@ -19,6 +19,7 @@ export type {
   ProjectRepository,
   WorkflowStatusRepository,
 } from "./projects.js";
+export type { TagRepository } from "./tags.js";
 export type {
   Workspace,
   WorkspaceMembership,

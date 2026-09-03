@@ -11,6 +11,8 @@ import type {
 import { TASK_EVENTS } from "@morrowlist/contracts";
 import {
   DomainError,
+  MAX_TAGS_PER_TASK,
+  ValidationError,
   assertExpectedVersion,
   assertParentIsAssignable,
   completeTask,
@@ -34,6 +36,7 @@ import {
   type DayPlanSource,
   type PlainDate,
   type PlainTime,
+  type Tag,
   type Task,
   type WorkflowStatus,
 } from "@morrowlist/domain";
@@ -283,6 +286,7 @@ export class TaskService {
           statusId: query.statusId,
           parentTaskId: query.parentTaskId,
           priority: query.priority,
+          tagId: query.tagId,
           inboxOnly: query.inbox,
           isCompleted: query.isCompleted,
           deletedOnly: query.deleted,
@@ -606,6 +610,84 @@ export class TaskService {
   }
 
   /**
+   * Attach a workspace tag (spec 12.1). The tag set is a relation on the canonical task,
+   * like My Day (ADR-001): it changes no task column, so the task's version is untouched
+   * and an open editor's expectedVersion stays valid. Adding a tag the task already
+   * carries is a no-op that records no event.
+   */
+  async addTag(
+    context: ActorContext,
+    workspaceId: string,
+    taskId: string,
+    tagId: string,
+  ): Promise<TaskDto> {
+    assertWorkspaceAccess(context, workspaceId);
+    assertScope(context, SCOPES.tasksWrite);
+
+    return this.unitOfWork.execute(async (tx) => {
+      const workspace = await this.requireWorkspace(tx, workspaceId);
+      const task = await this.requireTask(tx, workspaceId, taskId);
+      const tag = await this.requireTag(tx, workspaceId, tagId);
+      const current = await this.tagsOf(tx, task);
+
+      if (current.some((candidate) => candidate.id === tag.id)) {
+        return this.toDto(tx, workspace, task);
+      }
+      if (current.length >= MAX_TAGS_PER_TASK) {
+        throw new ValidationError(
+          `A task can carry at most ${MAX_TAGS_PER_TASK} tags.`,
+          { taskId, maxTags: MAX_TAGS_PER_TASK },
+        );
+      }
+
+      await tx.tasks.addTag(taskId, tagId, this.clock.now());
+      await recordEvent(tx, context, this.clock, {
+        workspaceId,
+        aggregateType: "task",
+        aggregateId: taskId,
+        eventType: TASK_EVENTS.tagAdded,
+        summary: `Added tag ${tag.name}`,
+        payload: { taskId, tagId, tagName: tag.name },
+      });
+      return this.toDto(tx, workspace, task);
+    });
+  }
+
+  async removeTag(
+    context: ActorContext,
+    workspaceId: string,
+    taskId: string,
+    tagId: string,
+  ): Promise<TaskDto> {
+    assertWorkspaceAccess(context, workspaceId);
+    assertScope(context, SCOPES.tasksWrite);
+
+    return this.unitOfWork.execute(async (tx) => {
+      const workspace = await this.requireWorkspace(tx, workspaceId);
+      const task = await this.requireTask(tx, workspaceId, taskId);
+      const current = await this.tagsOf(tx, task);
+      const tag = current.find((candidate) => candidate.id === tagId);
+      if (!tag) {
+        // Not carried: nothing to remove, nothing to record. An unknown tag id is still
+        // reported so a client cannot mistake a typo for success.
+        await this.requireTag(tx, workspaceId, tagId);
+        return this.toDto(tx, workspace, task);
+      }
+
+      await tx.tasks.removeTag(taskId, tagId);
+      await recordEvent(tx, context, this.clock, {
+        workspaceId,
+        aggregateType: "task",
+        aggregateId: taskId,
+        eventType: TASK_EVENTS.tagRemoved,
+        summary: `Removed tag ${tag.name}`,
+        payload: { taskId, tagId, tagName: tag.name },
+      });
+      return this.toDto(tx, workspace, task);
+    });
+  }
+
+  /**
    * Shared mutation pipeline: load, guard the expected version, apply a policy, persist
    * with an optimistic-concurrency check, and record activity plus an outbox event — all
    * in one transaction.
@@ -703,8 +785,10 @@ export class TaskService {
   }
 
   /**
-   * Map tasks with their upcoming My Day dates (spec 9.5) and their child progress
-   * (spec 29.3), each loaded in one query for the whole page.
+   * Map tasks with their upcoming My Day dates (spec 9.5), their child progress and
+   * their tags (spec 29.3), each loaded in one query for the whole page. Tags survive
+   * every command here: completion, moves, deletion and restore all leave the relation
+   * alone (spec 8.5).
    */
   private async toDtos(
     tx: TransactionContext,
@@ -712,9 +796,10 @@ export class TaskService {
     tasks: readonly Task[],
   ): Promise<TaskDto[]> {
     const ids = tasks.map((task) => task.id);
-    const [plans, progress] = await Promise.all([
+    const [plans, progress, tags] = await Promise.all([
       tx.dayPlans.listForTasks(ids, this.workspaceToday(workspace.timezone)),
       tx.tasks.childSummary(workspace.id, ids),
+      tx.tasks.tagsFor(workspace.id, ids),
     ]);
     return tasks.map((task) =>
       toTaskDto(
@@ -722,8 +807,24 @@ export class TaskService {
         workspace.taskKeyPrefix,
         plans.get(task.id) ?? [],
         progress.get(task.id) ?? null,
+        tags.get(task.id) ?? [],
       ),
     );
+  }
+
+  private async tagsOf(tx: TransactionContext, task: Task): Promise<readonly Tag[]> {
+    const tags = await tx.tasks.tagsFor(task.workspaceId, [task.id]);
+    return tags.get(task.id) ?? [];
+  }
+
+  private async requireTag(
+    tx: TransactionContext,
+    workspaceId: string,
+    tagId: string,
+  ): Promise<Tag> {
+    const tag = await tx.tags.findById(workspaceId, tagId);
+    if (!tag) throw new DomainError("TAG_NOT_FOUND", "Tag not found.", { tagId });
+    return tag;
   }
 
   private async requireWorkspace(tx: TransactionContext, workspaceId: string) {

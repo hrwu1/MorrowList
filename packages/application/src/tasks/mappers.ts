@@ -1,5 +1,7 @@
 import type { SubtaskProgress, TaskDto } from "@morrowlist/contracts";
-import { isCompleted, taskKey, type Task } from "@morrowlist/domain";
+import { isCompleted, taskKey, type Tag, type Task } from "@morrowlist/domain";
+
+import { toTagDto } from "../tags/mappers.js";
 
 /**
  * Domain-to-contract mapping (spec 17.3 step 8). Keeping this in one place means a
@@ -13,6 +15,7 @@ export function toTaskDto(
   taskKeyPrefix: string,
   dayPlans: readonly string[] = [],
   subtaskProgress: SubtaskProgress | null = null,
+  tags: readonly Tag[] = [],
 ): TaskDto {
   return {
     id: task.id,
@@ -32,6 +35,7 @@ export function toTaskDto(
     isCompleted: isCompleted(task),
     completedAt: task.completedAt?.toISOString() ?? null,
     version: task.version,
+    tags: tags.map(toTagDto),
     createdBy: { kind: task.createdBy.kind, id: task.createdBy.id },
     lastActor: { kind: task.lastActor.kind, id: task.lastActor.id },
     createdAt: task.createdAt.toISOString(),

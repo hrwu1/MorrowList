@@ -10,6 +10,7 @@ import {
   createProjectRepository,
   createWorkflowStatusRepository,
 } from "./repositories/projects.js";
+import { createTagRepository } from "./repositories/tags.js";
 import {
   createTaskCounterRepository,
   createTaskRepository,
@@ -30,6 +31,7 @@ export function buildTransactionContext(db: Database): TransactionContext {
     dayPlans: createDayPlanRepository(db),
     projects: createProjectRepository(db),
     statuses: createWorkflowStatusRepository(db),
+    tags: createTagRepository(db),
     workspaces: createWorkspaceRepository(db),
     activity: createActivityRepository(db),
     outbox: createOutboxRepository(db),

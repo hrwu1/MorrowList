@@ -1,7 +1,19 @@
 import type { Project, Workspace } from "@morrowlist/application";
-import type { ActorKind, Task, WorkflowStatus } from "@morrowlist/domain";
+import type {
+  ActorKind,
+  Tag,
+  TagColorToken,
+  Task,
+  WorkflowStatus,
+} from "@morrowlist/domain";
 
-import type { projects, tasks, workflowStatuses, workspaces } from "../schema/index.js";
+import type {
+  projects,
+  tags,
+  tasks,
+  workflowStatuses,
+  workspaces,
+} from "../schema/index.js";
 
 /**
  * Row-to-entity mapping. Kept in one place so a column rename cannot silently change the
@@ -12,6 +24,7 @@ type TaskRow = typeof tasks.$inferSelect;
 type ProjectRow = typeof projects.$inferSelect;
 type StatusRow = typeof workflowStatuses.$inferSelect;
 type WorkspaceRow = typeof workspaces.$inferSelect;
+type TagRow = typeof tags.$inferSelect;
 
 export function toTask(row: TaskRow): Task {
   return {
@@ -102,6 +115,32 @@ export function toWorkflowStatus(row: StatusRow): WorkflowStatus {
     isDefault: row.isDefault,
     archivedAt: row.archivedAt,
     version: row.version,
+  };
+}
+
+export function toTag(row: TagRow): Tag {
+  return {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    name: row.name,
+    normalizedName: row.normalizedName,
+    colorToken: row.colorToken as TagColorToken,
+    description: row.description,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export function toTagRow(tag: Tag): TagRow {
+  return {
+    id: tag.id,
+    workspaceId: tag.workspaceId,
+    name: tag.name,
+    normalizedName: tag.normalizedName,
+    colorToken: tag.colorToken,
+    description: tag.description,
+    createdAt: tag.createdAt,
+    updatedAt: tag.updatedAt,
   };
 }
 

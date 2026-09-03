@@ -16,6 +16,7 @@ export {
   createProjectRepository,
   createWorkflowStatusRepository,
 } from "./repositories/projects.js";
+export { createTagRepository } from "./repositories/tags.js";
 export {
   createTaskCounterRepository,
   createTaskRepository,
@@ -23,6 +24,7 @@ export {
 export { createWorkspaceRepository } from "./repositories/workspaces.js";
 export {
   toProject,
+  toTag,
   toTask,
   toWorkflowStatus,
   toWorkspace,

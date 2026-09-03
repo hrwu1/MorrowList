@@ -10,6 +10,7 @@ import {
   timezoneSchema,
   uuidSchema,
 } from "./common.js";
+import { tagSchema } from "./tag.js";
 
 /** Task transport schemas (spec 20.3–20.5). */
 
@@ -37,6 +38,8 @@ export const taskSchema = z.object({
   isCompleted: z.boolean(),
   completedAt: z.iso.datetime().nullable(),
   version: z.number().int().positive(),
+  /** Ordered by normalized name, so the same task always lists its tags the same way. */
+  tags: z.array(tagSchema),
   createdBy: actorSchema,
   lastActor: actorSchema,
   createdAt: z.iso.datetime(),

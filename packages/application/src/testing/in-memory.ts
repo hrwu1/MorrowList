@@ -2,6 +2,7 @@ import {
   childProgress,
   type DayPlan,
   type PlainDate,
+  type Tag,
   type Task,
   type WorkflowStatus,
 } from "@morrowlist/domain";
@@ -19,6 +20,7 @@ import type {
   Project,
   ProjectRepository,
   RankScope,
+  TagRepository,
   TaskCounterRepository,
   TaskFilter,
   TaskRepository,
@@ -47,6 +49,8 @@ export interface InMemoryData {
   dayPlans: Map<string, DayPlan>;
   projects: Map<string, Project>;
   statuses: Map<string, WorkflowStatus>;
+  tags: Map<string, Tag>;
+  taskTags: { taskId: string; tagId: string; createdAt: Date }[];
   workspaces: Map<string, Workspace>;
   memberships: WorkspaceMembership[];
   activity: ActivityEvent[];
@@ -60,11 +64,21 @@ export function emptyData(): InMemoryData {
     dayPlans: new Map(),
     projects: new Map(),
     statuses: new Map(),
+    tags: new Map(),
+    taskTags: [],
     workspaces: new Map(),
     memberships: [],
     activity: [],
     outbox: [],
   };
+}
+
+/** Normalized name, then id: the same order the SQL repository's COLLATE "C" produces. */
+function compareTags(left: Tag, right: Tag): number {
+  if (left.normalizedName !== right.normalizedName) {
+    return left.normalizedName < right.normalizedName ? -1 : 1;
+  }
+  return left.id < right.id ? -1 : 1;
 }
 
 const PRIORITY_ORDER = ["none", "low", "medium", "high", "urgent"];
@@ -106,6 +120,12 @@ function taskRepository(data: InMemoryData): TaskRepository {
         items = items.filter((t) => t.parentTaskId === null);
       }
       if (filter.priority) items = items.filter((t) => t.priority === filter.priority);
+      if (filter.tagId) {
+        const tagId = filter.tagId;
+        items = items.filter((t) =>
+          data.taskTags.some((link) => link.taskId === t.id && link.tagId === tagId),
+        );
+      }
       if (filter.isCompleted !== undefined) {
         items = items.filter((t) => (t.completedAt !== null) === filter.isCompleted);
       }
@@ -253,6 +273,7 @@ function taskRepository(data: InMemoryData): TaskRepository {
     },
     async hardDelete(_workspaceId, taskId) {
       data.tasks.delete(taskId);
+      data.taskTags = data.taskTags.filter((link) => link.taskId !== taskId);
     },
     async firstRankIn(scope) {
       const ranks = [...data.tasks.values()]
@@ -313,6 +334,29 @@ function taskRepository(data: InMemoryData): TaskRepository {
       }
       return result;
     },
+    async tagsFor(workspaceId, taskIds) {
+      const result = new Map<string, readonly Tag[]>();
+      for (const taskId of taskIds) {
+        const tags = data.taskTags
+          .filter((link) => link.taskId === taskId)
+          .flatMap((link) => {
+            const tag = data.tags.get(link.tagId);
+            return tag && tag.workspaceId === workspaceId ? [tag] : [];
+          })
+          .sort(compareTags);
+        if (tags.length > 0) result.set(taskId, tags);
+      }
+      return result;
+    },
+    async addTag(taskId, tagId, createdAt) {
+      if (data.taskTags.some((l) => l.taskId === taskId && l.tagId === tagId)) return;
+      data.taskTags.push({ taskId, tagId, createdAt });
+    },
+    async removeTag(taskId, tagId) {
+      data.taskTags = data.taskTags.filter(
+        (link) => !(link.taskId === taskId && link.tagId === tagId),
+      );
+    },
   };
 }
 
@@ -363,6 +407,54 @@ function dayPlanRepository(data: InMemoryData): DayPlanRepository {
             : [];
         })
         .sort((left, right) => (left.rank < right.rank ? -1 : 1));
+    },
+  };
+}
+
+function tagRepository(data: InMemoryData): TagRepository {
+  return {
+    async findById(workspaceId, tagId) {
+      const tag = data.tags.get(tagId);
+      return tag && tag.workspaceId === workspaceId ? tag : null;
+    },
+    async findByNormalizedName(workspaceId, normalizedName) {
+      return (
+        [...data.tags.values()].find(
+          (tag) =>
+            tag.workspaceId === workspaceId && tag.normalizedName === normalizedName,
+        ) ?? null
+      );
+    },
+    async listByWorkspace(workspaceId) {
+      return [...data.tags.values()]
+        .filter((tag) => tag.workspaceId === workspaceId)
+        .sort(compareTags);
+    },
+    async taskCounts(workspaceId) {
+      const counts = new Map<string, number>();
+      for (const link of data.taskTags) {
+        const task = data.tasks.get(link.taskId);
+        if (!task || task.workspaceId !== workspaceId || task.deletedAt !== null) {
+          continue;
+        }
+        counts.set(link.tagId, (counts.get(link.tagId) ?? 0) + 1);
+      }
+      return counts;
+    },
+    async insert(tag) {
+      data.tags.set(tag.id, tag);
+    },
+    async update(tag) {
+      if (!data.tags.has(tag.id)) return false;
+      data.tags.set(tag.id, tag);
+      return true;
+    },
+    async delete(workspaceId, tagId) {
+      const tag = data.tags.get(tagId);
+      if (!tag || tag.workspaceId !== workspaceId) return;
+      data.tags.delete(tagId);
+      // The SQL foreign key cascades; the double has to do it by hand.
+      data.taskTags = data.taskTags.filter((link) => link.tagId !== tagId);
     },
   };
 }
@@ -570,6 +662,8 @@ export function createInMemoryUnitOfWork(
     dayPlans: new Map(source.dayPlans),
     projects: new Map(source.projects),
     statuses: new Map(source.statuses),
+    tags: new Map(source.tags),
+    taskTags: [...source.taskTags],
     workspaces: new Map(source.workspaces),
     memberships: [...source.memberships],
     activity: [...source.activity],
@@ -582,6 +676,8 @@ export function createInMemoryUnitOfWork(
     target.dayPlans = source.dayPlans;
     target.projects = source.projects;
     target.statuses = source.statuses;
+    target.tags = source.tags;
+    target.taskTags = source.taskTags;
     target.workspaces = source.workspaces;
     target.memberships = source.memberships;
     target.activity = source.activity;
@@ -604,6 +700,7 @@ export function createInMemoryUnitOfWork(
         dayPlans: dayPlanRepository(working),
         projects: projectRepository(working),
         statuses: statusRepository(working),
+        tags: tagRepository(working),
         workspaces: workspaceRepository(working),
         activity: activityRepository(working),
         outbox: outboxRepository(working),

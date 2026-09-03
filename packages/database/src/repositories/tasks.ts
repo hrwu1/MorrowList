@@ -9,7 +9,7 @@ import {
   type TaskFilter,
   type TaskRepository,
 } from "@morrowlist/application";
-import type { ChildProgress, Task } from "@morrowlist/domain";
+import type { ChildProgress, Tag, Task } from "@morrowlist/domain";
 import {
   and,
   asc,
@@ -28,13 +28,15 @@ import {
 
 import type { Database } from "../client.js";
 import {
+  tags,
   taskDayPlans,
+  taskTags,
   tasks,
   workflowStatuses,
   workspaceTaskCounters,
 } from "../schema/index.js";
 
-import { toTask, toTaskRow } from "./mappers.js";
+import { toTag, toTask, toTaskRow } from "./mappers.js";
 
 /** Drizzle implementation of the task ports (TASK-003). */
 
@@ -92,6 +94,18 @@ export function createTaskRepository(db: Database): TaskRepository {
       if (filter.projectId) conditions.push(eq(tasks.projectId, filter.projectId));
       if (filter.statusId) conditions.push(eq(tasks.statusId, filter.statusId));
       if (filter.priority) conditions.push(eq(tasks.priority, filter.priority));
+      if (filter.tagId) {
+        conditions.push(
+          exists(
+            db
+              .select({ one: sql`1` })
+              .from(taskTags)
+              .where(
+                and(eq(taskTags.taskId, tasks.id), eq(taskTags.tagId, filter.tagId)),
+              ),
+          ),
+        );
+      }
       if (filter.parentTaskId) {
         conditions.push(eq(tasks.parentTaskId, filter.parentTaskId));
       } else if (filter.includeSubtasks === false) {
@@ -370,6 +384,43 @@ export function createTaskRepository(db: Database): TaskRepository {
             : [],
         ),
       );
+    },
+
+    async tagsFor(workspaceId, taskIds) {
+      const result = new Map<string, Tag[]>();
+      if (taskIds.length === 0) return result;
+      // One query for the whole page (spec 29.3). normalized_name is COLLATE "C", so the
+      // order is by code point and matches the in-memory double.
+      const rows = await db
+        .select({ taskId: taskTags.taskId, tag: tags })
+        .from(taskTags)
+        .innerJoin(tags, eq(tags.id, taskTags.tagId))
+        .where(
+          and(
+            eq(tags.workspaceId, workspaceId),
+            inArray(taskTags.taskId, [...taskIds]),
+          ),
+        )
+        .orderBy(asc(tags.normalizedName), asc(tags.id));
+      for (const row of rows) {
+        const list = result.get(row.taskId) ?? [];
+        list.push(toTag(row.tag));
+        result.set(row.taskId, list);
+      }
+      return result;
+    },
+
+    async addTag(taskId, tagId, createdAt) {
+      await db
+        .insert(taskTags)
+        .values({ taskId, tagId, createdAt })
+        .onConflictDoNothing();
+    },
+
+    async removeTag(taskId, tagId) {
+      await db
+        .delete(taskTags)
+        .where(and(eq(taskTags.taskId, taskId), eq(taskTags.tagId, tagId)));
     },
   };
 }

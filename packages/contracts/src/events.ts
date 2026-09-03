@@ -52,6 +52,15 @@ export const TASK_EVENTS = {
   dayRemoved: "task.day_removed",
   /** Payload: `{ taskId, previousParentId, parentId }`. */
   parentChanged: "task.parent_changed",
+  /** Payload: `{ taskId, tagId, tagName }`. */
+  tagAdded: "task.tag_added",
+  tagRemoved: "task.tag_removed",
+} as const;
+
+export const TAG_EVENTS = {
+  created: "tag.created",
+  updated: "tag.updated",
+  deleted: "tag.deleted",
 } as const;
 
 export const WORKSPACE_EVENTS = {

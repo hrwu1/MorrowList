@@ -1,5 +1,5 @@
 import { PROJECT_BOARD_TASK_LIMIT, UPCOMING_TASK_LIMIT } from "@morrowlist/contracts";
-import type { ChildProgress, PlainDate, Task } from "@morrowlist/domain";
+import type { ChildProgress, PlainDate, Tag, Task } from "@morrowlist/domain";
 
 /** Persistence ports for tasks. Implemented by `@morrowlist/database`. */
 
@@ -9,6 +9,8 @@ export interface TaskFilter {
   readonly statusId?: string | undefined;
   readonly parentTaskId?: string | undefined;
   readonly priority?: Task["priority"] | undefined;
+  /** Only tasks carrying this tag (spec 9.8). */
+  readonly tagId?: string | undefined;
   /** True selects Inbox tasks only: those with no project (spec 9.1). */
   readonly inboxOnly?: boolean | undefined;
   readonly isCompleted?: boolean | undefined;
@@ -127,6 +129,16 @@ export interface TaskRepository {
     workspaceId: string,
     taskIds: readonly string[],
   ): Promise<ReadonlyMap<string, ChildProgress>>;
+  /**
+   * The tags of a page of tasks in one query (spec 29.3), keyed by task id and ordered
+   * by normalized name then id so every response lists them the same way (spec 12.1).
+   */
+  tagsFor(
+    workspaceId: string,
+    taskIds: readonly string[],
+  ): Promise<Map<string, readonly Tag[]>>;
+  addTag(taskId: string, tagId: string, createdAt: Date): Promise<void>;
+  removeTag(taskId: string, tagId: string): Promise<void>;
 }
 
 export interface TaskCounterRepository {

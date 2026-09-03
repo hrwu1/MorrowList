@@ -1,4 +1,9 @@
-import { TaskService, bootstrapUser, type ActorContext } from "@morrowlist/application";
+import {
+  TagService,
+  TaskService,
+  bootstrapUser,
+  type ActorContext,
+} from "@morrowlist/application";
 import { fixedClock, uuidv7 } from "@morrowlist/domain";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -22,6 +27,7 @@ let handle: DatabaseHandle;
 let context: ActorContext;
 let workspaceId: string;
 let tasks: TaskService;
+let tagService: TagService;
 
 beforeAll(async () => {
   handle = await setupTestDatabase();
@@ -59,6 +65,7 @@ beforeEach(async () => {
     clock: fixedClock(NOW),
     cursorSecret: "tags-integration-cursor-secret",
   });
+  tagService = new TagService({ unitOfWork, clock: fixedClock(NOW) });
 });
 
 async function insertTag(name: string, normalizedName = name.toLowerCase()) {
@@ -167,5 +174,91 @@ describe("migration 0003", () => {
     expect(rows.map((row) => row.normalized_name)).toEqual(
       ["a-b", "ab", "a b", "zed", "zed2"].sort((a, b) => (a < b ? -1 : 1)),
     );
+  });
+});
+
+describe("tag commands", () => {
+  it("creates, attaches, lists in name order, filters, counts, and deletes", async () => {
+    const zulu = await tagService.create(context, workspaceId, { name: "Zulu" });
+    const alpha = await tagService.create(context, workspaceId, {
+      name: "alpha",
+      colorToken: "teal",
+    });
+    const tagged = await tasks.create(context, { workspaceId, title: "Tagged" });
+    await tasks.create(context, { workspaceId, title: "Plain" });
+    await tasks.addTag(context, workspaceId, tagged.id, zulu.id);
+    const withBoth = await tasks.addTag(context, workspaceId, tagged.id, alpha.id);
+    expect(withBoth.tags.map((tag) => tag.name)).toEqual(["alpha", "Zulu"]);
+
+    // The tag filter is an EXISTS subquery; only the SQL path proves the clause runs.
+    const filtered = await tasks.list(context, {
+      workspaceId,
+      limit: 50,
+      includeSubtasks: true,
+      tagId: alpha.id,
+      sort: "rank",
+      order: "asc",
+    } as never);
+    expect(filtered.data.map((task) => task.title)).toEqual(["Tagged"]);
+    expect(filtered.data[0]?.tags.map((tag) => tag.name)).toEqual(["alpha", "Zulu"]);
+
+    const listed = await tagService.list(context, workspaceId);
+    expect(listed.data.map((tag) => [tag.name, tag.taskCount])).toEqual([
+      ["alpha", 1],
+      ["Zulu", 1],
+    ]);
+
+    await expect(
+      tagService.create(context, workspaceId, { name: "ALPHA" }),
+    ).rejects.toMatchObject({ code: "TAG_NAME_CONFLICT" });
+
+    await tagService.delete(context, workspaceId, zulu.id);
+    const after = await tasks.get(context, workspaceId, tagged.id);
+    expect(after.tags.map((tag) => tag.name)).toEqual(["alpha"]);
+
+    const events = await handle.pool.query<{ event_type: string }>(
+      "select event_type from activity_events where aggregate_type = 'tag' order by created_at, id",
+    );
+    expect(events.rows.map((row) => row.event_type)).toEqual([
+      "tag.created",
+      "tag.created",
+      "tag.deleted",
+    ]);
+  });
+
+  it("rolls back the association with its activity and outbox rows", async () => {
+    // EVT-001 for the task–tag relation: a failure after the insert must leave no
+    // association behind and no event describing one.
+    const tag = await tagService.create(context, workspaceId, { name: "Doomed" });
+    const task = await tasks.create(context, { workspaceId, title: "Rolled back" });
+    const unitOfWork = createUnitOfWork(handle);
+
+    await expect(
+      unitOfWork.execute(async (tx) => {
+        await tx.tasks.addTag(task.id, tag.id, NOW);
+        await tx.activity.append({
+          id: uuidv7(),
+          workspaceId,
+          aggregateType: "task",
+          aggregateId: task.id,
+          eventType: "task.tag_added",
+          actorKind: "user",
+          actorId: context.actorId,
+          actorDisplayName: null,
+          summary: "never committed",
+          payload: {},
+          correlationId: "req_rollback",
+          createdAt: NOW,
+        });
+        throw new Error("deliberate failure");
+      }),
+    ).rejects.toThrow("deliberate failure");
+
+    const links = await handle.pool.query("select tag_id from task_tags");
+    expect(links.rows).toHaveLength(0);
+    const added = await handle.pool.query(
+      "select id from activity_events where event_type = 'task.tag_added'",
+    );
+    expect(added.rows).toHaveLength(0);
   });
 });

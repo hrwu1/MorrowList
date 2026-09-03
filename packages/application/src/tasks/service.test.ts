@@ -2,6 +2,7 @@ import { fixedClock, uuidv7 } from "@morrowlist/domain";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { SCOPES, type ActorContext } from "../shared/actor-context.js";
+import { TagService } from "../tags/service.js";
 import {
   buildActorContext,
   createInMemoryUnitOfWork,
@@ -768,6 +769,169 @@ describe("TaskService.list", () => {
     await expect(
       service.list(seeded.context, listQuery({ cursor: "forged.signature" })),
     ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  });
+});
+
+describe("TaskService tags", () => {
+  async function createTag(name: string) {
+    const tags = new TagService({ unitOfWork, clock: fixedClock(NOW) });
+    return tags.create(seeded.context, seeded.workspace.id, { name });
+  }
+
+  it("adds and removes a tag with events and without bumping the version", async () => {
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Tagged",
+    });
+    const tag = await createTag("Deep Work");
+
+    const tagged = await service.addTag(
+      seeded.context,
+      seeded.workspace.id,
+      task.id,
+      tag.id,
+    );
+    expect(tagged.tags.map((t) => t.name)).toEqual(["Deep Work"]);
+    expect(tagged.version).toBe(task.version);
+
+    const untagged = await service.removeTag(
+      seeded.context,
+      seeded.workspace.id,
+      task.id,
+      tag.id,
+    );
+    expect(untagged.tags).toEqual([]);
+
+    const events = unitOfWork.data.activity
+      .filter((event) => event.aggregateId === task.id)
+      .map((event) => event.eventType);
+    expect(events).toEqual(["task.created", "task.tag_added", "task.tag_removed"]);
+    expect(unitOfWork.data.outbox.at(-1)).toMatchObject({
+      eventType: "task.tag_removed",
+      payload: { taskId: task.id, tagId: tag.id, tagName: "Deep Work" },
+    });
+  });
+
+  it("orders a task's tags by name regardless of when they were added", async () => {
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Ordered",
+    });
+    for (const name of ["zulu", "Alpha", "mike"]) {
+      const tag = await createTag(name);
+      await service.addTag(seeded.context, seeded.workspace.id, task.id, tag.id);
+    }
+
+    const fetched = await service.get(seeded.context, seeded.workspace.id, task.id);
+    expect(fetched.tags.map((tag) => tag.name)).toEqual(["Alpha", "mike", "zulu"]);
+  });
+
+  it("treats adding a tag twice as a no-op and caps a task at twenty tags", async () => {
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Crowded",
+    });
+    const first = await createTag("tag-0");
+    await service.addTag(seeded.context, seeded.workspace.id, task.id, first.id);
+    await service.addTag(seeded.context, seeded.workspace.id, task.id, first.id);
+    expect(
+      unitOfWork.data.activity.filter((e) => e.eventType === "task.tag_added"),
+    ).toHaveLength(1);
+
+    for (let index = 1; index < 20; index++) {
+      const tag = await createTag(`tag-${index}`);
+      await service.addTag(seeded.context, seeded.workspace.id, task.id, tag.id);
+    }
+    const overflow = await createTag("tag-20");
+    await expect(
+      service.addTag(seeded.context, seeded.workspace.id, task.id, overflow.id),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  });
+
+  it("reports an unknown tag and a tag from another workspace as not found", async () => {
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Lonely",
+    });
+    const other = seedWorkspace(unitOfWork.data);
+    const foreign = await new TagService({ unitOfWork, clock: fixedClock(NOW) }).create(
+      other.context,
+      other.workspace.id,
+      { name: "Foreign" },
+    );
+
+    await expect(
+      service.addTag(seeded.context, seeded.workspace.id, task.id, foreign.id),
+    ).rejects.toMatchObject({ code: "TAG_NOT_FOUND" });
+    await expect(
+      service.removeTag(seeded.context, seeded.workspace.id, task.id, uuidv7()),
+    ).rejects.toMatchObject({ code: "TAG_NOT_FOUND" });
+  });
+
+  it("keeps tags through moves, completion, deletion, and restore", async () => {
+    // Spec 8.5: completing and reopening remove no tags; the same holds for Trash.
+    const tag = await createTag("Sticky");
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Travels",
+    });
+    await service.addTag(seeded.context, seeded.workspace.id, task.id, tag.id);
+
+    const moved = await service.move(seeded.context, seeded.workspace.id, task.id, {
+      projectId: seeded.project.id,
+      statusId: statusByCategory(seeded.statuses, "ready").id,
+    });
+    expect(moved.tags.map((t) => t.name)).toEqual(["Sticky"]);
+
+    const completed = await service.complete(
+      seeded.context,
+      seeded.workspace.id,
+      task.id,
+    );
+    expect(completed.tags.map((t) => t.name)).toEqual(["Sticky"]);
+
+    await service.delete(seeded.context, seeded.workspace.id, task.id);
+    const restored = await service.restore(
+      seeded.context,
+      seeded.workspace.id,
+      task.id,
+    );
+    expect(restored.tags.map((t) => t.name)).toEqual(["Sticky"]);
+  });
+
+  it("filters a list by tag", async () => {
+    const tag = await createTag("Errands");
+    const tagged = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Buy milk",
+    });
+    await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Write essay",
+    });
+    await service.addTag(seeded.context, seeded.workspace.id, tagged.id, tag.id);
+
+    const page = await service.list(seeded.context, listQuery({ tagId: tag.id }));
+    expect(page.data.map((task) => task.title)).toEqual(["Buy milk"]);
+    expect(page.data[0]?.tags.map((t) => t.name)).toEqual(["Errands"]);
+  });
+
+  it("rolls back the association and both event rows together", async () => {
+    const tag = await createTag("Doomed");
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Rolled back",
+    });
+    const before = unitOfWork.data.activity.length;
+    unitOfWork.failNextCommit();
+
+    await expect(
+      service.addTag(seeded.context, seeded.workspace.id, task.id, tag.id),
+    ).rejects.toThrow(/simulated commit failure/);
+
+    expect(unitOfWork.data.taskTags).toHaveLength(0);
+    expect(unitOfWork.data.activity).toHaveLength(before);
+    expect(unitOfWork.data.outbox).toHaveLength(before);
   });
 });
 
