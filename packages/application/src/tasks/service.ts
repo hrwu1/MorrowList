@@ -4,6 +4,7 @@ import type {
   ListTasksQuery,
   MoveTaskRequest,
   ReorderTaskRequest,
+  SetTaskParentRequest,
   TaskDto,
   UpdateTaskRequest,
 } from "@morrowlist/contracts";
@@ -11,6 +12,7 @@ import { TASK_EVENTS } from "@morrowlist/contracts";
 import {
   DomainError,
   assertExpectedVersion,
+  assertParentIsAssignable,
   completeTask,
   createTask,
   deleteTask,
@@ -22,6 +24,7 @@ import {
   reorderTask as applyTaskReorder,
   resolveReopenStatus,
   restoreTask,
+  setParent as applyParent,
   systemClock,
   toLocalDate,
   toPlainDate,
@@ -97,11 +100,31 @@ export class TaskService {
     return this.unitOfWork.execute(async (tx) => {
       const workspace = await this.requireWorkspace(tx, request.workspaceId);
 
-      const destination = request.projectId
+      const id = uuidv7();
+      const parent = request.parentTaskId
+        ? await this.requireTask(tx, request.workspaceId, request.parentTaskId)
+        : null;
+      if (parent) {
+        // The new task is a leaf, so only the depth above the parent matters.
+        assertParentIsAssignable(
+          id,
+          parent.id,
+          await tx.tasks.ancestorIds(request.workspaceId, parent.id),
+          0,
+        );
+      }
+
+      // A subtask defaults to its parent's project unless the request says otherwise
+      // (spec 8.3); an explicit null still means the Inbox.
+      const projectId =
+        request.projectId === undefined
+          ? (parent?.projectId ?? null)
+          : request.projectId;
+      const destination = projectId
         ? await this.resolveDestination(
             tx,
             request.workspaceId,
-            request.projectId,
+            projectId,
             request.statusId ?? null,
           )
         : null;
@@ -114,13 +137,9 @@ export class TaskService {
       // New tasks land at the end of their scope so capture never reorders existing work.
       const lastRank = await tx.tasks.lastRankIn(scope);
 
-      if (request.parentTaskId) {
-        await this.requireTask(tx, request.workspaceId, request.parentTaskId);
-      }
-
       const task = createTask(
         {
-          id: uuidv7(),
+          id,
           workspaceId: request.workspaceId,
           taskNumber: await tx.taskCounters.allocate(request.workspaceId),
           title: request.title,
@@ -130,7 +149,7 @@ export class TaskService {
           dueDate: (request.dueDate ?? null) as PlainDate | null,
           dueTime: (request.dueTime ?? null) as PlainTime | null,
           dueTimezone: request.dueTimezone ?? workspace.timezone,
-          parentTaskId: request.parentTaskId ?? null,
+          parentTaskId: parent?.id ?? null,
           project: destination,
         },
         { actor: actorRef(context), clock: this.clock },
@@ -149,6 +168,7 @@ export class TaskService {
           projectId: task.projectId,
           statusId: task.statusId,
           priority: task.priority,
+          parentTaskId: task.parentTaskId,
         },
       });
 
@@ -414,6 +434,61 @@ export class TaskService {
   }
 
   /**
+   * Make a task a subtask of another (spec 8.3). The parent must be a live task in this
+   * workspace; the chain stays acyclic and at most three levels deep.
+   */
+  async setParent(
+    context: ActorContext,
+    workspaceId: string,
+    taskId: string,
+    request: SetTaskParentRequest,
+  ): Promise<TaskDto> {
+    assertWorkspaceAccess(context, workspaceId);
+    assertScope(context, SCOPES.tasksWrite);
+
+    return this.mutate(context, workspaceId, taskId, request.expectedVersion, {
+      eventType: TASK_EVENTS.parentChanged,
+      summarize: () => "Made task a subtask",
+      payload: parentChangePayload,
+      apply: async (task, tx) => {
+        const parent = await this.requireTask(tx, workspaceId, request.parentTaskId);
+        return applyParent(
+          task,
+          {
+            parent,
+            ancestorIds: await tx.tasks.ancestorIds(workspaceId, parent.id),
+            descendantDepth: await tx.tasks.descendantDepth(workspaceId, task.id),
+          },
+          { actor: actorRef(context), clock: this.clock },
+        );
+      },
+    });
+  }
+
+  /** Detach a subtask from its parent; it stays exactly where it is otherwise. */
+  async clearParent(
+    context: ActorContext,
+    workspaceId: string,
+    taskId: string,
+    expectedVersion?: number,
+  ): Promise<TaskDto> {
+    assertWorkspaceAccess(context, workspaceId);
+    assertScope(context, SCOPES.tasksWrite);
+
+    return this.mutate(context, workspaceId, taskId, expectedVersion, {
+      eventType: TASK_EVENTS.parentChanged,
+      summarize: () => "Detached task from its parent",
+      payload: parentChangePayload,
+      apply: (task) =>
+        applyParent(
+          task,
+          { parent: null },
+          { actor: actorRef(context), clock: this.clock },
+        ),
+    });
+  }
+
+  /**
    * Complete a task (spec 8.5). A project task moves to the project's Done status at the
    * end of that column; an Inbox task keeps its null project and status.
    */
@@ -544,6 +619,8 @@ export class TaskService {
       eventType: string;
       summarize: (next: Task, previous: Task) => string;
       apply: (task: Task, tx: TransactionContext) => Task | Promise<Task>;
+      /** Event payload; defaults to the field-level diff (spec 18.2). */
+      payload?: (next: Task, previous: Task) => Record<string, unknown>;
     },
     options: { allowDeleted?: boolean } = {},
   ): Promise<TaskDto> {
@@ -580,7 +657,9 @@ export class TaskService {
         aggregateId: taskId,
         eventType: step.eventType,
         summary: step.summarize(next, previous),
-        payload: { taskId, changes: materialChanges(next, previous) },
+        payload: step.payload
+          ? step.payload(next, previous)
+          : { taskId, changes: materialChanges(next, previous) },
       });
 
       return this.toDto(tx, workspace, next);
@@ -623,18 +702,27 @@ export class TaskService {
     return dto as TaskDto;
   }
 
-  /** Map tasks with their upcoming My Day dates, loaded in one query (spec 9.5). */
+  /**
+   * Map tasks with their upcoming My Day dates (spec 9.5) and their child progress
+   * (spec 29.3), each loaded in one query for the whole page.
+   */
   private async toDtos(
     tx: TransactionContext,
     workspace: Workspace,
     tasks: readonly Task[],
   ): Promise<TaskDto[]> {
-    const plans = await tx.dayPlans.listForTasks(
-      tasks.map((task) => task.id),
-      this.workspaceToday(workspace.timezone),
-    );
+    const ids = tasks.map((task) => task.id);
+    const [plans, progress] = await Promise.all([
+      tx.dayPlans.listForTasks(ids, this.workspaceToday(workspace.timezone)),
+      tx.tasks.childSummary(workspace.id, ids),
+    ]);
     return tasks.map((task) =>
-      toTaskDto(task, workspace.taskKeyPrefix, plans.get(task.id) ?? []),
+      toTaskDto(
+        task,
+        workspace.taskKeyPrefix,
+        plans.get(task.id) ?? [],
+        progress.get(task.id) ?? null,
+      ),
     );
   }
 
@@ -811,4 +899,12 @@ export class TaskService {
   private workspaceToday(timezone: string): PlainDate {
     return toLocalDate(this.clock.now(), timezone);
   }
+}
+
+function parentChangePayload(next: Task, previous: Task): Record<string, unknown> {
+  return {
+    taskId: next.id,
+    previousParentId: previous.parentTaskId,
+    parentId: next.parentTaskId,
+  };
 }

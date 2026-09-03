@@ -50,6 +50,8 @@ export const TASK_EVENTS = {
   /** My Day add/remove (spec 9.2). Payload: `{ taskId, planDate, source }`. */
   dayAdded: "task.day_added",
   dayRemoved: "task.day_removed",
+  /** Payload: `{ taskId, previousParentId, parentId }`. */
+  parentChanged: "task.parent_changed",
 } as const;
 
 export const WORKSPACE_EVENTS = {

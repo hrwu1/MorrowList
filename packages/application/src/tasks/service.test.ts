@@ -148,6 +148,181 @@ describe("TaskService.create", () => {
   });
 });
 
+describe("TaskService.create with a parent", () => {
+  it("defaults a subtask to its parent's project unless told otherwise", async () => {
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const parent = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Parent",
+      projectId: seeded.project.id,
+    });
+
+    const defaulted = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Inherits the project",
+      parentTaskId: parent.id,
+    });
+    expect(defaulted.parentTaskId).toBe(parent.id);
+    expect(defaulted.projectId).toBe(seeded.project.id);
+    expect(defaulted.statusId).toBe(ready.id);
+
+    const inbox = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Explicitly in the Inbox",
+      parentTaskId: parent.id,
+      projectId: null,
+    });
+    expect(inbox.parentTaskId).toBe(parent.id);
+    expect(inbox.projectId).toBeNull();
+
+    const fetched = await service.get(seeded.context, seeded.workspace.id, parent.id);
+    expect(fetched.subtaskProgress).toEqual({ completed: 0, total: 2 });
+  });
+
+  it("rejects a fourth nesting level", async () => {
+    const workspaceId = seeded.workspace.id;
+    const root = await service.create(seeded.context, { workspaceId, title: "1" });
+    const second = await service.create(seeded.context, {
+      workspaceId,
+      title: "2",
+      parentTaskId: root.id,
+    });
+    const third = await service.create(seeded.context, {
+      workspaceId,
+      title: "3",
+      parentTaskId: second.id,
+    });
+
+    await expect(
+      service.create(seeded.context, {
+        workspaceId,
+        title: "4",
+        parentTaskId: third.id,
+      }),
+    ).rejects.toMatchObject({ code: "TASK_NESTING_LIMIT_EXCEEDED" });
+    expect(unitOfWork.data.tasks.size).toBe(3);
+  });
+});
+
+describe("TaskService.setParent and clearParent", () => {
+  async function twoTasks() {
+    const workspaceId = seeded.workspace.id;
+    const parent = await service.create(seeded.context, {
+      workspaceId,
+      title: "Parent",
+    });
+    const child = await service.create(seeded.context, { workspaceId, title: "Child" });
+    return { workspaceId, parent, child };
+  }
+
+  it("attaches, records the parent-changed event, and detaches again", async () => {
+    const { workspaceId, parent, child } = await twoTasks();
+
+    const attached = await service.setParent(seeded.context, workspaceId, child.id, {
+      parentTaskId: parent.id,
+    });
+    expect(attached.parentTaskId).toBe(parent.id);
+    expect(attached.version).toBe(2);
+
+    const event = unitOfWork.data.activity.at(-1);
+    expect(event?.eventType).toBe("task.parent_changed");
+    expect(event?.payload).toEqual({
+      taskId: child.id,
+      previousParentId: null,
+      parentId: parent.id,
+    });
+    expect(unitOfWork.data.outbox.at(-1)?.eventType).toBe("task.parent_changed");
+
+    const listed = await service.list(seeded.context, listQuery({ inbox: true }));
+    expect(listed.data.find((task) => task.id === parent.id)?.subtaskProgress).toEqual({
+      completed: 0,
+      total: 1,
+    });
+
+    const detached = await service.clearParent(seeded.context, workspaceId, child.id);
+    expect(detached.parentTaskId).toBeNull();
+    expect(detached.version).toBe(3);
+    expect(unitOfWork.data.activity.at(-1)?.payload).toEqual({
+      taskId: child.id,
+      previousParentId: parent.id,
+      parentId: null,
+    });
+    // Detaching a task with no parent is not a change and records nothing.
+    const eventCount = unitOfWork.data.activity.length;
+    await service.clearParent(seeded.context, workspaceId, child.id);
+    expect(unitOfWork.data.activity).toHaveLength(eventCount);
+  });
+
+  it("rolls back the parent change with both event rows when the commit fails", async () => {
+    const { workspaceId, parent, child } = await twoTasks();
+    const eventsBefore = unitOfWork.data.activity.length;
+    unitOfWork.failNextCommit();
+
+    await expect(
+      service.setParent(seeded.context, workspaceId, child.id, {
+        parentTaskId: parent.id,
+      }),
+    ).rejects.toThrow(/simulated commit failure/);
+
+    expect(unitOfWork.data.tasks.get(child.id)?.parentTaskId).toBeNull();
+    expect(unitOfWork.data.tasks.get(child.id)?.version).toBe(1);
+    expect(unitOfWork.data.activity).toHaveLength(eventsBefore);
+    expect(unitOfWork.data.outbox).toHaveLength(eventsBefore);
+  });
+
+  it("rejects a cycle and a tree deeper than three levels", async () => {
+    const { workspaceId, parent, child } = await twoTasks();
+    const grandchild = await service.create(seeded.context, {
+      workspaceId,
+      title: "Grandchild",
+      parentTaskId: child.id,
+    });
+    await service.setParent(seeded.context, workspaceId, child.id, {
+      parentTaskId: parent.id,
+    });
+
+    await expect(
+      service.setParent(seeded.context, workspaceId, parent.id, {
+        parentTaskId: grandchild.id,
+      }),
+    ).rejects.toMatchObject({ code: "TASK_RELATION_CYCLE" });
+
+    // Hanging the root under a new task would make the grandchild a fourth level.
+    const newRoot = await service.create(seeded.context, {
+      workspaceId,
+      title: "Root",
+    });
+    await expect(
+      service.setParent(seeded.context, workspaceId, parent.id, {
+        parentTaskId: newRoot.id,
+      }),
+    ).rejects.toMatchObject({ code: "TASK_NESTING_LIMIT_EXCEEDED" });
+    expect(unitOfWork.data.tasks.get(parent.id)?.parentTaskId).toBeNull();
+  });
+
+  it("honours expectedVersion and hides a foreign parent behind not-found", async () => {
+    const { workspaceId, parent, child } = await twoTasks();
+
+    await expect(
+      service.setParent(seeded.context, workspaceId, child.id, {
+        parentTaskId: parent.id,
+        expectedVersion: 7,
+      }),
+    ).rejects.toMatchObject({ code: "TASK_VERSION_CONFLICT" });
+
+    const other = seedWorkspace(unitOfWork.data, { userId: seeded.userId });
+    const foreign = await service.create(other.context, {
+      workspaceId: other.workspace.id,
+      title: "Elsewhere",
+    });
+    await expect(
+      service.setParent(seeded.context, workspaceId, child.id, {
+        parentTaskId: foreign.id,
+      }),
+    ).rejects.toMatchObject({ code: "TASK_NOT_FOUND" });
+  });
+});
+
 describe("TaskService authorization", () => {
   it("hides a task in another workspace behind not-found", async () => {
     // M1 acceptance scenario 2 (spec 35): no data from workspace B may leak.

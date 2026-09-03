@@ -13,6 +13,12 @@ import {
 
 /** Task transport schemas (spec 20.3–20.5). */
 
+/** Completed over total direct children (spec 8.3); null when a task has no children. */
+export const subtaskProgressSchema = z.object({
+  completed: z.number().int().nonnegative(),
+  total: z.number().int().positive(),
+});
+
 export const taskSchema = z.object({
   id: uuidSchema,
   key: z.string(),
@@ -42,6 +48,7 @@ export const taskSchema = z.object({
    * My Day indicator without knowing the workspace timezone.
    */
   dayPlans: z.array(plainDateSchema),
+  subtaskProgress: subtaskProgressSchema.nullable(),
 });
 
 export const titleSchema = z.string().trim().min(1).max(500);
@@ -151,6 +158,12 @@ export const addTaskToDayRequestSchema = z.object({
   date: plainDateSchema.optional(),
 });
 
+/** Attach a task to a parent (spec 8.3). Detaching is `DELETE /tasks/{id}/parent`. */
+export const setTaskParentRequestSchema = z.object({
+  parentTaskId: uuidSchema,
+  expectedVersion: z.number().int().positive().optional(),
+});
+
 export const dueFilterSchema = z.enum(["overdue", "today", "future", "none"]);
 
 /** Task list query fields (spec 20.5). */
@@ -182,6 +195,8 @@ export const taskResponseSchema = z.object({ data: taskSchema });
 export const taskListResponseSchema = paginated(taskSchema);
 
 export type TaskDto = z.infer<typeof taskSchema>;
+export type SubtaskProgress = z.infer<typeof subtaskProgressSchema>;
+export type SetTaskParentRequest = z.infer<typeof setTaskParentRequestSchema>;
 export type CreateTaskRequest = z.infer<typeof createTaskRequestSchema>;
 export type UpdateTaskRequest = z.infer<typeof updateTaskRequestSchema>;
 export type MoveTaskRequest = z.infer<typeof moveTaskRequestSchema>;

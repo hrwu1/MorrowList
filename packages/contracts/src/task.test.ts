@@ -5,6 +5,7 @@ import {
   listTasksQuerySchema,
   moveTaskRequestSchema,
   reorderTaskRequestSchema,
+  setTaskParentRequestSchema,
   updateTaskRequestSchema,
 } from "./task.js";
 
@@ -112,5 +113,21 @@ describe("task movement schemas", () => {
         afterTaskId: TASK_ID,
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("setTaskParentRequestSchema", () => {
+  it("requires a parent id and accepts an optional expected version", () => {
+    expect(setTaskParentRequestSchema.parse({ parentTaskId: TASK_ID })).toEqual({
+      parentTaskId: TASK_ID,
+    });
+    expect(
+      setTaskParentRequestSchema.parse({ parentTaskId: TASK_ID, expectedVersion: 2 })
+        .expectedVersion,
+    ).toBe(2);
+    expect(setTaskParentRequestSchema.safeParse({}).success).toBe(false);
+    expect(setTaskParentRequestSchema.safeParse({ parentTaskId: "ML-1" }).success).toBe(
+      false,
+    );
   });
 });

@@ -54,6 +54,8 @@ export const projectBoardQuerySchema = z.object({
     .min(1)
     .max(PROJECT_BOARD_TASK_LIMIT)
     .default(PROJECT_BOARD_TASK_LIMIT),
+  /** Boards hide subtasks by default; the parent card shows their progress (spec 8.3). */
+  includeSubtasks: z.stringbool().default(false),
 });
 
 export const projectDetailSchema = z.object({

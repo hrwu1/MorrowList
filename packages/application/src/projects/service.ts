@@ -171,19 +171,30 @@ export class ProjectService {
         workspaceId,
         projectId,
         limit: Math.min(query.limit ?? BOARD_TASK_LIMIT, BOARD_TASK_LIMIT),
+        includeSubtasks: query.includeSubtasks ?? false,
       });
-      // Cards show the My Day indicator (spec 9.5); one query covers the whole board.
-      const plans = await tx.dayPlans.listForTasks(
-        tasks.items.map((task) => task.id),
-        toLocalDate(this.clock.now(), workspace.timezone),
-      );
+      const boardTaskIds = tasks.items.map((task) => task.id);
+      // Cards show the My Day indicator (spec 9.5) and subtask progress (spec 29.3);
+      // one query each covers the whole board.
+      const [plans, progress] = await Promise.all([
+        tx.dayPlans.listForTasks(
+          boardTaskIds,
+          toLocalDate(this.clock.now(), workspace.timezone),
+        ),
+        tx.tasks.childSummary(workspaceId, boardTaskIds),
+      ]);
 
       return {
         data: {
           project: toProjectDto(project),
           statuses: statuses.map(toWorkflowStatusDto),
           tasks: tasks.items.map((task) =>
-            toTaskDto(task, workspace.taskKeyPrefix, plans.get(task.id) ?? []),
+            toTaskDto(
+              task,
+              workspace.taskKeyPrefix,
+              plans.get(task.id) ?? [],
+              progress.get(task.id) ?? null,
+            ),
           ),
         },
         page: { hasMore: tasks.hasMore, truncated: tasks.truncated },

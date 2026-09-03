@@ -154,6 +154,44 @@ describe("ProjectService reads", () => {
     expect(board.page).toEqual({ hasMore: true, truncated: true });
   });
 
+  it("hides subtasks by default and shows progress on the parent card", async () => {
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const parent = buildTask(seeded, ready.id, "Parent", "a0");
+    const openChild: Task = {
+      ...buildTask(seeded, ready.id, "Open child", "a1"),
+      parentTaskId: parent.id,
+    };
+    const doneChild: Task = {
+      ...buildTask(seeded, ready.id, "Done child", "a2"),
+      parentTaskId: parent.id,
+      completedAt: NOW,
+    };
+    for (const task of [parent, openChild, doneChild]) {
+      unitOfWork.data.tasks.set(task.id, task);
+    }
+
+    const hidden = await service.board(
+      seeded.context,
+      seeded.workspace.id,
+      seeded.project.id,
+    );
+    expect(hidden.data.tasks.map((task) => task.title)).toEqual(["Parent"]);
+    expect(hidden.data.tasks[0]?.subtaskProgress).toEqual({ completed: 1, total: 2 });
+
+    const shown = await service.board(
+      seeded.context,
+      seeded.workspace.id,
+      seeded.project.id,
+      { includeSubtasks: true },
+    );
+    expect(shown.data.tasks.map((task) => task.title)).toEqual([
+      "Parent",
+      "Open child",
+      "Done child",
+    ]);
+    expect(shown.data.tasks[1]?.subtaskProgress).toBeNull();
+  });
+
   it("never returns more than the 500-card hard cap", async () => {
     const ready = statusByCategory(seeded.statuses, "ready");
     let rank: string | null = null;
