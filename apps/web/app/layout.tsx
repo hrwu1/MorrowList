@@ -13,6 +13,11 @@ export const metadata: Metadata = {
     "One canonical task model, shown as a list, a plan for today, or a board.",
   // The task list is private; search engines must never index a signed-in view.
   robots: { index: false, follow: false },
+  // Installable as an app (spec 25.1). The manifest is a static file so the worker can
+  // precache it; the Apple fields cover Safari, which reads the manifest only partially.
+  manifest: "/manifest.webmanifest",
+  icons: { apple: "/icons/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "MorrowList", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
