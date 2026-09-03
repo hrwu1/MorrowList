@@ -55,4 +55,5 @@ export const SCOPES = {
   tasksWrite: "tasks:write",
   projectsRead: "projects:read",
   projectsWrite: "projects:write",
+  activityRead: "activity:read",
 } as const;

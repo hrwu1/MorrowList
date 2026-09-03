@@ -346,6 +346,24 @@ function workspaceRepository(data: InMemoryData): WorkspaceRepository {
 }
 
 function activityRepository(data: InMemoryData): ActivityRepository {
+  /** Newest first on `(createdAt, id)`, then keyset-paged after the anchor id. */
+  const page = (events: ActivityEvent[], cursor: Cursor): Page<ActivityEvent> => {
+    let items = events.sort((left, right) => {
+      const byTime = right.createdAt.getTime() - left.createdAt.getTime();
+      if (byTime !== 0) return byTime;
+      return left.id < right.id ? 1 : -1;
+    });
+    if (cursor.after) {
+      const index = items.findIndex((event) => event.id === cursor.after);
+      if (index >= 0) items = items.slice(index + 1);
+    }
+    return {
+      items: items.slice(0, cursor.limit),
+      hasMore: items.length > cursor.limit,
+      nextCursor: null,
+    };
+  };
+
   return {
     async append(event: ActivityEventInput) {
       data.activity.push(event);
@@ -354,17 +372,35 @@ function activityRepository(data: InMemoryData): ActivityRepository {
       workspaceId: string,
       aggregateType: AggregateType,
       aggregateId: string,
-      limit = 50,
+      cursor: Cursor,
     ) {
-      return data.activity
-        .filter(
+      return page(
+        data.activity.filter(
           (event) =>
             event.workspaceId === workspaceId &&
             event.aggregateType === aggregateType &&
             event.aggregateId === aggregateId,
-        )
-        .slice(-limit)
-        .reverse();
+        ),
+        cursor,
+      );
+    },
+    async listForProject(workspaceId: string, projectId: string, cursor: Cursor) {
+      const taskIds = new Set(
+        [...data.tasks.values()]
+          .filter(
+            (task) => task.workspaceId === workspaceId && task.projectId === projectId,
+          )
+          .map((task) => task.id),
+      );
+      return page(
+        data.activity.filter(
+          (event) =>
+            event.workspaceId === workspaceId &&
+            ((event.aggregateType === "project" && event.aggregateId === projectId) ||
+              (event.aggregateType === "task" && taskIds.has(event.aggregateId))),
+        ),
+        cursor,
+      );
     },
   };
 }

@@ -1,12 +1,58 @@
-import type { ActivityRepository, OutboxRepository } from "@morrowlist/application";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import type {
+  ActivityEvent,
+  ActivityRepository,
+  Cursor,
+  OutboxRepository,
+  Page,
+} from "@morrowlist/application";
+import { and, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 
 import type { Database } from "../client.js";
-import { activityEvents, outboxEvents } from "../schema/index.js";
+import { activityEvents, outboxEvents, tasks } from "../schema/index.js";
 
 /** Activity and outbox writers (EVT-001). Both are append-only for application roles. */
 
 export function createActivityRepository(db: Database): ActivityRepository {
+  /**
+   * Newest first with keyset paging on `(created_at, id)`. The anchor row is re-read by
+   * id, as the task list does, so the cursor carries a position and nothing else.
+   */
+  async function page(
+    predicate: SQL | undefined,
+    cursor: Cursor,
+  ): Promise<Page<ActivityEvent>> {
+    const conditions = [predicate];
+    if (cursor.after) {
+      const [anchor] = await db
+        .select({ id: activityEvents.id, createdAt: activityEvents.createdAt })
+        .from(activityEvents)
+        .where(eq(activityEvents.id, cursor.after))
+        .limit(1);
+      if (anchor) {
+        conditions.push(
+          sql`(${activityEvents.createdAt}, ${activityEvents.id}) < (${anchor.createdAt.toISOString()}::timestamptz, ${anchor.id}::uuid)`,
+        );
+      }
+    }
+
+    // One extra row decides `hasMore` without a count query.
+    const rows = await db
+      .select()
+      .from(activityEvents)
+      .where(and(...conditions))
+      .orderBy(desc(activityEvents.createdAt), desc(activityEvents.id))
+      .limit(cursor.limit + 1);
+
+    return {
+      items: rows.slice(0, cursor.limit).map((row) => ({
+        ...row,
+        payload: row.payload as Record<string, unknown>,
+      })),
+      hasMore: rows.length > cursor.limit,
+      nextCursor: null,
+    };
+  }
+
   return {
     async append(event) {
       await db.insert(activityEvents).values({
@@ -25,24 +71,40 @@ export function createActivityRepository(db: Database): ActivityRepository {
       });
     },
 
-    async listForAggregate(workspaceId, aggregateType, aggregateId, limit = 50) {
-      const rows = await db
-        .select()
-        .from(activityEvents)
-        .where(
-          and(
-            eq(activityEvents.workspaceId, workspaceId),
-            eq(activityEvents.aggregateType, aggregateType),
-            eq(activityEvents.aggregateId, aggregateId),
-          ),
-        )
-        .orderBy(desc(activityEvents.createdAt))
-        .limit(limit);
+    async listForAggregate(workspaceId, aggregateType, aggregateId, cursor) {
+      return page(
+        and(
+          eq(activityEvents.workspaceId, workspaceId),
+          eq(activityEvents.aggregateType, aggregateType),
+          eq(activityEvents.aggregateId, aggregateId),
+        ),
+        cursor,
+      );
+    },
 
-      return rows.map((row) => ({
-        ...row,
-        payload: row.payload as Record<string, unknown>,
-      }));
+    async listForProject(workspaceId, projectId, cursor) {
+      // Trashed tasks keep their project, so their history stays part of the project's.
+      const projectTaskIds = db
+        .select({ id: tasks.id })
+        .from(tasks)
+        .where(and(eq(tasks.workspaceId, workspaceId), eq(tasks.projectId, projectId)));
+
+      return page(
+        and(
+          eq(activityEvents.workspaceId, workspaceId),
+          or(
+            and(
+              eq(activityEvents.aggregateType, "project"),
+              eq(activityEvents.aggregateId, projectId),
+            ),
+            and(
+              eq(activityEvents.aggregateType, "task"),
+              inArray(activityEvents.aggregateId, projectTaskIds),
+            ),
+          ),
+        ),
+        cursor,
+      );
     },
   };
 }

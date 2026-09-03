@@ -1,5 +1,7 @@
 import type { ActorKind } from "@morrowlist/domain";
 
+import type { Cursor, Page } from "./tasks.js";
+
 /**
  * Activity and transactional outbox ports (spec 18.2, EVT-001). Both are written inside
  * the same transaction as the data change they describe; a failure rolls back all three.
@@ -29,12 +31,23 @@ export type ActivityEvent = ActivityEventInput;
 
 export interface ActivityRepository {
   append(event: ActivityEventInput): Promise<void>;
+  /**
+   * One aggregate's history, newest first, keyset-paginated on `(createdAt, id)` so a
+   * page boundary can neither skip nor repeat a row when two events share a timestamp
+   * (spec 29.3). `cursor.after` is the id of the last row of the previous page.
+   */
   listForAggregate(
     workspaceId: string,
     aggregateType: AggregateType,
     aggregateId: string,
-    limit?: number,
-  ): Promise<readonly ActivityEvent[]>;
+    cursor: Cursor,
+  ): Promise<Page<ActivityEvent>>;
+  /** Events on a project itself and on the tasks currently in it, same order and paging. */
+  listForProject(
+    workspaceId: string,
+    projectId: string,
+    cursor: Cursor,
+  ): Promise<Page<ActivityEvent>>;
 }
 
 export interface OutboxEventInput {
