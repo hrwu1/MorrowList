@@ -15,6 +15,7 @@ export const workflowStatusSchema = z.object({
   wipLimit: z.number().int().positive().nullable(),
   isDefault: z.boolean(),
   isTerminal: z.boolean(),
+  policyMd: z.string().nullable(),
   archivedAt: z.iso.datetime().nullable(),
   version: z.number().int().positive(),
 });

@@ -262,6 +262,15 @@ function taskRepository(data: InMemoryData): TaskRepository {
       const hasMore = items.length > limit;
       return { items: items.slice(0, limit), hasMore, truncated: hasMore };
     },
+    async listInStatus(workspaceId, statusId) {
+      return [...data.tasks.values()]
+        .filter(
+          (task) => task.workspaceId === workspaceId && task.statusId === statusId,
+        )
+        .sort((a, b) =>
+          a.rank === b.rank ? (a.id < b.id ? -1 : 1) : a.rank < b.rank ? -1 : 1,
+        );
+    },
     async insert(task) {
       data.tasks.set(task.id, task);
     },
@@ -516,6 +525,10 @@ function statusRepository(data: InMemoryData): WorkflowStatusRepository {
     },
     async insertMany(statuses) {
       for (const status of statuses) data.statuses.set(status.id, status);
+    },
+    async countTasks(statusId) {
+      return [...data.tasks.values()].filter((task) => task.statusId === statusId)
+        .length;
     },
     async update(status, previousVersion) {
       const current = data.statuses.get(status.id);

@@ -32,4 +32,6 @@ export interface WorkflowStatusRepository {
   ): Promise<readonly WorkflowStatus[]>;
   insertMany(statuses: readonly WorkflowStatus[]): Promise<void>;
   update(status: WorkflowStatus, previousVersion: number): Promise<boolean>;
+  /** Tasks still referencing the status, trashed ones included (spec 8.6). */
+  countTasks(statusId: string): Promise<number>;
 }

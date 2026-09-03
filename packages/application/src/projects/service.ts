@@ -238,6 +238,7 @@ function buildDefaultWorkflow(projectId: string): WorkflowStatus[] {
     colorToken: template.colorToken,
     wipLimit: null,
     isDefault: template.isDefault,
+    policyMd: null,
     archivedAt: null,
     version: 1,
   }));

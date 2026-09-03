@@ -273,6 +273,17 @@ export function createTaskRepository(db: Database): TaskRepository {
       return { items: rows.slice(0, limit).map(toTask), hasMore, truncated: hasMore };
     },
 
+    async listInStatus(workspaceId, statusId) {
+      // Trashed tasks are included on purpose: this feeds the archive of a column, which
+      // has to carry every task that still references it (spec 8.6).
+      const rows = await db
+        .select()
+        .from(tasks)
+        .where(and(eq(tasks.workspaceId, workspaceId), eq(tasks.statusId, statusId)))
+        .orderBy(asc(tasks.rank), asc(tasks.id));
+      return rows.map(toTask);
+    },
+
     async insert(task) {
       await db.insert(tasks).values(toTaskRow(task));
     },

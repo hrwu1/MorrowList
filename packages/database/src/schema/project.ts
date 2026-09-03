@@ -63,6 +63,8 @@ export const workflowStatuses = pgTable(
     colorToken: varchar("color_token", { length: 50 }).notNull(),
     wipLimit: integer("wip_limit"),
     isDefault: boolean("is_default").notNull().default(false),
+    // Column policy in Markdown (spec 11.3); added by migration 0003.
+    policyMd: text("policy_md"),
     version: integer("version").notNull().default(1),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),

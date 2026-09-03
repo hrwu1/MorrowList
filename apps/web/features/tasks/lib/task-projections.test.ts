@@ -28,6 +28,7 @@ function status(overrides: Partial<WorkflowStatusDto> = {}): WorkflowStatusDto {
     wipLimit: null,
     isDefault: true,
     isTerminal: false,
+    policyMd: null,
     archivedAt: null,
     version: 1,
     ...overrides,

@@ -3,10 +3,10 @@ import type {
   WorkflowStatusRepository,
 } from "@morrowlist/application";
 import type { WorkflowStatus } from "@morrowlist/domain";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 
 import type { Database } from "../client.js";
-import { projects, workflowStatuses } from "../schema/index.js";
+import { projects, tasks, workflowStatuses } from "../schema/index.js";
 
 import { toProject, toWorkflowStatus } from "./mappers.js";
 
@@ -82,6 +82,7 @@ export function createWorkflowStatusRepository(db: Database): WorkflowStatusRepo
     colorToken: status.colorToken,
     wipLimit: status.wipLimit,
     isDefault: status.isDefault,
+    policyMd: status.policyMd,
     version: status.version,
     archivedAt: status.archivedAt,
     createdAt: now,
@@ -118,6 +119,14 @@ export function createWorkflowStatusRepository(db: Database): WorkflowStatusRepo
       await db.insert(workflowStatuses).values(statuses.map((s) => toRow(s, now)));
     },
 
+    async countTasks(statusId) {
+      const [row] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(tasks)
+        .where(eq(tasks.statusId, statusId));
+      return row?.count ?? 0;
+    },
+
     async update(status, previousVersion) {
       const result = await db
         .update(workflowStatuses)
@@ -128,6 +137,7 @@ export function createWorkflowStatusRepository(db: Database): WorkflowStatusRepo
           colorToken: status.colorToken,
           wipLimit: status.wipLimit,
           isDefault: status.isDefault,
+          policyMd: status.policyMd,
           version: status.version,
           archivedAt: status.archivedAt,
           updatedAt: new Date(),

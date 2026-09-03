@@ -30,6 +30,7 @@ export function toWorkflowStatusDto(status: WorkflowStatus): WorkflowStatusDto {
     wipLimit: status.wipLimit,
     isDefault: status.isDefault,
     isTerminal: isTerminal(status),
+    policyMd: status.policyMd,
     archivedAt: status.archivedAt?.toISOString() ?? null,
     version: status.version,
   };

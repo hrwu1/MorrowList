@@ -72,6 +72,7 @@ const status = (
   wipLimit: null,
   isDefault: true,
   isTerminal: false,
+  policyMd: null,
   archivedAt: null,
   version: 1,
   ...overrides,

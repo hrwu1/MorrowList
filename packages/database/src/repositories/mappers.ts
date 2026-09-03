@@ -113,6 +113,7 @@ export function toWorkflowStatus(row: StatusRow): WorkflowStatus {
     colorToken: row.colorToken,
     wipLimit: row.wipLimit,
     isDefault: row.isDefault,
+    policyMd: row.policyMd,
     archivedAt: row.archivedAt,
     version: row.version,
   };

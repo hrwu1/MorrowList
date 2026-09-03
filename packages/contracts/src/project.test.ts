@@ -50,6 +50,7 @@ describe("projectBoardResponseSchema", () => {
             wipLimit: null,
             isDefault: true,
             isTerminal: false,
+            policyMd: null,
             archivedAt: null,
             version: 1,
           },

@@ -102,6 +102,11 @@ export interface TaskRepository {
   listToday(query: TodayTaskQuery): Promise<BoardTaskPage>;
   /** Ordered by due date, then rank. */
   listUpcoming(query: UpcomingTaskQuery): Promise<BoardTaskPage>;
+  /**
+   * Every task referencing a status, trashed ones included, in rank order. Used to empty
+   * a column before it is archived (spec 8.6), so nothing may be left behind.
+   */
+  listInStatus(workspaceId: string, statusId: string): Promise<readonly Task[]>;
   insert(task: Task): Promise<void>;
   /**
    * Persist a task, guarding on the version the caller loaded. Returns false when the
