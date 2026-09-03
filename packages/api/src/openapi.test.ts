@@ -15,6 +15,9 @@ describe("board OpenAPI surface", () => {
     expect(document.paths["/projects/{projectId}/board"]).toHaveProperty("get");
     expect(document.paths["/tasks/{id}/move"]).toHaveProperty("post");
     expect(document.paths["/tasks/{id}/reorder"]).toHaveProperty("post");
+    expect(document.paths["/tasks/{id}/parent"]).toHaveProperty("post");
+    expect(document.paths["/tasks/{id}/parent"]).toHaveProperty("delete");
+    expect(document.components.schemas).toHaveProperty("SetTaskParentRequest");
     expect(document.components.schemas).toHaveProperty("ProjectBoard");
     expect(document.components.schemas).toHaveProperty("MoveTaskRequest");
   });

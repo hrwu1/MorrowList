@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { ApiClient, ApiClientError } from "@morrowlist/api-client";
-import type { CreateTaskRequest } from "@morrowlist/contracts";
+import type { CreateTaskRequest, UpdateTaskRequest } from "@morrowlist/contracts";
 import { Command } from "commander";
 
 import { readConfig, resolveProfile, type ResolveOptions } from "../config/profile.js";
@@ -96,22 +96,29 @@ export function taskCommand(): Command {
     .option("--due-time <time>", "due time as HH:mm; requires --due")
     .option("--project <id>", "project id; omit for the Inbox")
     .option("--status <id>", "workflow status id; requires --project")
+    .option(
+      "--parent <idOrKey>",
+      "make it a subtask of this task; it joins the parent's project unless --project is given",
+    )
     .action(async (titleParts: string[], options, command) => {
       const globals = globalsOf(command);
       const json = Boolean(globals.json);
       try {
-        const body: CreateTaskRequest = {
-          title: titleParts.join(" "),
-          ...(options.description ? { descriptionMd: options.description } : {}),
-          ...(options.priority ? { priority: options.priority } : {}),
-          ...(options.due ? { dueDate: options.due } : {}),
-          ...(options.dueTime ? { dueTime: options.dueTime } : {}),
-          ...(options.project ? { projectId: options.project } : {}),
-          ...(options.status ? { statusId: options.status } : {}),
-        };
-        const created = await withClient(globals, (client) =>
-          client.createTask(body, idempotency()),
-        );
+        const created = await withClient(globals, async (client) => {
+          const body: CreateTaskRequest = {
+            title: titleParts.join(" "),
+            ...(options.description ? { descriptionMd: options.description } : {}),
+            ...(options.priority ? { priority: options.priority } : {}),
+            ...(options.due ? { dueDate: options.due } : {}),
+            ...(options.dueTime ? { dueTime: options.dueTime } : {}),
+            ...(options.project ? { projectId: options.project } : {}),
+            ...(options.status ? { statusId: options.status } : {}),
+            ...(options.parent
+              ? { parentTaskId: (await client.getTask(options.parent)).id }
+              : {}),
+          };
+          return client.createTask(body, idempotency());
+        });
 
         if (json) printJson({ ok: true, data: created });
         else process.stdout.write(`${created.key}  ${created.title}\n`);
@@ -159,9 +166,16 @@ export function taskCommand(): Command {
       const globals = globalsOf(command);
       const json = Boolean(globals.json);
       try {
-        const found = await withClient(globals, (client) => client.getTask(idOrKey));
-        if (json) printJson({ ok: true, data: found });
-        else process.stdout.write(`${formatTaskDetail(found)}\n`);
+        const { found, children } = await withClient(globals, async (client) => {
+          const task = await client.getTask(idOrKey);
+          // Subtasks are ordinary tasks filtered by parent (spec 8.3).
+          const page = task.subtaskProgress
+            ? await client.listTasks({ parentTaskId: task.id, limit: 200 })
+            : { data: [] };
+          return { found: task, children: page.data };
+        });
+        if (json) printJson({ ok: true, data: { ...found, subtasks: children } });
+        else process.stdout.write(`${formatTaskDetail(found, children)}\n`);
       } catch (error) {
         fail(error, json);
       }
@@ -206,6 +220,8 @@ export function taskCommand(): Command {
     .option("-p, --priority <priority>", "none | low | medium | high | urgent")
     .option("--due <date>", "due date as YYYY-MM-DD")
     .option("--clear-due", "remove the due date")
+    .option("--parent <idOrKey>", "make it a subtask of this task")
+    .option("--no-parent", "detach it from its parent")
     .option("--expected-version <n>", "fail unless the task is still at this version")
     .action(async (idOrKey: string, options, command: Command) => {
       const globals = globalsOf(command);
@@ -213,27 +229,50 @@ export function taskCommand(): Command {
       try {
         const updated = await withClient(globals, async (client) => {
           const current = await client.getTask(idOrKey);
+          const expectedVersion = options.expectedVersion
+            ? Number(options.expectedVersion)
+            : undefined;
+
+          // Parent changes are their own command on the API; run them first so a field
+          // patch in the same invocation sees the bumped version.
+          let version = expectedVersion;
+          if (options.parent === false) {
+            version = (await client.clearTaskParent(current.id, version, idempotency()))
+              .version;
+          } else if (typeof options.parent === "string") {
+            const parent = await client.getTask(options.parent);
+            version = (
+              await client.setTaskParent(
+                current.id,
+                {
+                  parentTaskId: parent.id,
+                  ...(version ? { expectedVersion: version } : {}),
+                },
+                idempotency(),
+              )
+            ).version;
+          }
+
+          const fields: UpdateTaskRequest = {
+            ...(options.title ? { title: options.title } : {}),
+            // An explicit clear flag is how the CLI expresses null, which the API
+            // distinguishes from an omitted field (spec 20.4).
+            ...(options.clearDescription
+              ? { descriptionMd: null }
+              : options.description
+                ? { descriptionMd: options.description }
+                : {}),
+            ...(options.priority ? { priority: options.priority } : {}),
+            ...(options.clearDue
+              ? { dueDate: null }
+              : options.due
+                ? { dueDate: options.due }
+                : {}),
+          };
+          if (Object.keys(fields).length === 0) return client.getTask(current.id);
           return client.updateTask(
             current.id,
-            {
-              ...(options.title ? { title: options.title } : {}),
-              // An explicit clear flag is how the CLI expresses null, which the API
-              // distinguishes from an omitted field (spec 20.4).
-              ...(options.clearDescription
-                ? { descriptionMd: null }
-                : options.description
-                  ? { descriptionMd: options.description }
-                  : {}),
-              ...(options.priority ? { priority: options.priority } : {}),
-              ...(options.clearDue
-                ? { dueDate: null }
-                : options.due
-                  ? { dueDate: options.due }
-                  : {}),
-              ...(options.expectedVersion
-                ? { expectedVersion: Number(options.expectedVersion) }
-                : {}),
-            },
+            { ...fields, ...(version ? { expectedVersion: version } : {}) },
             idempotency(),
           );
         });

@@ -7,6 +7,7 @@ import {
   moveTaskRequestSchema,
   reorderTaskRequestSchema,
   reopenTaskRequestSchema,
+  setTaskParentRequestSchema,
   updateTaskRequestSchema,
 } from "@morrowlist/contracts";
 import { Hono } from "hono";
@@ -122,6 +123,29 @@ export function taskRoutes(deps: ApiDependencies) {
         requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
         c.req.param("id"),
         body.expectedVersion,
+      );
+      return c.json({ data: task });
+    })
+
+    .post("/tasks/:id/parent", async (c) => {
+      const actor = c.get("actor");
+      const body = await parseJsonBody(c, setTaskParentRequestSchema);
+      const task = await deps.taskService.setParent(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("id"),
+        body,
+      );
+      return c.json({ data: task });
+    })
+
+    .delete("/tasks/:id/parent", async (c) => {
+      const actor = c.get("actor");
+      const task = await deps.taskService.clearParent(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("id"),
+        expectedVersionFrom(c.req.query("expectedVersion")),
       );
       return c.json({ data: task });
     })

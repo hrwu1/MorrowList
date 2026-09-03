@@ -14,6 +14,7 @@ import {
   projectListResponseSchema,
   projectResponseSchema,
   reorderTaskRequestSchema,
+  setTaskParentRequestSchema,
   taskListResponseSchema,
   taskResponseSchema,
   todayViewQuerySchema,
@@ -49,6 +50,7 @@ const registry = {
   AddTaskToDayRequest: addTaskToDayRequestSchema,
   TodayView: todayViewResponseSchema,
   UpcomingView: upcomingViewResponseSchema,
+  SetTaskParentRequest: setTaskParentRequestSchema,
   MeResponse: meResponseSchema,
   ErrorResponse: errorResponseSchema,
 } as const;
@@ -393,6 +395,48 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
           requestBody: { required: false, ...jsonContent(ref("CompleteTaskRequest")) },
           responses: {
             "200": { description: "The reopened task", ...jsonContent(ref("Task")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/tasks/{id}/parent": {
+        post: {
+          summary: "Make a task a subtask of another",
+          description:
+            "The parent must be a live task in the same workspace. A cycle is rejected with TASK_RELATION_CYCLE and a fourth nesting level with TASK_NESTING_LIMIT_EXCEEDED.",
+          parameters: [taskIdParam, workspaceIdParam],
+          requestBody: { required: true, ...jsonContent(ref("SetTaskParentRequest")) },
+          responses: {
+            "200": {
+              description: "The task, now a subtask",
+              ...jsonContent(ref("Task")),
+            },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            "409": {
+              description: "Version conflict",
+              ...jsonContent(ref("ErrorResponse")),
+            },
+            ...commonErrors,
+          },
+        },
+        delete: {
+          summary: "Detach a subtask from its parent",
+          parameters: [
+            taskIdParam,
+            workspaceIdParam,
+            {
+              name: "expectedVersion",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1 },
+            },
+          ],
+          responses: {
+            "200": { description: "The detached task", ...jsonContent(ref("Task")) },
+            "409": {
+              description: "Version conflict",
+              ...jsonContent(ref("ErrorResponse")),
+            },
             ...commonErrors,
           },
         },

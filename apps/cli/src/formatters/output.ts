@@ -153,7 +153,10 @@ export function formatTodayView(view: TodayViewDto): string {
     : `${view.date}\n\n${blocks.join("\n\n")}`;
 }
 
-export function formatTaskDetail(task: TaskDto): string {
+export function formatTaskDetail(
+  task: TaskDto,
+  subtasks: readonly TaskDto[] = [],
+): string {
   const lines = [
     `${task.key}  ${task.title}`,
     `  status      ${task.isCompleted ? "completed" : "open"}`,
@@ -161,11 +164,26 @@ export function formatTaskDetail(task: TaskDto): string {
     `  project     ${task.projectId ?? "Inbox"}`,
     `  due         ${task.dueDate ?? "none"}${task.dueTime ? ` ${task.dueTime}` : ""}`,
     `  my day      ${task.dayPlans.length > 0 ? task.dayPlans.join(", ") : "no"}`,
+    ...(task.parentTaskId ? [`  parent      ${task.parentTaskId}`] : []),
+    ...(task.subtaskProgress
+      ? [
+          `  subtasks    ${task.subtaskProgress.completed}/${task.subtaskProgress.total} done`,
+        ]
+      : []),
     `  version     ${task.version}`,
     `  created     ${task.createdAt}`,
   ];
   if (task.descriptionMd) {
     lines.push("", task.descriptionMd);
+  }
+  if (subtasks.length > 0) {
+    lines.push(
+      "",
+      "Subtasks",
+      ...formatTaskTable(subtasks)
+        .split("\n")
+        .map((l) => `  ${l}`),
+    );
   }
   return lines.join("\n");
 }

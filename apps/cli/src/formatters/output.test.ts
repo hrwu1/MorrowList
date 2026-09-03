@@ -5,6 +5,7 @@ import {
   EXIT,
   exitCodeFor,
   formatActivity,
+  formatTaskDetail,
   formatTaskTable,
   formatTodayView,
 } from "./output.js";
@@ -34,6 +35,7 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     updatedAt: "2026-08-29T09:00:00.000Z",
     deletedAt: null,
     dayPlans: [],
+    subtaskProgress: null,
     ...overrides,
   };
 }
@@ -168,5 +170,26 @@ describe("formatTodayView", () => {
         review: null,
       }),
     ).toBe("Nothing planned for 2026-09-03.");
+  });
+});
+
+describe("formatTaskDetail", () => {
+  it("prints subtask progress and the children beneath the task", () => {
+    const output = formatTaskDetail(
+      task({ subtaskProgress: { completed: 1, total: 2 } }),
+      [
+        task({ key: "ML-2", title: "Collect sources", isCompleted: true }),
+        task({ key: "ML-3", title: "Make slides" }),
+      ],
+    );
+
+    expect(output).toContain("subtasks    1/2 done");
+    expect(output).toContain("Subtasks");
+    expect(output).toContain("[x] ML-2  ");
+    expect(output).toContain("[ ] ML-3  ");
+  });
+
+  it("omits the subtask lines for a childless task", () => {
+    expect(formatTaskDetail(task())).not.toContain("subtasks");
   });
 });

@@ -154,3 +154,25 @@ describe("My Day and view requests", () => {
     expect(requests[1]?.url).toContain("horizon=30");
   });
 });
+
+describe("subtask requests", () => {
+  it("sets a parent and detaches it with the expected version", async () => {
+    const task = { id: TASK_ID, parentTaskId: PROJECT_ID };
+    const { client, requests } = recordingClient({ data: task });
+
+    await expect(
+      client.setTaskParent(TASK_ID, { parentTaskId: PROJECT_ID, expectedVersion: 2 }),
+    ).resolves.toEqual(task);
+    expect(requests[0]?.method).toBe("POST");
+    expect(requests[0]?.url).toContain(`/tasks/${TASK_ID}/parent?workspaceId=`);
+    await expect(requests[0]?.json()).resolves.toEqual({
+      parentTaskId: PROJECT_ID,
+      expectedVersion: 2,
+    });
+
+    await client.clearTaskParent(TASK_ID, 3);
+    expect(requests[1]?.method).toBe("DELETE");
+    expect(requests[1]?.url).toContain(`/tasks/${TASK_ID}/parent?workspaceId=`);
+    expect(requests[1]?.url).toContain("expectedVersion=3");
+  });
+});

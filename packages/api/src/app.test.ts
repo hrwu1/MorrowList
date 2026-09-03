@@ -248,6 +248,53 @@ describe("task endpoints", () => {
     expect(emptyTrash.data).toHaveLength(0);
   });
 
+  it("attaches and detaches a parent, reporting progress and nesting errors", async () => {
+    const parent = await (
+      await jsonRequest("/api/v1/tasks", "POST", { title: "Parent" })
+    ).json();
+    const child = await (
+      await jsonRequest("/api/v1/tasks", "POST", { title: "Child" })
+    ).json();
+
+    const attached = await jsonRequest(
+      `/api/v1/tasks/${child.data.id}/parent`,
+      "POST",
+      {
+        parentTaskId: parent.data.id,
+      },
+    );
+    expect(attached.status).toBe(200);
+    await expect(attached.json()).resolves.toMatchObject({
+      data: { parentTaskId: parent.data.id, version: 2 },
+    });
+
+    const listed = await (await request("/api/v1/tasks")).json();
+    expect(
+      listed.data.find((t: { id: string }) => t.id === parent.data.id).subtaskProgress,
+    ).toEqual({ completed: 0, total: 1 });
+    const children = await (
+      await request(`/api/v1/tasks?parentTaskId=${parent.data.id}`)
+    ).json();
+    expect(children.data.map((t: { id: string }) => t.id)).toEqual([child.data.id]);
+
+    const cycle = await jsonRequest(`/api/v1/tasks/${parent.data.id}/parent`, "POST", {
+      parentTaskId: child.data.id,
+    });
+    expect(cycle.status).toBe(422);
+    await expect(cycle.json()).resolves.toMatchObject({
+      error: { code: "TASK_RELATION_CYCLE" },
+    });
+
+    const detached = await jsonRequest(
+      `/api/v1/tasks/${child.data.id}/parent?expectedVersion=2`,
+      "DELETE",
+    );
+    expect(detached.status).toBe(200);
+    await expect(detached.json()).resolves.toMatchObject({
+      data: { parentTaskId: null, version: 3, subtaskProgress: null },
+    });
+  });
+
   it("maps a version conflict to 409 with the actual version", async () => {
     const created = await (
       await jsonRequest("/api/v1/tasks", "POST", {

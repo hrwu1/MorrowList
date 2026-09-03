@@ -15,6 +15,7 @@ import type {
   ProjectListResponse,
   ProjectResponse,
   ReorderTaskRequest,
+  SetTaskParentRequest,
   TaskDto,
   TaskListResponse,
   TodayViewQuery,
@@ -250,6 +251,34 @@ export class ApiClient {
       "POST",
       `/tasks/${encodeURIComponent(id)}/reopen${this.queryString({}, options)}`,
       expectedVersion === undefined ? {} : { expectedVersion },
+      options,
+    );
+    return response.data;
+  }
+
+  async setTaskParent(
+    id: string,
+    body: SetTaskParentRequest,
+    options: RequestOptions = {},
+  ): Promise<TaskDto> {
+    const response = await this.send<{ data: TaskDto }>(
+      "POST",
+      `/tasks/${encodeURIComponent(id)}/parent${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async clearTaskParent(
+    id: string,
+    expectedVersion?: number,
+    options: RequestOptions = {},
+  ): Promise<TaskDto> {
+    const response = await this.send<{ data: TaskDto }>(
+      "DELETE",
+      `/tasks/${encodeURIComponent(id)}/parent${this.queryString({ expectedVersion }, options)}`,
+      undefined,
       options,
     );
     return response.data;
