@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { actorKindSchema, uuidSchema } from "./common.js";
+import {
+  actorKindSchema,
+  paginated,
+  paginationQuerySchema,
+  uuidSchema,
+} from "./common.js";
 
 /**
  * Domain event envelope (spec 19.6). The MVP writes events to the transactional outbox
@@ -73,3 +78,27 @@ export const activityEventSchema = z.object({
 });
 
 export type ActivityEventDto = z.infer<typeof activityEventSchema>;
+
+/**
+ * Activity read model (ACT-001, spec 10.2). A stored event is exposed as-is plus a
+ * `changes` list mapped from its payload for the user-facing fields only, so a client can
+ * render a diff without knowing how any payload is shaped — and never has to show raw
+ * payload JSON (spec 26.2).
+ */
+export const activityChangeSchema = z.object({
+  field: z.string(),
+  from: z.string().nullable(),
+  to: z.string().nullable(),
+});
+
+export const activityEntrySchema = activityEventSchema.extend({
+  changes: z.array(activityChangeSchema),
+});
+
+export const activityQuerySchema = paginationQuerySchema;
+export const activityListResponseSchema = paginated(activityEntrySchema);
+
+export type ActivityChangeDto = z.infer<typeof activityChangeSchema>;
+export type ActivityEntryDto = z.infer<typeof activityEntrySchema>;
+export type ActivityQuery = z.infer<typeof activityQuerySchema>;
+export type ActivityListResponse = z.infer<typeof activityListResponseSchema>;
