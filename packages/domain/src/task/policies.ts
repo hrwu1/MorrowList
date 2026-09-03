@@ -163,7 +163,19 @@ export function moveTask(
   context: PolicyContext,
 ): Task {
   assertMutable(task);
+  return relocateTask(task, input, context);
+}
 
+/**
+ * The move policy without the Trash guard. Only the archive of a workflow status uses it
+ * directly: a trashed task in an archived column has to travel with the column's other
+ * tasks, or restoring it later would place it in a column that no longer exists.
+ */
+export function relocateTask(
+  task: Task,
+  input: MoveTaskInput,
+  context: PolicyContext,
+): Task {
   if (input.destination === null) {
     // Back to the Inbox: project and status are cleared, completion is preserved.
     const next: Task = {

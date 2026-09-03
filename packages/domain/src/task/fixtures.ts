@@ -26,6 +26,7 @@ export function testStatus(overrides: Partial<WorkflowStatus> = {}): WorkflowSta
     colorToken: overrides.colorToken ?? "blue",
     wipLimit: overrides.wipLimit ?? null,
     isDefault: overrides.isDefault ?? category === "ready",
+    policyMd: overrides.policyMd ?? null,
     archivedAt: overrides.archivedAt ?? null,
     version: overrides.version ?? 1,
   };
