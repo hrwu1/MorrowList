@@ -1,4 +1,6 @@
 import {
+  activityListResponseSchema,
+  activityQuerySchema,
   completeTaskRequestSchema,
   createProjectRequestSchema,
   createTaskRequestSchema,
@@ -32,6 +34,7 @@ const registry = {
   ProjectDetail: projectResponseSchema,
   ProjectList: projectListResponseSchema,
   ProjectBoard: projectBoardResponseSchema,
+  ActivityList: activityListResponseSchema,
   CreateProjectRequest: createProjectRequestSchema,
   CreateTaskRequest: createTaskRequestSchema,
   UpdateTaskRequest: updateTaskRequestSchema,
@@ -208,6 +211,26 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
           },
         },
       },
+      "/projects/{projectId}/activity": {
+        get: {
+          summary: "List a project's activity",
+          description:
+            "The project's own events and those of the tasks in it, newest first. Read-only and cursor-paginated.",
+          parameters: [
+            projectIdParam,
+            workspaceIdParam,
+            ...queryParameters(activityQuerySchema),
+          ],
+          responses: {
+            "200": {
+              description: "A page of activity",
+              ...jsonContent(ref("ActivityList")),
+            },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
       "/tasks": {
         get: {
           summary: "List tasks",
@@ -244,6 +267,32 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
           ],
           responses: {
             "200": { description: "The task", ...jsonContent(ref("Task")) },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/tasks/{idOrKey}/activity": {
+        get: {
+          summary: "List a task's activity",
+          description:
+            "Immutable history of the task, newest first, with a safe summary, the actor, and the changed fields a person can read. A task in the Trash still answers.",
+          parameters: [
+            {
+              name: "idOrKey",
+              in: "path",
+              required: true,
+              description: "Task UUID or workspace key such as ML-142.",
+              schema: { type: "string" },
+            },
+            workspaceIdParam,
+            ...queryParameters(activityQuerySchema),
+          ],
+          responses: {
+            "200": {
+              description: "A page of activity",
+              ...jsonContent(ref("ActivityList")),
+            },
             "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
             ...commonErrors,
           },

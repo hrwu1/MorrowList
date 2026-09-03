@@ -1,4 +1,5 @@
 import type {
+  ActivityService,
   ActorContext,
   ProjectService,
   TaskService,
@@ -16,6 +17,7 @@ export interface ApiDependencies {
   readonly unitOfWork: UnitOfWork;
   readonly projectService: ProjectService;
   readonly taskService: TaskService;
+  readonly activityService: ActivityService;
   readonly logger: Logger;
   readonly metrics?: Metrics;
   /** Readiness probe backing `GET /ready` (spec FND-006). */

@@ -54,6 +54,35 @@ describe("project requests", () => {
   });
 });
 
+describe("activity requests", () => {
+  it("requests a task's history by key with the paging query", async () => {
+    const response = { data: [], page: { hasMore: false, nextCursor: null } };
+    const { client, requests } = recordingClient(response);
+
+    await expect(
+      client.listTaskActivity("ML-12", { limit: 20, cursor: "abc.def" }),
+    ).resolves.toEqual(response);
+
+    expect(requests[0]?.method).toBe("GET");
+    expect(requests[0]?.url).toBe(
+      "https://example.test/api/v1/tasks/ML-12/activity?workspaceId=0198f0a0-0000-7000-8000-000000000003&limit=20&cursor=abc.def",
+    );
+  });
+
+  it("requests a project's history", async () => {
+    const { client, requests } = recordingClient({
+      data: [],
+      page: { hasMore: false, nextCursor: null },
+    });
+
+    await client.listProjectActivity(PROJECT_ID);
+
+    expect(requests[0]?.url).toBe(
+      `https://example.test/api/v1/projects/${PROJECT_ID}/activity?workspaceId=0198f0a0-0000-7000-8000-000000000003`,
+    );
+  });
+});
+
 describe("task movement requests", () => {
   it("moves with destination and server-ranking neighbours", async () => {
     const task = { id: TASK_ID, statusId: STATUS_ID };

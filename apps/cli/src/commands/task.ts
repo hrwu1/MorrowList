@@ -8,6 +8,7 @@ import { readConfig, resolveProfile, type ResolveOptions } from "../config/profi
 import {
   EXIT,
   exitCodeFor,
+  formatActivity,
   formatTaskDetail,
   formatTaskTable,
   printError,
@@ -159,6 +160,35 @@ export function taskCommand(): Command {
         const found = await withClient(globals, (client) => client.getTask(idOrKey));
         if (json) printJson({ ok: true, data: found });
         else process.stdout.write(`${formatTaskDetail(found)}\n`);
+      } catch (error) {
+        fail(error, json);
+      }
+    });
+
+  task
+    .command("history")
+    .description("Show a task's history, newest first")
+    .argument("<idOrKey>")
+    .option("--limit <n>", "page size, 1-200", "50")
+    .option("--cursor <cursor>", "continue from a previous page's nextCursor")
+    .action(async (idOrKey: string, options, command: Command) => {
+      const globals = globalsOf(command);
+      const json = Boolean(globals.json);
+      try {
+        const page = await withClient(globals, (client) =>
+          client.listTaskActivity(idOrKey, {
+            limit: Number(options.limit),
+            ...(options.cursor ? { cursor: options.cursor } : {}),
+          }),
+        );
+
+        if (json) printJson({ ok: true, data: page });
+        else {
+          process.stdout.write(`${formatActivity(page.data)}\n`);
+          if (page.page.nextCursor) {
+            printError(`more: --cursor ${page.page.nextCursor}`);
+          }
+        }
       } catch (error) {
         fail(error, json);
       }

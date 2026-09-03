@@ -1,4 +1,4 @@
-import type { TaskDto } from "@morrowlist/contracts";
+import type { ActivityEntryDto, TaskDto } from "@morrowlist/contracts";
 
 /**
  * Output envelope and exit codes (spec 21.5, 21.6).
@@ -87,6 +87,33 @@ export function formatTaskTable(tasks: readonly TaskDto[]): string {
       return `[${done}] ${key}  ${mark}${task.title}${due}`;
     })
     .join("\n");
+}
+
+/**
+ * Human-readable history, newest first: when, who, what, then the readable field diffs
+ * indented beneath. Raw payloads never print here; `--json` carries them (spec 26.2).
+ */
+export function formatActivity(entries: readonly ActivityEntryDto[]): string {
+  if (entries.length === 0) return "No activity.";
+
+  return entries
+    .map((entry) => {
+      const actor =
+        entry.actorDisplayName ??
+        (entry.actorKind === "user" ? "user" : entry.actorKind.replace("_", " "));
+      const lines = [`${entry.createdAt}  ${actor.padEnd(16)}  ${entry.summary}`];
+      for (const change of entry.changes) {
+        lines.push(
+          `    ${change.field}: ${formatValue(change.from)} → ${formatValue(change.to)}`,
+        );
+      }
+      return lines.join("\n");
+    })
+    .join("\n");
+}
+
+function formatValue(value: string | null): string {
+  return value === null ? "(none)" : JSON.stringify(value);
 }
 
 export function formatTaskDetail(task: TaskDto): string {

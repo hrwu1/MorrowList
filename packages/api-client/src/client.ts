@@ -1,4 +1,6 @@
 import type {
+  ActivityListResponse,
+  ActivityQuery,
   CreateProjectRequest,
   CreateTaskRequest,
   ErrorCode,
@@ -116,6 +118,19 @@ export class ApiClient {
     );
   }
 
+  async listProjectActivity(
+    projectId: string,
+    query: Partial<ActivityQuery> = {},
+    options: RequestOptions = {},
+  ): Promise<ActivityListResponse> {
+    return this.send<ActivityListResponse>(
+      "GET",
+      `/projects/${encodeURIComponent(projectId)}/activity${this.queryString(query, options)}`,
+      undefined,
+      options,
+    );
+  }
+
   async listTasks(
     query: Partial<ListTasksQuery> = {},
     options: RequestOptions = {},
@@ -149,6 +164,20 @@ export class ApiClient {
       options,
     );
     return response.data;
+  }
+
+  /** A task's immutable history by UUID or workspace key, newest first. */
+  async listTaskActivity(
+    idOrKey: string,
+    query: Partial<ActivityQuery> = {},
+    options: RequestOptions = {},
+  ): Promise<ActivityListResponse> {
+    return this.send<ActivityListResponse>(
+      "GET",
+      `/tasks/${encodeURIComponent(idOrKey)}/activity${this.queryString(query, options)}`,
+      undefined,
+      options,
+    );
   }
 
   async updateTask(

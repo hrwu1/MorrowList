@@ -1,4 +1,9 @@
-import { ProjectService, TaskService, bootstrapUser } from "@morrowlist/application";
+import {
+  ActivityService,
+  ProjectService,
+  TaskService,
+  bootstrapUser,
+} from "@morrowlist/application";
 import type { AuthPort, AuthenticatedUser } from "@morrowlist/auth";
 import { fixedClock, uuidv7 } from "@morrowlist/domain";
 import { silentLogger } from "@morrowlist/observability";
@@ -67,6 +72,7 @@ beforeEach(async () => {
       clock: fixedClock(NOW),
       cursorSecret: "test-secret",
     }),
+    activityService: new ActivityService({ unitOfWork, cursorSecret: "test-secret" }),
     logger: silentLogger,
     checkHealth: async () =>
       healthy
@@ -331,6 +337,78 @@ describe("task endpoints", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: "WORKSPACE_NOT_FOUND" },
     });
+  });
+});
+
+describe("activity endpoints", () => {
+  it("lists a task's history by key, newest first, with readable changes", async () => {
+    const created = await (
+      await jsonRequest("/api/v1/tasks", "POST", { title: "Draft brief" })
+    ).json();
+    await jsonRequest(`/api/v1/tasks/${created.data.id}`, "PATCH", {
+      title: "Draft the brief",
+      expectedVersion: 1,
+    });
+
+    const response = await request("/api/v1/tasks/ML-1/activity?limit=1");
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0]).toMatchObject({
+      eventType: "task.updated",
+      summary: "Updated task fields",
+      actorKind: "user",
+      actorDisplayName: "Alex",
+      changes: [{ field: "title", from: "Draft brief", to: "Draft the brief" }],
+    });
+    expect(body.page.hasMore).toBe(true);
+
+    const rest = await request(
+      `/api/v1/tasks/ML-1/activity?cursor=${encodeURIComponent(body.page.nextCursor)}`,
+    );
+    const restBody = await rest.json();
+    expect(
+      restBody.data.map((entry: { eventType: string }) => entry.eventType),
+    ).toEqual(["task.created"]);
+    expect(restBody.page).toEqual({ hasMore: false, nextCursor: null });
+  });
+
+  it("rejects a tampered cursor and reports an unknown task", async () => {
+    const forged = await request("/api/v1/tasks/ML-1/activity?cursor=abc.def");
+    expect(forged.status).toBe(404);
+
+    await jsonRequest("/api/v1/tasks", "POST", { title: "Exists" });
+    const tampered = await request("/api/v1/tasks/ML-1/activity?cursor=abc.def");
+    expect(tampered.status).toBe(422);
+    await expect(tampered.json()).resolves.toMatchObject({
+      error: { code: "VALIDATION_FAILED" },
+    });
+
+    const missing = await request("/api/v1/tasks/ML-9/activity");
+    expect(missing.status).toBe(404);
+  });
+
+  it("lists a project's history including its tasks", async () => {
+    const project = await (
+      await jsonRequest("/api/v1/projects", "POST", { name: "Launch" })
+    ).json();
+    await jsonRequest("/api/v1/tasks", "POST", {
+      title: "Inside",
+      projectId: project.data.project.id,
+    });
+    await jsonRequest("/api/v1/tasks", "POST", { title: "Outside" });
+
+    const response = await request(
+      `/api/v1/projects/${project.data.project.id}/activity`,
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.map((entry: { eventType: string }) => entry.eventType)).toEqual([
+      "task.created",
+      "project.created",
+    ]);
   });
 });
 

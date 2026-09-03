@@ -1,4 +1,5 @@
 import {
+  activityQuerySchema,
   completeTaskRequestSchema,
   createTaskRequestSchema,
   listTasksQuerySchema,
@@ -49,6 +50,18 @@ export function taskRoutes(deps: ApiDependencies) {
         c.req.param("idOrKey"),
       );
       return c.json({ data: task });
+    })
+
+    .get("/tasks/:idOrKey/activity", async (c) => {
+      const actor = c.get("actor");
+      const query = parseQuery(c.req.query(), activityQuerySchema);
+      const result = await deps.activityService.listForTask(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("idOrKey"),
+        query,
+      );
+      return c.json(result);
     })
 
     .patch("/tasks/:id", async (c) => {

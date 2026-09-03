@@ -18,4 +18,15 @@ describe("board OpenAPI surface", () => {
     expect(document.components.schemas).toHaveProperty("ProjectBoard");
     expect(document.components.schemas).toHaveProperty("MoveTaskRequest");
   });
+
+  it("publishes the read-only activity history for tasks and projects", () => {
+    const document = buildOpenApiDocument() as {
+      paths: Record<string, Record<string, unknown>>;
+      components: { schemas: Record<string, unknown> };
+    };
+
+    expect(document.paths["/tasks/{idOrKey}/activity"]).toHaveProperty("get");
+    expect(document.paths["/projects/{projectId}/activity"]).toHaveProperty("get");
+    expect(document.components.schemas).toHaveProperty("ActivityList");
+  });
 });

@@ -1,4 +1,5 @@
 import {
+  activityQuerySchema,
   createProjectRequestSchema,
   projectBoardQuerySchema,
 } from "@morrowlist/contracts";
@@ -40,6 +41,19 @@ export function projectRoutes(deps: ApiDependencies) {
           requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
           c.req.param("projectId"),
           { limit: query.limit },
+        ),
+      );
+    })
+
+    .get("/projects/:projectId/activity", async (c) => {
+      const actor = c.get("actor");
+      const query = parseQuery(c.req.query(), activityQuerySchema);
+      return c.json(
+        await deps.activityService.listForProject(
+          actor,
+          requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+          c.req.param("projectId"),
+          query,
         ),
       );
     })

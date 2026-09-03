@@ -1,7 +1,7 @@
-import type { TaskDto } from "@morrowlist/contracts";
+import type { ActivityEntryDto, TaskDto } from "@morrowlist/contracts";
 import { describe, expect, it } from "vitest";
 
-import { EXIT, exitCodeFor, formatTaskTable } from "./output.js";
+import { EXIT, exitCodeFor, formatActivity, formatTaskTable } from "./output.js";
 
 function task(overrides: Partial<TaskDto> = {}): TaskDto {
   return {
@@ -64,5 +64,43 @@ describe("formatTaskTable", () => {
     expect(output).toContain("[x]");
     expect(output).toContain("(due 2026-09-01)");
     expect(output).toContain("!");
+  });
+});
+
+describe("formatActivity", () => {
+  it("prints when, who, and what, with readable diffs beneath", () => {
+    const entry: ActivityEntryDto = {
+      id: "01a04e0f-0000-7000-8000-000000000009",
+      workspaceId: "01a04e0f-0000-7000-8000-000000000002",
+      aggregateType: "task",
+      aggregateId: "01a04e0f-0000-7000-8000-000000000001",
+      eventType: "task.updated",
+      actorKind: "user",
+      actorId: "u1",
+      actorDisplayName: "Alex",
+      summary: "Updated task fields",
+      payload: { secretLooking: "never printed" },
+      createdAt: "2026-08-29T09:00:00.000Z",
+      changes: [
+        { field: "title", from: "Old", to: "New" },
+        { field: "dueDate", from: null, to: "2026-09-15" },
+      ],
+    };
+
+    const output = formatActivity([
+      entry,
+      { ...entry, actorDisplayName: null, actorKind: "api_key", changes: [] },
+    ]);
+
+    expect(output).toBe(
+      [
+        "2026-08-29T09:00:00.000Z  Alex              Updated task fields",
+        '    title: "Old" → "New"',
+        '    dueDate: (none) → "2026-09-15"',
+        "2026-08-29T09:00:00.000Z  api key           Updated task fields",
+      ].join("\n"),
+    );
+    expect(output).not.toContain("never printed");
+    expect(formatActivity([])).toBe("No activity.");
   });
 });

@@ -1,7 +1,12 @@
 import "server-only";
 
 import { createApiApp, type ApiDependencies } from "@morrowlist/api";
-import { ProjectService, TaskService, bootstrapUser } from "@morrowlist/application";
+import {
+  ActivityService,
+  ProjectService,
+  TaskService,
+  bootstrapUser,
+} from "@morrowlist/application";
 import { createAuth, createAuthPort, type AuthPort } from "@morrowlist/auth";
 import { parseServerEnv, type ServerEnv } from "@morrowlist/config/env";
 import {
@@ -69,16 +74,15 @@ export function getContainer(): Container {
   });
   const auth = createAuthPort(authInstance);
 
+  // Cursors are signed with the application secret so a client cannot forge a page
+  // position (spec 20.6).
+  const cursorSecret = env.AUTH_SECRET ?? "development-only-cursor-secret";
   const dependencies: ApiDependencies = {
     auth,
     unitOfWork,
     projectService: new ProjectService({ unitOfWork }),
-    taskService: new TaskService({
-      unitOfWork,
-      // Cursors are signed with the application secret so a client cannot forge a page
-      // position (spec 20.6).
-      cursorSecret: env.AUTH_SECRET ?? "development-only-cursor-secret",
-    }),
+    taskService: new TaskService({ unitOfWork, cursorSecret }),
+    activityService: new ActivityService({ unitOfWork, cursorSecret }),
     logger,
     checkHealth: () => checkDatabaseHealth(database),
   };
