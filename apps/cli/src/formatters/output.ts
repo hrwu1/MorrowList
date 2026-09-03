@@ -1,9 +1,11 @@
 import type {
   ActivityEntryDto,
   TagListItemDto,
+  ProjectDto,
   TaskDto,
   TodayReason,
   TodayViewDto,
+  WorkflowStatusDto,
 } from "@morrowlist/contracts";
 
 /**
@@ -60,11 +62,14 @@ export function exitCodeFor(errorCode: string): ExitCode {
       return EXIT.notFound;
     case "TASK_VERSION_CONFLICT":
     case "TAG_NAME_CONFLICT":
+    case "VERSION_CONFLICT":
     case "IDEMPOTENCY_KEY_REUSED":
     case "STATUS_ARCHIVE_REQUIRES_DESTINATION":
+    case "STATUS_ARCHIVE_REQUIRES_REPLACEMENT":
       return EXIT.conflict;
     case "VALIDATION_FAILED":
     case "TASK_INVALID_STATUS":
+    case "WORKFLOW_INVARIANT_VIOLATED":
     case "TASK_NESTING_LIMIT_EXCEEDED":
     case "TASK_RELATION_CYCLE":
       return EXIT.validation;
@@ -118,6 +123,33 @@ export function formatActivity(entries: readonly ActivityEntryDto[]): string {
         );
       }
       return lines.join("\n");
+    })
+    .join("\n");
+}
+
+export function formatProjectTable(projects: readonly ProjectDto[]): string {
+  if (projects.length === 0) return "No projects.";
+  return projects
+    .map(
+      (project) =>
+        `${project.id}  ${project.name}${project.archivedAt ? "  (archived)" : ""}`,
+    )
+    .join("\n");
+}
+
+/** Statuses in workflow order, with the flags that matter when editing a board. */
+export function formatStatusTable(statuses: readonly WorkflowStatusDto[]): string {
+  if (statuses.length === 0) return "No statuses.";
+  return statuses
+    .map((status) => {
+      const flags = [
+        status.isDefault ? "default" : null,
+        status.isTerminal ? "done" : null,
+        status.wipLimit !== null ? `wip ${status.wipLimit}` : null,
+        status.archivedAt ? "archived" : null,
+      ].filter((flag) => flag !== null);
+      const suffix = flags.length > 0 ? `  [${flags.join(", ")}]` : "";
+      return `${status.id}  ${status.name}  (${status.category})${suffix}`;
     })
     .join("\n");
 }

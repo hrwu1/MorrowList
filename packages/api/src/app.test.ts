@@ -4,6 +4,7 @@ import {
   TagService,
   TaskService,
   ViewService,
+  WorkflowService,
   bootstrapUser,
 } from "@morrowlist/application";
 import type { AuthPort, AuthenticatedUser } from "@morrowlist/auth";
@@ -69,6 +70,7 @@ beforeEach(async () => {
     auth,
     unitOfWork,
     projectService: new ProjectService({ unitOfWork, clock: fixedClock(NOW) }),
+    workflowService: new WorkflowService({ unitOfWork, clock: fixedClock(NOW) }),
     taskService: new TaskService({
       unitOfWork,
       clock: fixedClock(NOW),
@@ -815,5 +817,192 @@ describe("tag endpoints", () => {
       colorToken: "magenta",
     });
     expect(badColour.status).toBe(422);
+  });
+});
+
+describe("workflow editing endpoints", () => {
+  async function createProject(name = "Research launch") {
+    const created = await (
+      await jsonRequest("/api/v1/projects", "POST", { name })
+    ).json();
+    const statuses = created.data.statuses as {
+      id: string;
+      category: string;
+      name: string;
+    }[];
+    const byCategory = (category: string) => {
+      const status = statuses.find((candidate) => candidate.category === category);
+      if (!status) throw new Error(`no ${category} status`);
+      return status;
+    };
+    return { projectId: created.data.project.id as string, statuses, byCategory };
+  }
+
+  it("adds, renames, reorders, and lists columns", async () => {
+    const { projectId, byCategory } = await createProject();
+
+    const createdResponse = await jsonRequest(
+      `/api/v1/projects/${projectId}/statuses`,
+      "POST",
+      { name: "Testing", category: "review", wipLimit: 2 },
+    );
+    expect(createdResponse.status).toBe(201);
+    const created = (await createdResponse.json()).data;
+    expect(created).toMatchObject({ name: "Testing", wipLimit: 2, policyMd: null });
+
+    const renamed = await (
+      await jsonRequest(`/api/v1/statuses/${created.id}`, "PATCH", {
+        name: "QA",
+        policyMd: "Two reviewers.",
+        expectedVersion: 1,
+      })
+    ).json();
+    expect(renamed.data).toMatchObject({
+      name: "QA",
+      category: "review",
+      policyMd: "Two reviewers.",
+      version: 2,
+    });
+
+    const reordered = await jsonRequest(
+      `/api/v1/statuses/${created.id}/reorder`,
+      "POST",
+      {
+        afterStatusId: byCategory("backlog").id,
+      },
+    );
+    expect(reordered.status).toBe(200);
+
+    const listed = await (
+      await request(`/api/v1/projects/${projectId}/statuses`)
+    ).json();
+    expect(listed.data.map((status: { name: string }) => status.name)).toEqual([
+      "QA",
+      "Backlog",
+      "Ready",
+      "In Progress",
+      "Blocked",
+      "In Review",
+      "Done",
+    ]);
+  });
+
+  it("archives a column with its tasks and reports the workflow rules as 409", async () => {
+    const { projectId, byCategory } = await createProject();
+    const ready = byCategory("ready");
+    const blocked = byCategory("blocked");
+    const task = await (
+      await jsonRequest("/api/v1/tasks", "POST", {
+        title: "Stuck",
+        projectId,
+        statusId: blocked.id,
+      })
+    ).json();
+
+    const noDestination = await jsonRequest(
+      `/api/v1/statuses/${blocked.id}/archive`,
+      "POST",
+      {},
+    );
+    expect(noDestination.status).toBe(409);
+    await expect(noDestination.json()).resolves.toMatchObject({
+      error: { code: "STATUS_ARCHIVE_REQUIRES_DESTINATION" },
+    });
+
+    const defaultWithoutReplacement = await jsonRequest(
+      `/api/v1/statuses/${ready.id}/archive`,
+      "POST",
+      {},
+    );
+    expect(defaultWithoutReplacement.status).toBe(409);
+    await expect(defaultWithoutReplacement.json()).resolves.toMatchObject({
+      error: { code: "STATUS_ARCHIVE_REQUIRES_REPLACEMENT" },
+    });
+
+    const lastDone = await jsonRequest(
+      `/api/v1/statuses/${byCategory("done").id}/archive`,
+      "POST",
+      {},
+    );
+    expect(lastDone.status).toBe(422);
+    await expect(lastDone.json()).resolves.toMatchObject({
+      error: { code: "WORKFLOW_INVARIANT_VIOLATED" },
+    });
+
+    const archived = await jsonRequest(
+      `/api/v1/statuses/${blocked.id}/archive`,
+      "POST",
+      {
+        destinationStatusId: ready.id,
+      },
+    );
+    expect(archived.status).toBe(200);
+    const moved = await (await request(`/api/v1/tasks/${task.data.id}`)).json();
+    expect(moved.data.statusId).toBe(ready.id);
+
+    const listed = await (
+      await request(`/api/v1/projects/${projectId}/statuses`)
+    ).json();
+    expect(listed.data.map((status: { id: string }) => status.id)).not.toContain(
+      blocked.id,
+    );
+    const withArchived = await (
+      await request(`/api/v1/projects/${projectId}/statuses?includeArchived=true`)
+    ).json();
+    expect(withArchived.data).toHaveLength(6);
+  });
+
+  it("maps a stale status version to 409 VERSION_CONFLICT", async () => {
+    const { byCategory } = await createProject();
+    const response = await jsonRequest(
+      `/api/v1/statuses/${byCategory("ready").id}`,
+      "PATCH",
+      {
+        name: "Next",
+        expectedVersion: 9,
+      },
+    );
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "VERSION_CONFLICT" },
+    });
+  });
+
+  it("updates, archives, lists, and restores a project", async () => {
+    const { projectId } = await createProject();
+
+    const updated = await (
+      await jsonRequest(`/api/v1/projects/${projectId}`, "PATCH", {
+        name: "Research relaunch",
+        colorToken: "violet",
+      })
+    ).json();
+    expect(updated.data).toMatchObject({ name: "Research relaunch", version: 2 });
+
+    const archived = await jsonRequest(
+      `/api/v1/projects/${projectId}/archive`,
+      "POST",
+      {},
+    );
+    expect(archived.status).toBe(200);
+
+    const visible = await (await request("/api/v1/projects")).json();
+    expect(visible.data).toEqual([]);
+    const all = await (await request("/api/v1/projects?includeArchived=true")).json();
+    expect(all.data.map((project: { name: string }) => project.name)).toEqual([
+      "Research relaunch",
+    ]);
+    expect((await request(`/api/v1/projects/${projectId}/board`)).status).toBe(404);
+
+    const restored = await (
+      await jsonRequest(`/api/v1/projects/${projectId}/restore`, "POST", {})
+    ).json();
+    expect(restored.data.archivedAt).toBeNull();
+    expect((await request(`/api/v1/projects/${projectId}/board`)).status).toBe(200);
+  });
+
+  it("rejects an empty status update before calling the service", async () => {
+    const response = await jsonRequest(`/api/v1/statuses/${uuidv7()}`, "PATCH", {});
+    expect(response.status).toBe(422);
   });
 });

@@ -10,6 +10,7 @@ export {
   buildActorContext,
   buildDefaultWorkflow,
   buildProject,
+  buildTask,
   buildWorkspace,
   createInMemoryUnitOfWork,
   emptyData,

@@ -6,6 +6,7 @@ import type {
   TaskService,
   UnitOfWork,
   ViewService,
+  WorkflowService,
 } from "@morrowlist/application";
 import type { AuthPort } from "@morrowlist/auth";
 import type { Logger, Metrics } from "@morrowlist/observability";
@@ -18,6 +19,7 @@ export interface ApiDependencies {
   readonly auth: AuthPort;
   readonly unitOfWork: UnitOfWork;
   readonly projectService: ProjectService;
+  readonly workflowService: WorkflowService;
   readonly taskService: TaskService;
   readonly activityService: ActivityService;
   readonly viewService: ViewService;

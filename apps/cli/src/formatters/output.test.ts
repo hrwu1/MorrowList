@@ -6,6 +6,7 @@ import {
   exitCodeFor,
   formatActivity,
   formatTagTable,
+  formatStatusTable,
   formatTaskDetail,
   formatTaskTable,
   formatTodayView,
@@ -231,5 +232,43 @@ describe("formatTagTable", () => {
       }),
     ]);
     expect(output).toContain("#Deep Work");
+  });
+});
+
+describe("formatStatusTable", () => {
+  it("shows the flags that matter when editing a workflow", () => {
+    const base = {
+      projectId: "p",
+      rank: "a0",
+      colorToken: "blue",
+      policyMd: null,
+      archivedAt: null,
+      version: 1,
+    };
+    const lines = formatStatusTable([
+      {
+        ...base,
+        id: "s1",
+        name: "Ready",
+        category: "ready",
+        wipLimit: 3,
+        isDefault: true,
+        isTerminal: false,
+      },
+      {
+        ...base,
+        id: "s2",
+        name: "Done",
+        category: "done",
+        wipLimit: null,
+        isDefault: false,
+        isTerminal: true,
+        archivedAt: "2026-09-01T10:00:00.000Z",
+      },
+    ]).split("\n");
+
+    expect(lines[0]).toBe("s1  Ready  (ready)  [default, wip 3]");
+    expect(lines[1]).toBe("s2  Done  (done)  [done, archived]");
+    expect(formatStatusTable([])).toBe("No statuses.");
   });
 });

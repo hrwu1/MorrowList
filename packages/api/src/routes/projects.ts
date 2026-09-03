@@ -1,7 +1,12 @@
 import {
   activityQuerySchema,
   createProjectRequestSchema,
+  createStatusRequestSchema,
+  listProjectsQuerySchema,
+  listStatusesQuerySchema,
   projectBoardQuerySchema,
+  projectVersionRequestSchema,
+  updateProjectRequestSchema,
 } from "@morrowlist/contracts";
 import { Hono } from "hono";
 
@@ -10,14 +15,16 @@ import { parseJsonBody, parseQuery } from "../middleware/validate.js";
 
 import { requireWorkspace } from "./workspace.js";
 
-/** Project and normalized board endpoints (spec 20.3, BRD-001). */
+/** Project, workflow-status, and normalized board endpoints (spec 20.3, BRD-001). */
 export function projectRoutes(deps: ApiDependencies) {
   return new Hono<ApiEnv>()
     .get("/projects", async (c) => {
       const actor = c.get("actor");
+      const query = parseQuery(c.req.query(), listProjectsQuerySchema);
       return c.json(
         await deps.projectService.list(actor, {
           workspaceId: requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+          includeArchived: query.includeArchived,
         }),
       );
     })
@@ -58,12 +65,72 @@ export function projectRoutes(deps: ApiDependencies) {
       );
     })
 
+    .get("/projects/:projectId/statuses", async (c) => {
+      const actor = c.get("actor");
+      const query = parseQuery(c.req.query(), listStatusesQuerySchema);
+      const statuses = await deps.workflowService.list(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("projectId"),
+        { includeArchived: query.includeArchived },
+      );
+      return c.json({ data: statuses });
+    })
+
+    .post("/projects/:projectId/statuses", async (c) => {
+      const actor = c.get("actor");
+      const body = await parseJsonBody(c, createStatusRequestSchema);
+      const status = await deps.workflowService.create(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("projectId"),
+        body,
+      );
+      return c.json({ data: status }, 201);
+    })
+
     .get("/projects/:projectId", async (c) => {
       const actor = c.get("actor");
       const project = await deps.projectService.get(
         actor,
         requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
         c.req.param("projectId"),
+      );
+      return c.json({ data: project });
+    })
+
+    .patch("/projects/:projectId", async (c) => {
+      const actor = c.get("actor");
+      const body = await parseJsonBody(c, updateProjectRequestSchema);
+      const project = await deps.projectService.update(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("projectId"),
+        body,
+      );
+      return c.json({ data: project });
+    })
+
+    .post("/projects/:projectId/archive", async (c) => {
+      const actor = c.get("actor");
+      const body = await parseJsonBody(c, projectVersionRequestSchema);
+      const project = await deps.projectService.archive(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("projectId"),
+        body.expectedVersion,
+      );
+      return c.json({ data: project });
+    })
+
+    .post("/projects/:projectId/restore", async (c) => {
+      const actor = c.get("actor");
+      const body = await parseJsonBody(c, projectVersionRequestSchema);
+      const project = await deps.projectService.restore(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("projectId"),
+        body.expectedVersion,
       );
       return c.json({ data: project });
     });

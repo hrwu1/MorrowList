@@ -7,6 +7,7 @@ import {
   TagService,
   TaskService,
   ViewService,
+  WorkflowService,
   bootstrapUser,
 } from "@morrowlist/application";
 import { createAuth, createAuthPort, type AuthPort } from "@morrowlist/auth";
@@ -83,6 +84,7 @@ export function getContainer(): Container {
     auth,
     unitOfWork,
     projectService: new ProjectService({ unitOfWork }),
+    workflowService: new WorkflowService({ unitOfWork }),
     taskService: new TaskService({ unitOfWork, cursorSecret }),
     activityService: new ActivityService({ unitOfWork, cursorSecret }),
     viewService: new ViewService({ unitOfWork }),

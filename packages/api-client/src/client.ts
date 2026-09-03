@@ -2,19 +2,25 @@ import type {
   ActivityListResponse,
   ActivityQuery,
   AddTaskToDayRequest,
+  ArchiveStatusRequest,
   CreateProjectRequest,
   CreateTagRequest,
+  CreateStatusRequest,
   CreateTaskRequest,
   ErrorCode,
   ErrorResponse,
+  ListProjectsQuery,
+  ListStatusesQuery,
   ListTasksQuery,
   MeResponse,
   MoveTaskRequest,
   ProjectBoardQuery,
   ProjectBoardResponse,
   ProjectDetailDto,
+  ProjectDto,
   ProjectListResponse,
   ProjectResponse,
+  ReorderStatusRequest,
   ReorderTaskRequest,
   SetTaskParentRequest,
   TagDto,
@@ -26,7 +32,12 @@ import type {
   UpcomingViewQuery,
   UpcomingViewResponse,
   UpdateTagRequest,
+  UpdateProjectRequest,
+  UpdateStatusRequest,
   UpdateTaskRequest,
+  WorkflowStatusDto,
+  WorkflowStatusListResponse,
+  WorkflowStatusResponse,
 } from "@morrowlist/contracts";
 
 /**
@@ -80,13 +91,128 @@ export class ApiClient {
     return body.data;
   }
 
-  async listProjects(options: RequestOptions = {}): Promise<ProjectListResponse> {
+  async listProjects(
+    query: Partial<ListProjectsQuery> = {},
+    options: RequestOptions = {},
+  ): Promise<ProjectListResponse> {
     return this.send<ProjectListResponse>(
       "GET",
-      `/projects${this.queryString({}, options)}`,
+      `/projects${this.queryString(query, options)}`,
       undefined,
       options,
     );
+  }
+
+  async updateProject(
+    projectId: string,
+    body: UpdateProjectRequest,
+    options: RequestOptions = {},
+  ): Promise<ProjectDto> {
+    const response = await this.send<{ data: ProjectDto }>(
+      "PATCH",
+      `/projects/${encodeURIComponent(projectId)}${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async archiveProject(
+    projectId: string,
+    expectedVersion?: number,
+    options: RequestOptions = {},
+  ): Promise<ProjectDto> {
+    const response = await this.send<{ data: ProjectDto }>(
+      "POST",
+      `/projects/${encodeURIComponent(projectId)}/archive${this.queryString({}, options)}`,
+      expectedVersion === undefined ? {} : { expectedVersion },
+      options,
+    );
+    return response.data;
+  }
+
+  async restoreProject(
+    projectId: string,
+    expectedVersion?: number,
+    options: RequestOptions = {},
+  ): Promise<ProjectDto> {
+    const response = await this.send<{ data: ProjectDto }>(
+      "POST",
+      `/projects/${encodeURIComponent(projectId)}/restore${this.queryString({}, options)}`,
+      expectedVersion === undefined ? {} : { expectedVersion },
+      options,
+    );
+    return response.data;
+  }
+
+  async listStatuses(
+    projectId: string,
+    query: Partial<ListStatusesQuery> = {},
+    options: RequestOptions = {},
+  ): Promise<WorkflowStatusDto[]> {
+    const response = await this.send<WorkflowStatusListResponse>(
+      "GET",
+      `/projects/${encodeURIComponent(projectId)}/statuses${this.queryString(query, options)}`,
+      undefined,
+      options,
+    );
+    return response.data;
+  }
+
+  async createStatus(
+    projectId: string,
+    body: CreateStatusRequest,
+    options: RequestOptions = {},
+  ): Promise<WorkflowStatusDto> {
+    const response = await this.send<WorkflowStatusResponse>(
+      "POST",
+      `/projects/${encodeURIComponent(projectId)}/statuses${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async updateStatus(
+    statusId: string,
+    body: UpdateStatusRequest,
+    options: RequestOptions = {},
+  ): Promise<WorkflowStatusDto> {
+    const response = await this.send<WorkflowStatusResponse>(
+      "PATCH",
+      `/statuses/${encodeURIComponent(statusId)}${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async reorderStatus(
+    statusId: string,
+    body: ReorderStatusRequest,
+    options: RequestOptions = {},
+  ): Promise<WorkflowStatusDto> {
+    const response = await this.send<WorkflowStatusResponse>(
+      "POST",
+      `/statuses/${encodeURIComponent(statusId)}/reorder${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async archiveStatus(
+    statusId: string,
+    body: ArchiveStatusRequest,
+    options: RequestOptions = {},
+  ): Promise<WorkflowStatusDto> {
+    const response = await this.send<WorkflowStatusResponse>(
+      "POST",
+      `/statuses/${encodeURIComponent(statusId)}/archive${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
   }
 
   async createProject(

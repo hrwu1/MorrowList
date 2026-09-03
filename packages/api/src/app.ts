@@ -9,6 +9,7 @@ import { healthRoutes } from "./routes/health.js";
 import { meRoutes } from "./routes/me.js";
 import { projectRoutes } from "./routes/projects.js";
 import { tagRoutes } from "./routes/tags.js";
+import { statusRoutes } from "./routes/statuses.js";
 import { taskRoutes } from "./routes/tasks.js";
 import { viewRoutes } from "./routes/views.js";
 
@@ -44,9 +45,11 @@ export function createApiApp(deps: ApiDependencies) {
   app.use("/views/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/tags", authenticate(deps.auth, listWorkspaceIds));
   app.use("/tags/*", authenticate(deps.auth, listWorkspaceIds));
+  app.use("/statuses/*", authenticate(deps.auth, listWorkspaceIds));
 
   app.route("/", meRoutes(deps));
   app.route("/", projectRoutes(deps));
+  app.route("/", statusRoutes(deps));
   app.route("/", tagRoutes(deps));
   app.route("/", taskRoutes(deps));
   app.route("/", viewRoutes(deps));

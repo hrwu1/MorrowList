@@ -2,11 +2,15 @@ import {
   activityListResponseSchema,
   activityQuerySchema,
   addTaskToDayRequestSchema,
+  archiveStatusRequestSchema,
   completeTaskRequestSchema,
   createProjectRequestSchema,
   createTagRequestSchema,
+  createStatusRequestSchema,
   createTaskRequestSchema,
   errorResponseSchema,
+  listProjectsQuerySchema,
+  listStatusesQuerySchema,
   listTasksQuerySchema,
   meResponseSchema,
   moveTaskRequestSchema,
@@ -14,6 +18,9 @@ import {
   projectBoardResponseSchema,
   projectListResponseSchema,
   projectResponseSchema,
+  projectSchema,
+  projectVersionRequestSchema,
+  reorderStatusRequestSchema,
   reorderTaskRequestSchema,
   setTaskParentRequestSchema,
   tagListResponseSchema,
@@ -25,7 +32,11 @@ import {
   upcomingViewQuerySchema,
   upcomingViewResponseSchema,
   updateTagRequestSchema,
+  updateProjectRequestSchema,
+  updateStatusRequestSchema,
   updateTaskRequestSchema,
+  workflowStatusListResponseSchema,
+  workflowStatusResponseSchema,
 } from "@morrowlist/contracts";
 import { z } from "zod";
 
@@ -42,6 +53,7 @@ const registry = {
   Task: taskResponseSchema.shape.data,
   TaskList: taskListResponseSchema,
   ProjectDetail: projectResponseSchema,
+  Project: z.object({ data: projectSchema }),
   ProjectList: projectListResponseSchema,
   ProjectBoard: projectBoardResponseSchema,
   ActivityList: activityListResponseSchema,
@@ -49,7 +61,15 @@ const registry = {
   TagList: tagListResponseSchema,
   CreateTagRequest: createTagRequestSchema,
   UpdateTagRequest: updateTagRequestSchema,
+  WorkflowStatus: workflowStatusResponseSchema,
+  WorkflowStatusList: workflowStatusListResponseSchema,
   CreateProjectRequest: createProjectRequestSchema,
+  UpdateProjectRequest: updateProjectRequestSchema,
+  ProjectVersionRequest: projectVersionRequestSchema,
+  CreateStatusRequest: createStatusRequestSchema,
+  UpdateStatusRequest: updateStatusRequestSchema,
+  ReorderStatusRequest: reorderStatusRequestSchema,
+  ArchiveStatusRequest: archiveStatusRequestSchema,
   CreateTaskRequest: createTaskRequestSchema,
   UpdateTaskRequest: updateTaskRequestSchema,
   MoveTaskRequest: moveTaskRequestSchema,
@@ -110,6 +130,23 @@ const tagIdParam = {
   in: "path",
   required: true,
   schema: { type: "string", format: "uuid" },
+};
+
+const statusIdParam = {
+  name: "id",
+  in: "path",
+  required: true,
+  schema: { type: "string", format: "uuid" },
+};
+
+const notFound = {
+  "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+};
+const conflict = {
+  "409": {
+    description: "Version conflict or a workflow rule needs a choice first",
+    ...jsonContent(ref("ErrorResponse")),
+  },
 };
 
 export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown> {
@@ -177,10 +214,12 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
       "/projects": {
         get: {
           summary: "List projects",
-          parameters: [workspaceIdParam],
+          description:
+            "Archived projects are omitted unless `includeArchived` is true.",
+          parameters: [workspaceIdParam, ...queryParameters(listProjectsQuerySchema)],
           responses: {
             "200": {
-              description: "The workspace's active projects",
+              description: "The workspace's projects",
               ...jsonContent(ref("ProjectList")),
             },
             ...commonErrors,
@@ -211,7 +250,148 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
               description: "The project and its active statuses",
               ...jsonContent(ref("ProjectDetail")),
             },
-            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...notFound,
+            ...commonErrors,
+          },
+        },
+        patch: {
+          summary: "Update a project's name, description, colour, or icon",
+          description:
+            "An omitted field is left unchanged; a field explicitly set to null is cleared.",
+          parameters: [projectIdParam, workspaceIdParam],
+          requestBody: { required: true, ...jsonContent(ref("UpdateProjectRequest")) },
+          responses: {
+            "200": {
+              description: "The updated project",
+              ...jsonContent(ref("Project")),
+            },
+            ...notFound,
+            ...conflict,
+            ...commonErrors,
+          },
+        },
+      },
+      "/projects/{projectId}/archive": {
+        post: {
+          summary: "Archive a project",
+          description:
+            "Hides the project from navigation and keeps every task (spec 8.6).",
+          parameters: [projectIdParam, workspaceIdParam],
+          requestBody: {
+            required: false,
+            ...jsonContent(ref("ProjectVersionRequest")),
+          },
+          responses: {
+            "200": {
+              description: "The archived project",
+              ...jsonContent(ref("Project")),
+            },
+            ...notFound,
+            ...conflict,
+            ...commonErrors,
+          },
+        },
+      },
+      "/projects/{projectId}/restore": {
+        post: {
+          summary: "Restore an archived project",
+          parameters: [projectIdParam, workspaceIdParam],
+          requestBody: {
+            required: false,
+            ...jsonContent(ref("ProjectVersionRequest")),
+          },
+          responses: {
+            "200": {
+              description: "The restored project",
+              ...jsonContent(ref("Project")),
+            },
+            ...notFound,
+            ...conflict,
+            ...commonErrors,
+          },
+        },
+      },
+      "/projects/{projectId}/statuses": {
+        get: {
+          summary: "List a project's workflow statuses in order",
+          parameters: [
+            projectIdParam,
+            workspaceIdParam,
+            ...queryParameters(listStatusesQuerySchema),
+          ],
+          responses: {
+            "200": {
+              description: "The statuses, ranked",
+              ...jsonContent(ref("WorkflowStatusList")),
+            },
+            ...notFound,
+            ...commonErrors,
+          },
+        },
+        post: {
+          summary: "Add a workflow status at the end of the board",
+          parameters: [projectIdParam, workspaceIdParam],
+          requestBody: { required: true, ...jsonContent(ref("CreateStatusRequest")) },
+          responses: {
+            "201": {
+              description: "The created status",
+              ...jsonContent(ref("WorkflowStatus")),
+            },
+            ...notFound,
+            ...commonErrors,
+          },
+        },
+      },
+      "/statuses/{id}": {
+        patch: {
+          summary: "Update a workflow status",
+          description:
+            "Rename, recolour, set a WIP limit or policy, change the category, or make it the default. A category change across the Done boundary completes or reopens the tasks in the column. Renaming never changes the category.",
+          parameters: [statusIdParam, workspaceIdParam],
+          requestBody: { required: true, ...jsonContent(ref("UpdateStatusRequest")) },
+          responses: {
+            "200": {
+              description: "The updated status",
+              ...jsonContent(ref("WorkflowStatus")),
+            },
+            ...notFound,
+            ...conflict,
+            ...commonErrors,
+          },
+        },
+      },
+      "/statuses/{id}/reorder": {
+        post: {
+          summary: "Reorder a workflow status",
+          description:
+            "Neighbour IDs describe the intended position; the server computes the authoritative rank.",
+          parameters: [statusIdParam, workspaceIdParam],
+          requestBody: { required: true, ...jsonContent(ref("ReorderStatusRequest")) },
+          responses: {
+            "200": {
+              description: "The reordered status",
+              ...jsonContent(ref("WorkflowStatus")),
+            },
+            ...notFound,
+            ...conflict,
+            ...commonErrors,
+          },
+        },
+      },
+      "/statuses/{id}/archive": {
+        post: {
+          summary: "Move a status's tasks to another status and archive it atomically",
+          description:
+            "A status with tasks needs `destinationStatusId` (STATUS_ARCHIVE_REQUIRES_DESTINATION otherwise); the default status needs a replacement default (STATUS_ARCHIVE_REQUIRES_REPLACEMENT otherwise), which falls back to the destination. The last Done or last non-Done status cannot be archived (WORKFLOW_INVARIANT_VIOLATED).",
+          parameters: [statusIdParam, workspaceIdParam],
+          requestBody: { required: false, ...jsonContent(ref("ArchiveStatusRequest")) },
+          responses: {
+            "200": {
+              description: "The archived status",
+              ...jsonContent(ref("WorkflowStatus")),
+            },
+            ...notFound,
+            ...conflict,
             ...commonErrors,
           },
         },

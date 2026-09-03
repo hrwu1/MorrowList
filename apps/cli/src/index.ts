@@ -2,6 +2,8 @@ import { Command } from "commander";
 
 import { authCommand } from "./commands/auth.js";
 import { tagCommand } from "./commands/tag.js";
+import { projectCommand } from "./commands/project.js";
+import { statusCommand } from "./commands/status.js";
 import { taskCommand } from "./commands/task.js";
 import { todayCommand } from "./commands/today.js";
 import { EXIT, printError } from "./formatters/output.js";
@@ -28,6 +30,8 @@ const program = new Command()
   .showHelpAfterError();
 
 program.addCommand(authCommand());
+program.addCommand(projectCommand());
+program.addCommand(statusCommand());
 program.addCommand(taskCommand());
 program.addCommand(todayCommand());
 program.addCommand(tagCommand());
