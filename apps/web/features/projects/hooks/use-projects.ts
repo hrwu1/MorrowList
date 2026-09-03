@@ -10,7 +10,11 @@ export const projectKeys = {
   list: () => [...projectKeys.all, "list"] as const,
   detail: (projectId: string) => [...projectKeys.all, "detail", projectId] as const,
   boards: () => [...projectKeys.all, "board"] as const,
-  board: (projectId: string) => [...projectKeys.all, "board", projectId] as const,
+  /** Every cached variant of one project's board, whichever subtask view it shows. */
+  projectBoards: (projectId: string) =>
+    [...projectKeys.all, "board", projectId] as const,
+  board: (projectId: string, includeSubtasks: boolean) =>
+    [...projectKeys.projectBoards(projectId), { includeSubtasks }] as const,
 };
 
 export function useProjects() {

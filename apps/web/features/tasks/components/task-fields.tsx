@@ -1,6 +1,6 @@
 "use client";
 
-import type { Priority } from "@morrowlist/contracts";
+import type { Priority, SubtaskProgress } from "@morrowlist/contracts";
 import { Select, TextInput } from "@morrowlist/ui";
 
 import { PRIORITIES } from "../lib/task-view";
@@ -143,4 +143,22 @@ export function DueBadge({
 export function MyDayBadge({ dayPlans }: { readonly dayPlans: readonly string[] }) {
   if (dayPlans.length === 0) return null;
   return <span className="task-row__my-day">My Day</span>;
+}
+
+/** "1/2" for a parent's direct children (spec 8.3); nothing for a task without any. */
+export function SubtaskProgressBadge({
+  progress,
+}: {
+  readonly progress: SubtaskProgress | null;
+}) {
+  if (!progress) return null;
+  return (
+    <span
+      className="task-row__subtasks"
+      data-done={progress.completed === progress.total || undefined}
+      aria-label={`${progress.completed} of ${progress.total} subtasks done`}
+    >
+      {progress.completed}/{progress.total}
+    </span>
+  );
 }

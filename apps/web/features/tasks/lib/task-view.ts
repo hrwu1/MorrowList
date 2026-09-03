@@ -123,5 +123,18 @@ export function matchesFilters(
   }
   if (filters.priority !== undefined && task.priority !== filters.priority)
     return false;
+  if (
+    filters.parentTaskId !== undefined &&
+    task.parentTaskId !== filters.parentTaskId
+  ) {
+    return false;
+  }
+  if (
+    filters.parentTaskId === undefined &&
+    filters.includeSubtasks === false &&
+    task.parentTaskId !== null
+  ) {
+    return false;
+  }
   return true;
 }

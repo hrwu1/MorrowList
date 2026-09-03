@@ -11,6 +11,7 @@ import {
   placementForDrop,
   readBoardStageView,
   readBoardSort,
+  readBoardSubtasks,
   sortBoardTasks,
   tasksInStatus,
   visibleBoardStatuses,
@@ -40,6 +41,7 @@ const BASE_TASK: TaskDto = {
   updatedAt: "2026-08-30T12:00:00.000Z",
   deletedAt: null,
   dayPlans: [],
+  subtaskProgress: null,
 };
 
 const READY = "0198f0a0-0000-7000-8000-000000000030";
@@ -222,5 +224,13 @@ describe("board view", () => {
       completedAt: "2026-08-30T13:00:00.000Z",
     });
     expect(moved.data.tasks).toHaveLength(1);
+  });
+});
+
+describe("readBoardSubtasks", () => {
+  it("hides subtasks unless the URL asks to show them", () => {
+    expect(readBoardSubtasks(new URLSearchParams(""))).toBe(false);
+    expect(readBoardSubtasks(new URLSearchParams("subtasks=show"))).toBe(true);
+    expect(readBoardSubtasks(new URLSearchParams("subtasks=yes"))).toBe(false);
   });
 });

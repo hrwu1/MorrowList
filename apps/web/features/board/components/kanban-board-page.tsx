@@ -12,6 +12,7 @@ import {
   placementForDrop,
   readBoardStageView,
   readBoardSort,
+  readBoardSubtasks,
   tasksInStatus,
   visibleBoardStatuses,
   type BoardPlacement,
@@ -35,10 +36,11 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const board = useProjectBoard(projectId);
-  const moveTask = useMoveBoardTask(projectId);
   const sort = readBoardSort(new URLSearchParams(searchParams.toString()));
   const stageView = readBoardStageView(new URLSearchParams(searchParams.toString()));
+  const showSubtasks = readBoardSubtasks(new URLSearchParams(searchParams.toString()));
+  const board = useProjectBoard(projectId, showSubtasks);
+  const moveTask = useMoveBoardTask(projectId);
   const selectedTaskKey = searchParams.get("task");
   const [mobileStatusId, setMobileStatusId] = useState<string | null>(null);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -97,6 +99,14 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
     const params = new URLSearchParams(searchParams.toString());
     if (next === "focus") params.delete("show");
     else params.set("show", next);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
+  function changeSubtasks(show: boolean) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (show) params.set("subtasks", "show");
+    else params.delete("subtasks");
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
@@ -237,6 +247,12 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
                   ? "All stages"
                   : `${visibleStatuses.length} of ${statuses.length} stages`}
               </span>
+              <span
+                className="view-disclosure__chip"
+                data-active={showSubtasks || undefined}
+              >
+                {showSubtasks ? "Subtasks shown" : "Subtasks hidden"}
+              </span>
             </span>
           </summary>
           <div className="view-disclosure__panel board-toolbar__view-panel">
@@ -265,6 +281,17 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
               >
                 <option value="focus">Focused stages</option>
                 <option value="all">All stages</option>
+              </Select>
+            </label>
+            <label className="filters__control">
+              <span className="ml-field__label">Subtasks</span>
+              <Select
+                value={showSubtasks ? "show" : "hide"}
+                aria-label="Subtasks shown"
+                onChange={(event) => changeSubtasks(event.target.value === "show")}
+              >
+                <option value="hide">Hidden, progress on the parent</option>
+                <option value="show">Shown as cards</option>
               </Select>
             </label>
             <p className="board-toolbar__hint" id="board-drag-hint">

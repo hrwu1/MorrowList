@@ -30,6 +30,11 @@ export function readBoardSort(params: URLSearchParams): BoardSort {
   return BOARD_SORTS.find((sort) => sort === requested) ?? "manual";
 }
 
+/** Boards hide subtasks by default and show progress on the parent card (spec 8.3). */
+export function readBoardSubtasks(params: URLSearchParams): boolean {
+  return params.get("subtasks") === "show";
+}
+
 /** Empty exception lanes stay out of the way unless the user explicitly asks for them. */
 export function readBoardStageView(params: URLSearchParams): BoardStageView {
   return params.get("show") === "all" ? "all" : "focus";

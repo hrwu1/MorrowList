@@ -16,6 +16,7 @@ import {
   useUpdateTask,
 } from "../hooks/use-tasks";
 import type { TaskDragData } from "../lib/task-dnd";
+import { hasOpenSubtasks } from "../lib/task-projections";
 
 import {
   DueBadge,
@@ -23,6 +24,7 @@ import {
   MyDayBadge,
   PriorityBadge,
   PrioritySelect,
+  SubtaskProgressBadge,
 } from "./task-fields";
 
 /**
@@ -76,9 +78,14 @@ export function TaskRow({ task, detailHref, selected, today }: TaskRowProps) {
         <button
           type="button"
           className="task-row__check"
-          onClick={() =>
-            task.isCompleted ? reopen.mutate(task) : complete.mutate(task)
-          }
+          onClick={() => {
+            if (task.isCompleted) return reopen.mutate(task);
+            // Completing a parent leaves its open children as they are (spec 8.3).
+            if (hasOpenSubtasks(task) && !window.confirm(openSubtasksWarning(task))) {
+              return;
+            }
+            complete.mutate(task);
+          }}
           disabled={busy}
           // The label names the task, so the control is unambiguous out of context.
           aria-label={`${task.isCompleted ? "Reopen" : "Complete"} ${task.title}`}
@@ -110,6 +117,7 @@ export function TaskRow({ task, detailHref, selected, today }: TaskRowProps) {
               today={today}
             />
             <MyDayBadge dayPlans={task.dayPlans} />
+            <SubtaskProgressBadge progress={task.subtaskProgress} />
             {task.completedAt ? (
               <time dateTime={task.completedAt}>
                 Completed {new Date(task.completedAt).toLocaleDateString()}
@@ -136,6 +144,12 @@ export function TaskRow({ task, detailHref, selected, today }: TaskRowProps) {
       ) : null}
     </li>
   );
+}
+
+export function openSubtasksWarning(task: TaskDto): string {
+  const progress = task.subtaskProgress ?? { completed: 0, total: 0 };
+  const open = progress.total - progress.completed;
+  return `${open} of ${progress.total} subtasks are still open. Complete "${task.title}" anyway? The subtasks stay as they are.`;
 }
 
 function RowActions({

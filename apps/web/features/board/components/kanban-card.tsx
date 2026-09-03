@@ -9,6 +9,7 @@ import {
   DueBadge,
   MyDayBadge,
   PriorityBadge,
+  SubtaskProgressBadge,
 } from "@/features/tasks/components/task-fields";
 import { useAddToDay, useRemoveFromDay } from "@/features/tasks/hooks/use-tasks";
 import type { TaskDragData } from "@/features/tasks/lib/task-dnd";
@@ -138,6 +139,7 @@ export function KanbanCard({
           isCompleted={task.isCompleted}
         />
         <MyDayBadge dayPlans={task.dayPlans} />
+        <SubtaskProgressBadge progress={task.subtaskProgress} />
       </div>
     </li>
   );

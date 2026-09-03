@@ -34,6 +34,7 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     updatedAt: "2026-08-29T09:00:00.000Z",
     deletedAt: null,
     dayPlans: [],
+    subtaskProgress: null,
     ...overrides,
   };
 }
@@ -136,5 +137,17 @@ describe("matchesFilters", () => {
   it("leaves a due-filtered list alone, since the browser cannot evaluate it", () => {
     // `due` is relative to the workspace timezone, which lives on the server.
     expect(matchesFilters(task({ dueDate: null }), { due: "today" })).toBe(true);
+  });
+});
+
+describe("matchesFilters for subtasks", () => {
+  it("keeps a subtask in its parent's list and out of a parent-free list", () => {
+    const parentId = "01a04e0f-2e8a-7000-ae0a-989d784c0299";
+    const subtask = task({ parentTaskId: parentId });
+
+    expect(matchesFilters(subtask, { parentTaskId: parentId })).toBe(true);
+    expect(matchesFilters(task(), { parentTaskId: parentId })).toBe(false);
+    expect(matchesFilters(subtask, { includeSubtasks: false })).toBe(false);
+    expect(matchesFilters(subtask, { inbox: true })).toBe(true);
   });
 });

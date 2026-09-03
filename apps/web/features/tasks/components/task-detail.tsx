@@ -16,6 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   useAddToDay,
+  useClearTaskParent,
   useCompleteTask,
   useDeleteTask,
   useMoveTaskToProject,
@@ -25,8 +26,10 @@ import {
   useTask,
   useUpdateTask,
 } from "../hooks/use-tasks";
+import { allSubtasksDone, hasOpenSubtasks } from "../lib/task-projections";
 
 import { Markdown } from "./markdown";
+import { SubtaskList } from "./subtask-list";
 import { DueDateInput, DueTimeInput, PrioritySelect } from "./task-fields";
 
 import { ActivityList } from "@/features/activity/components/activity-list";
@@ -123,6 +126,9 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
   const removeFromDay = useRemoveFromDay();
   const projects = useProjects();
   const inMyDay = task.dayPlans.length > 0;
+  const detach = useClearTaskParent();
+  const projects = useProjects();
+  const parent = useTask(task.parentTaskId);
 
   const [draft, setDraft] = useState(() => toDraft(task));
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -131,6 +137,7 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
   // History is fetched only once its disclosure is open: on the task's own page that is
   // immediately, in the side panel on demand.
   const [showActivity, setShowActivity] = useState(variant === "page");
+  const [confirmingComplete, setConfirmingComplete] = useState(false);
 
   // Refs, not state: the debounce callback must read the newest values without being
   // rescheduled every keystroke.
@@ -326,9 +333,12 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
           variant={task.isCompleted ? "secondary" : "primary"}
           disabled={!editable}
           loading={complete.isPending || reopen.isPending}
-          onClick={() =>
-            task.isCompleted ? reopen.mutate(task) : complete.mutate(task)
-          }
+          onClick={() => {
+            if (task.isCompleted) return reopen.mutate(task);
+            // Completing a parent with open children needs confirmation (spec 8.3).
+            if (hasOpenSubtasks(task)) return setConfirmingComplete(true);
+            complete.mutate(task);
+          }}
         >
           {task.isCompleted ? "Reopen task" : "Mark complete"}
         </Button>
@@ -346,6 +356,65 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
           </span>
         ) : null}
       </div>
+
+      {confirmingComplete && !task.isCompleted ? (
+        <Alert tone="info" title="Some subtasks are still open">
+          <p>
+            {(task.subtaskProgress?.total ?? 0) -
+              (task.subtaskProgress?.completed ?? 0)}{" "}
+            of {task.subtaskProgress?.total ?? 0} subtasks are not done. Completing this
+            task leaves them as they are.
+          </p>
+          <div className="button-row">
+            <Button
+              variant="primary"
+              onClick={() => {
+                setConfirmingComplete(false);
+                complete.mutate(task);
+              }}
+            >
+              Complete anyway
+            </Button>
+            <Button onClick={() => setConfirmingComplete(false)}>Keep it open</Button>
+          </div>
+        </Alert>
+      ) : null}
+
+      {!task.isCompleted && editable && allSubtasksDone(task) ? (
+        <Alert tone="success" title="All subtasks are done">
+          <p>Nothing here completes on its own; this task is still open.</p>
+          <Button
+            variant="primary"
+            loading={complete.isPending}
+            onClick={() => complete.mutate(task)}
+          >
+            Complete parent
+          </Button>
+        </Alert>
+      ) : null}
+
+      {task.parentTaskId ? (
+        <p className="task-detail__hint task-detail__parent">
+          Subtask of{" "}
+          <Link
+            href={`/tasks/${encodeURIComponent(parent.data?.key ?? task.parentTaskId)}`}
+          >
+            {parent.data
+              ? `${parent.data.key} ${parent.data.title}`
+              : "its parent task"}
+          </Link>
+          {editable ? (
+            <Button
+              variant="ghost"
+              loading={detach.isPending}
+              aria-label={`Detach ${task.title} from its parent`}
+              onClick={() => detach.mutate(task)}
+            >
+              Detach
+            </Button>
+          ) : null}
+        </p>
+      ) : null}
 
       {move.isError ? (
         <Alert tone="error" title="This task could not be moved">
@@ -494,6 +563,8 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
           ) : null}
         </div>
       </details>
+
+      {editable ? <SubtaskList parent={task} /> : null}
 
       <details
         className="task-detail__disclosure"

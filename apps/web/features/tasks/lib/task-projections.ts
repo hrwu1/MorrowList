@@ -1,5 +1,6 @@
 import type {
   ProjectBoardResponse,
+  SubtaskProgress,
   TaskDto,
   WorkflowStatusDto,
 } from "@morrowlist/contracts";
@@ -20,6 +21,7 @@ export function selectInboxDestination(
 export function patchTaskInBoard(
   response: ProjectBoardResponse,
   task: TaskDto,
+  includeSubtasks = false,
 ): ProjectBoardResponse {
   const currentIndex = response.data.tasks.findIndex(
     (candidate) => candidate.id === task.id,
@@ -28,6 +30,7 @@ export function patchTaskInBoard(
     task.deletedAt === null &&
     task.projectId === response.data.project.id &&
     task.statusId !== null &&
+    (includeSubtasks || task.parentTaskId === null) &&
     response.data.statuses.some(
       (status) => status.id === task.statusId && status.archivedAt === null,
     );
@@ -60,4 +63,59 @@ export function patchTaskInBoard(
       ),
     },
   };
+}
+
+/** Completing a parent with open children needs confirmation (spec 8.3). */
+export function hasOpenSubtasks(task: TaskDto): boolean {
+  return (
+    task.subtaskProgress !== null &&
+    task.subtaskProgress.completed < task.subtaskProgress.total
+  );
+}
+
+/** Every child is done, so the UI may suggest completing the parent (spec 8.3). */
+export function allSubtasksDone(task: TaskDto): boolean {
+  return (
+    task.subtaskProgress !== null &&
+    task.subtaskProgress.completed === task.subtaskProgress.total
+  );
+}
+
+/**
+ * How a change to one task moves its parents' progress: completing or reopening a child
+ * shifts `completed`; attaching, detaching, deleting, or restoring one shifts `total`.
+ * Keyed by parent id, so one patch can update the old and the new parent of a move.
+ */
+export function parentProgressDeltas(
+  previous: TaskDto | undefined,
+  next: TaskDto,
+): Map<string, SubtaskProgress> {
+  const deltas = new Map<string, SubtaskProgress>();
+  const previousParent =
+    previous && previous.deletedAt === null ? previous.parentTaskId : null;
+  const nextParent = next.deletedAt === null ? next.parentTaskId : null;
+
+  if (previousParent === nextParent) {
+    if (previousParent && previous && previous.isCompleted !== next.isCompleted) {
+      deltas.set(previousParent, { completed: next.isCompleted ? 1 : -1, total: 0 });
+    }
+    return deltas;
+  }
+  if (previousParent) {
+    deltas.set(previousParent, {
+      completed: previous?.isCompleted ? -1 : 0,
+      total: -1,
+    });
+  }
+  if (nextParent) {
+    deltas.set(nextParent, { completed: next.isCompleted ? 1 : 0, total: 1 });
+  }
+  return deltas;
+}
+
+export function applyProgressDelta(task: TaskDto, delta: SubtaskProgress): TaskDto {
+  const current = task.subtaskProgress ?? { completed: 0, total: 0 };
+  const total = Math.max(0, current.total + delta.total);
+  const completed = Math.min(total, Math.max(0, current.completed + delta.completed));
+  return { ...task, subtaskProgress: total === 0 ? null : { completed, total } };
 }

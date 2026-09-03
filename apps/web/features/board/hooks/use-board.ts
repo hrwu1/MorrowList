@@ -15,10 +15,11 @@ import { activityKeys } from "@/features/activity/hooks/use-activity";
 import { taskKeys } from "@/features/tasks/hooks/use-tasks";
 import { apiClient } from "@/lib/api-client";
 
-export function useProjectBoard(projectId: string) {
+export function useProjectBoard(projectId: string, includeSubtasks = false) {
   return useQuery({
-    queryKey: projectKeys.board(projectId),
-    queryFn: () => apiClient.getProjectBoard(projectId, { limit: 500 }),
+    queryKey: projectKeys.board(projectId, includeSubtasks),
+    queryFn: () =>
+      apiClient.getProjectBoard(projectId, { limit: 500, includeSubtasks }),
   });
 }
 
@@ -35,7 +36,8 @@ export interface MoveBoardTaskInput {
  */
 export function useMoveBoardTask(projectId: string) {
   const queryClient = useQueryClient();
-  const boardKey = projectKeys.board(projectId);
+  // Every cached variant of this board (subtasks hidden or shown) moves together.
+  const boardKey = projectKeys.projectBoards(projectId);
 
   return useMutation({
     mutationFn: async (input: MoveBoardTaskInput) => {
@@ -57,32 +59,39 @@ export function useMoveBoardTask(projectId: string) {
         queryClient.cancelQueries({ queryKey: boardKey }),
         queryClient.cancelQueries({ queryKey: taskKeys.all }),
       ]);
-      const previous = queryClient.getQueryData<ProjectBoardResponse>(boardKey);
-      if (previous) {
-        queryClient.setQueryData<ProjectBoardResponse>(
-          boardKey,
-          moveTaskInBoard(previous, {
-            taskId: input.task.id,
-            placement: input.placement,
-            destination: input.destination,
-          }),
-        );
-      }
+      const previous = queryClient.getQueriesData<ProjectBoardResponse>({
+        queryKey: boardKey,
+      });
+      queryClient.setQueriesData<ProjectBoardResponse>(
+        { queryKey: boardKey },
+        (current) =>
+          current
+            ? moveTaskInBoard(current, {
+                taskId: input.task.id,
+                placement: input.placement,
+                destination: input.destination,
+              })
+            : current,
+      );
       return { previous };
     },
     onError: (_error, _input, context) => {
-      if (context?.previous) queryClient.setQueryData(boardKey, context.previous);
+      for (const [key, value] of context?.previous ?? []) {
+        queryClient.setQueryData(key, value);
+      }
     },
     onSuccess: (task, input) => {
-      queryClient.setQueryData<ProjectBoardResponse>(boardKey, (current) =>
-        current
-          ? moveTaskInBoard(current, {
-              taskId: input.task.id,
-              placement: input.placement,
-              destination: input.destination,
-              authoritativeTask: task,
-            })
-          : current,
+      queryClient.setQueriesData<ProjectBoardResponse>(
+        { queryKey: boardKey },
+        (current) =>
+          current
+            ? moveTaskInBoard(current, {
+                taskId: input.task.id,
+                placement: input.placement,
+                destination: input.destination,
+                authoritativeTask: task,
+              })
+            : current,
       );
     },
     onSettled: () => {

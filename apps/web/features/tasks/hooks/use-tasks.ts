@@ -4,6 +4,7 @@ import type {
   CreateTaskRequest,
   ListTasksQuery,
   ProjectBoardResponse,
+  ReorderTaskRequest,
   TaskDto,
   TaskListResponse,
   TodayViewResponse,
@@ -22,7 +23,12 @@ import { activityKeys } from "../../activity/hooks/use-activity";
 import { projectKeys } from "../../projects/hooks/use-projects";
 import { localToday, patchTaskInToday } from "../../today/lib/today-view";
 import { patchTaskInUpcoming } from "../../upcoming/lib/upcoming-view";
-import { patchTaskInBoard, selectInboxDestination } from "../lib/task-projections";
+import {
+  applyProgressDelta,
+  parentProgressDeltas,
+  patchTaskInBoard,
+  selectInboxDestination,
+} from "../lib/task-projections";
 import { matchesFilters } from "../lib/task-view";
 
 import { todayKeys } from "@/features/today/hooks/use-today";
@@ -43,7 +49,8 @@ export const taskKeys = {
   lists: () => [...taskKeys.all, "list"] as const,
   list: (filters: Partial<ListTasksQuery>) =>
     [...taskKeys.lists(), filters] as const satisfies QueryKey,
-  detail: (idOrKey: string) => [...taskKeys.all, "detail", idOrKey] as const,
+  details: () => [...taskKeys.all, "detail"] as const,
+  detail: (idOrKey: string) => [...taskKeys.details(), idOrKey] as const,
 };
 
 type ListSnapshot = readonly [QueryKey, TaskListResponse | undefined][];
@@ -54,20 +61,51 @@ interface TaskProjectionSnapshot {
   readonly boards: Snapshot<ProjectBoardResponse>;
   readonly today: Snapshot<TodayViewResponse>;
   readonly upcoming: Snapshot<UpcomingViewResponse>;
-  readonly byId: TaskDto | undefined;
-  readonly byKey: TaskDto | undefined;
+  readonly details: Snapshot<TaskDto>;
 }
 
 function filtersOf(key: QueryKey): Partial<ListTasksQuery> {
   return (key[2] ?? {}) as Partial<ListTasksQuery>;
 }
 
+function boardIncludesSubtasks(key: QueryKey): boolean {
+  return (
+    (key[3] as { includeSubtasks?: boolean } | undefined)?.includeSubtasks ?? false
+  );
+}
+
 /**
  * The one canonical optimistic patch (spec 23.3, "do not duplicate patch logic per
  * view"). A task is replaced wherever it is cached, and drops out of the lists whose
- * filters it no longer satisfies.
+ * filters it no longer satisfies. Its parents' progress lines follow the change, so a
+ * card reads "1/2" the moment a subtask is ticked rather than after the refetch.
  */
 function patchTaskEverywhere(queryClient: QueryClient, task: TaskDto): void {
+  const previous = findCachedTask(queryClient, task.id);
+  replaceTaskInCaches(queryClient, task);
+
+  for (const [parentId, delta] of parentProgressDeltas(previous, task)) {
+    const parent = findCachedTask(queryClient, parentId);
+    if (parent) replaceTaskInCaches(queryClient, applyProgressDelta(parent, delta));
+  }
+}
+
+function findCachedTask(queryClient: QueryClient, taskId: string): TaskDto | undefined {
+  for (const [, current] of snapshotDetails(queryClient)) {
+    if (current?.id === taskId) return current;
+  }
+  for (const [, current] of snapshotLists(queryClient)) {
+    const hit = current?.data.find((candidate) => candidate.id === taskId);
+    if (hit) return hit;
+  }
+  for (const [, current] of snapshotBoards(queryClient)) {
+    const hit = current?.data.tasks.find((candidate) => candidate.id === taskId);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+function replaceTaskInCaches(queryClient: QueryClient, task: TaskDto): void {
   for (const [key, current] of snapshotLists(queryClient)) {
     if (!current?.data.some((candidate) => candidate.id === task.id)) continue;
     const filters = filtersOf(key);
@@ -87,7 +125,7 @@ function patchTaskEverywhere(queryClient: QueryClient, task: TaskDto): void {
     if (current) {
       queryClient.setQueryData<ProjectBoardResponse>(
         key,
-        patchTaskInBoard(current, task),
+        patchTaskInBoard(current, task, boardIncludesSubtasks(key)),
       );
     }
   }
@@ -105,22 +143,18 @@ function patchTaskEverywhere(queryClient: QueryClient, task: TaskDto): void {
     if (current) queryClient.setQueryData(key, patchTaskInUpcoming(current, task));
   }
 
-  patchDetail(queryClient, task.id, task);
-  patchDetail(queryClient, task.key, task);
-}
-
-/** Only refresh a detail entry that is actually cached; never conjure one. */
-function patchDetail(
-  queryClient: QueryClient,
-  idOrKey: string,
-  task: TaskDto | undefined,
-): void {
-  const key = taskKeys.detail(idOrKey);
-  if (queryClient.getQueryState(key)) queryClient.setQueryData(key, task);
+  // Only refresh detail entries that are actually cached; never conjure one.
+  for (const [key, current] of snapshotDetails(queryClient)) {
+    if (current?.id === task.id) queryClient.setQueryData(key, task);
+  }
 }
 
 function snapshotLists(queryClient: QueryClient): ListSnapshot {
   return queryClient.getQueriesData<TaskListResponse>({ queryKey: taskKeys.lists() });
+}
+
+function snapshotDetails(queryClient: QueryClient): Snapshot<TaskDto> {
+  return queryClient.getQueriesData<TaskDto>({ queryKey: taskKeys.details() });
 }
 
 function snapshotBoards(queryClient: QueryClient): Snapshot<ProjectBoardResponse> {
@@ -133,17 +167,13 @@ function snapshotViews<T>(queryClient: QueryClient, queryKey: QueryKey): Snapsho
   return queryClient.getQueriesData<T>({ queryKey });
 }
 
-function snapshotTaskProjections(
-  queryClient: QueryClient,
-  task: TaskDto,
-): TaskProjectionSnapshot {
+function snapshotTaskProjections(queryClient: QueryClient): TaskProjectionSnapshot {
   return {
     lists: snapshotLists(queryClient),
     boards: snapshotBoards(queryClient),
     today: snapshotViews(queryClient, todayKeys.all),
     upcoming: snapshotViews(queryClient, upcomingKeys.all),
-    byId: queryClient.getQueryData<TaskDto>(taskKeys.detail(task.id)),
-    byKey: queryClient.getQueryData<TaskDto>(taskKeys.detail(task.key)),
+    details: snapshotDetails(queryClient),
   };
 }
 
@@ -153,15 +183,13 @@ function restoreSnapshot<T>(queryClient: QueryClient, snapshot: Snapshot<T>): vo
 
 function restoreTaskProjections(
   queryClient: QueryClient,
-  task: TaskDto,
   snapshot: TaskProjectionSnapshot,
 ): void {
   restoreSnapshot(queryClient, snapshot.lists);
   restoreSnapshot(queryClient, snapshot.boards);
   restoreSnapshot(queryClient, snapshot.today);
   restoreSnapshot(queryClient, snapshot.upcoming);
-  patchDetail(queryClient, task.id, snapshot.byId);
-  patchDetail(queryClient, task.key, snapshot.byKey);
+  restoreSnapshot(queryClient, snapshot.details);
 }
 
 function invalidateLists(queryClient: QueryClient): void {
@@ -283,13 +311,12 @@ export function useUpdateTask() {
       apiClient.updateTask(task.id, { expectedVersion: task.version, ...patch }),
     onMutate: async ({ task, patch }) => {
       await cancelTaskProjections(queryClient);
-      const previous = snapshotTaskProjections(queryClient, task);
+      const previous = snapshotTaskProjections(queryClient);
       patchTaskEverywhere(queryClient, { ...task, ...stripControlFields(patch) });
-      return { previous, task };
+      return { previous };
     },
     onError: (_error, _variables, context) => {
-      if (!context) return;
-      restoreTaskProjections(queryClient, context.task, context.previous);
+      if (context) restoreTaskProjections(queryClient, context.previous);
     },
     onSuccess: (updated) => patchTaskEverywhere(queryClient, updated),
     onSettled: () => invalidateTaskProjections(queryClient),
@@ -368,6 +395,50 @@ export function useRemoveFromDay() {
   );
 }
 
+export interface SetTaskParentInput {
+  readonly task: TaskDto;
+  readonly parentTaskId: string;
+}
+
+/** Make a task a subtask of another (spec 8.3). The server enforces depth and cycles. */
+export function useSetTaskParent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ task, parentTaskId }: SetTaskParentInput) =>
+      apiClient.setTaskParent(task.id, { parentTaskId, expectedVersion: task.version }),
+    onSuccess: (updated) => patchTaskEverywhere(queryClient, updated),
+    onSettled: () => invalidateTaskProjections(queryClient),
+  });
+}
+
+export function useClearTaskParent() {
+  return useTaskAction(
+    (task) => apiClient.clearTaskParent(task.id, task.version),
+    (task) => ({ ...task, parentTaskId: null }),
+  );
+}
+
+export interface ReorderTaskInput {
+  readonly task: TaskDto;
+  readonly beforeTaskId: string | null;
+  readonly afterTaskId: string | null;
+}
+
+/** Rank-only move between two neighbours in the task's own status (spec 24.2). */
+export function useReorderTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ task, beforeTaskId, afterTaskId }: ReorderTaskInput) =>
+      apiClient.reorderTask(task.id, {
+        beforeTaskId,
+        afterTaskId,
+        expectedVersion: task.version,
+      } satisfies ReorderTaskRequest),
+    onSuccess: (updated) => patchTaskEverywhere(queryClient, updated),
+    onSettled: () => invalidateTaskProjections(queryClient),
+  });
+}
+
 /**
  * Complete, reopen, delete, and restore differ only in the request they send and the
  * shape of their optimistic guess; everything about snapshotting, patching, rollback, and
@@ -382,14 +453,12 @@ function useTaskAction(
     mutationFn: send,
     onMutate: async (task: TaskDto) => {
       await cancelTaskProjections(queryClient);
-      const previous = snapshotTaskProjections(queryClient, task);
+      const previous = snapshotTaskProjections(queryClient);
       patchTaskEverywhere(queryClient, guess(task, workspaceToday(queryClient)));
-      return { previous, task };
+      return { previous };
     },
     onError: (_error, _task, context) => {
-      if (context) {
-        restoreTaskProjections(queryClient, context.task, context.previous);
-      }
+      if (context) restoreTaskProjections(queryClient, context.previous);
     },
     onSuccess: (task) => patchTaskEverywhere(queryClient, task),
     onSettled: () => invalidateTaskProjections(queryClient),
