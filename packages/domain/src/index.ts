@@ -98,3 +98,16 @@ export {
   type PlainTime,
   type Priority,
 } from "./task/values.js";
+
+export {
+  DEFAULT_TAG_COLOR,
+  MAX_TAGS_PER_TASK,
+  TAG_COLOR_TOKENS,
+  TAG_NAME_MAX_LENGTH,
+  isTagColorToken,
+  normalizeTagName,
+  tagLookupKey,
+  toTagColorToken,
+  type Tag,
+  type TagColorToken,
+} from "./tag/tag.js";
