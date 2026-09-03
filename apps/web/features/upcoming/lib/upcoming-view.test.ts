@@ -28,6 +28,7 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     updatedAt: "2026-09-03T09:00:00.000Z",
     deletedAt: null,
     dayPlans: [],
+    subtaskProgress: null,
     ...overrides,
   };
 }

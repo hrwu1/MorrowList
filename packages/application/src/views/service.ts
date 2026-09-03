@@ -73,11 +73,12 @@ export class ViewService {
           ? await tx.dayPlans.listUnfinished(workspace.id, addDays(date, -1))
           : [];
 
-      const candidates = [...page.items, ...unfinished];
-      const plans = await tx.dayPlans.listForTasks(
-        candidates.map((task) => task.id),
-        date < today ? date : today,
-      );
+      const candidateIds = [...page.items, ...unfinished].map((task) => task.id);
+      // My Day dates and subtask progress each come from one query for the whole view.
+      const [plans, progress] = await Promise.all([
+        tx.dayPlans.listForTasks(candidateIds, date < today ? date : today),
+        tx.tasks.childSummary(workspace.id, candidateIds),
+      ]);
       const plannedFor = (task: Task, day: PlainDate) =>
         plans.get(task.id)?.includes(day) ?? false;
       const dto = (task: Task) =>
@@ -85,6 +86,7 @@ export class ViewService {
           task,
           workspace.taskKeyPrefix,
           (plans.get(task.id) ?? []).filter((planDate) => planDate >= today),
+          progress.get(task.id) ?? null,
         );
 
       const planned = new Set(
@@ -132,10 +134,11 @@ export class ViewService {
         to,
         limit: UPCOMING_LIMIT,
       });
-      const plans = await tx.dayPlans.listForTasks(
-        page.items.map((task) => task.id),
-        today,
-      );
+      const taskIds = page.items.map((task) => task.id);
+      const [plans, progress] = await Promise.all([
+        tx.dayPlans.listForTasks(taskIds, today),
+        tx.tasks.childSummary(workspace.id, taskIds),
+      ]);
 
       return {
         data: {
@@ -144,7 +147,12 @@ export class ViewService {
           groups: upcomingGroups(page.items, from, horizonDays).map((group) => ({
             date: group.date,
             tasks: group.tasks.map((task) =>
-              toTaskDto(task, workspace.taskKeyPrefix, plans.get(task.id) ?? []),
+              toTaskDto(
+                task,
+                workspace.taskKeyPrefix,
+                plans.get(task.id) ?? [],
+                progress.get(task.id) ?? null,
+              ),
             ),
           })),
           truncated: page.truncated,

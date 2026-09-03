@@ -69,6 +69,10 @@ async function taskWithFullHistory(): Promise<TaskDto> {
     date: "2026-08-29",
   });
   task = await tasks.removeFromDay(seeded.context, workspaceId, task.id, "2026-08-29");
+  task = await tasks.setParent(seeded.context, workspaceId, task.id, {
+    parentTaskId: sibling.id,
+  });
+  task = await tasks.clearParent(seeded.context, workspaceId, task.id);
   task = await tasks.delete(seeded.context, workspaceId, task.id);
   return tasks.restore(seeded.context, workspaceId, task.id);
 }
@@ -87,6 +91,8 @@ describe("ActivityService.listForTask", () => {
     expect(data.map((entry) => entry.eventType)).toEqual([
       TASK_EVENTS.restored,
       TASK_EVENTS.deleted,
+      TASK_EVENTS.parentChanged,
+      TASK_EVENTS.parentChanged,
       TASK_EVENTS.dayRemoved,
       TASK_EVENTS.dayAdded,
       TASK_EVENTS.reopened,
@@ -99,6 +105,12 @@ describe("ActivityService.listForTask", () => {
     expect(new Set(data.map((entry) => entry.eventType))).toEqual(
       new Set(Object.values(TASK_EVENTS)),
     );
+    // Attaching and detaching share one event type, so the summary tells them apart.
+    expect(
+      data
+        .filter((entry) => entry.eventType === TASK_EVENTS.parentChanged)
+        .map((entry) => entry.summary),
+    ).toEqual(["Detached task from its parent", "Made task a subtask"]);
     for (const entry of data) {
       expect(entry.summary.length).toBeGreaterThan(0);
       expect(entry.actorDisplayName).toBe("Test User");
@@ -153,8 +165,8 @@ describe("ActivityService.listForTask", () => {
       seen.push(...next.data);
       cursor = next.page.nextCursor;
     }
-    expect(seen).toHaveLength(10);
-    expect(new Set(seen.map((entry) => entry.id)).size).toBe(10);
+    expect(seen).toHaveLength(12);
+    expect(new Set(seen.map((entry) => entry.id)).size).toBe(12);
 
     const [body] = (first.page.nextCursor as string).split(".");
     await expect(

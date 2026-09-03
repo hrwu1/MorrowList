@@ -12,6 +12,7 @@ exports[`describeEntry > renders a readable line for every event type in the cat
   "task.day_removed": "Removed task from My Day for 2026-08-29",
   "task.deleted": "Moved task to Trash",
   "task.moved": "Moved task to another status",
+  "task.parent_changed": "Made task a subtask",
   "task.reopened": "Reopened task",
   "task.reordered": "Reordered task",
   "task.restored": "Restored task from Trash",

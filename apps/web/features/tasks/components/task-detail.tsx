@@ -127,7 +127,6 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
   const projects = useProjects();
   const inMyDay = task.dayPlans.length > 0;
   const detach = useClearTaskParent();
-  const projects = useProjects();
   const parent = useTask(task.parentTaskId);
 
   const [draft, setDraft] = useState(() => toDraft(task));

@@ -136,6 +136,22 @@ describe("ViewService.today", () => {
     expect(data.review).toBeNull();
   });
 
+  it("carries each task's subtask progress like the list does", async () => {
+    const parent = await create("Parent", { dueDate: "2026-09-03" });
+    const child = await create("Child", { parentTaskId: parent.id });
+    await create("Other child", { parentTaskId: parent.id });
+    await tasks.complete(seeded.context, seeded.workspace.id, child.id);
+
+    const { data } = await views.today(seeded.context, {
+      workspaceId: seeded.workspace.id,
+    });
+
+    expect(data.sections[1]?.tasks[0]?.task.subtaskProgress).toEqual({
+      completed: 1,
+      total: 2,
+    });
+  });
+
   it("refuses another workspace", async () => {
     const other = seedWorkspace(unitOfWork.data);
 
@@ -190,6 +206,22 @@ describe("ViewService.upcoming", () => {
       "2026-09-10",
       "2026-09-17",
       "2026-10-05",
+    ]);
+  });
+
+  it("carries each task's subtask progress like the list does", async () => {
+    const parent = await create("Parent", { dueDate: "2026-09-05" });
+    const child = await create("Child", { parentTaskId: parent.id });
+    await tasks.complete(seeded.context, seeded.workspace.id, child.id);
+
+    const { data } = await views.upcoming(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      horizon: "14",
+    });
+
+    const group = data.groups.find((candidate) => candidate.date === "2026-09-05");
+    expect(group?.tasks.map((task) => task.subtaskProgress)).toEqual([
+      { completed: 1, total: 1 },
     ]);
   });
 
