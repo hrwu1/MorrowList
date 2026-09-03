@@ -104,7 +104,9 @@ async function cancelStatusQueries(
 }
 
 function invalidateStatuses(queryClient: QueryClient, projectId: string): void {
-  void queryClient.invalidateQueries({ queryKey: projectKeys.projectBoards(projectId) });
+  void queryClient.invalidateQueries({
+    queryKey: projectKeys.projectBoards(projectId),
+  });
   void queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) });
 }
 

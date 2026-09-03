@@ -69,11 +69,11 @@ beforeEach(async () => {
   });
 });
 
-describe("migration 0003_status_policy", () => {
+describe("migration 0004_status_policy", () => {
   it("is recorded and adds a nullable policy_md column", async () => {
     const applied = await handle.pool.query(
       "select name from __morrowlist_migrations where name = $1",
-      ["0003_status_policy.sql"],
+      ["0004_status_policy.sql"],
     );
     expect(applied.rowCount).toBe(1);
 
