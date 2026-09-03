@@ -53,6 +53,7 @@ export async function bootstrapUser(
       slug: await uniqueSlug(tx, slugify(name)),
       taskKeyPrefix: input.taskKeyPrefix ?? defaultPrefix(name),
       timezone: input.timezone,
+      inProgressLimit: null,
       createdByUserId: input.userId,
       version: 1,
       createdAt: now,

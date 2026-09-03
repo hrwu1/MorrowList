@@ -251,9 +251,37 @@ export const listTasksQuerySchema = paginationQuerySchema.extend({
 });
 
 export const taskResponseSchema = z.object({ data: taskSchema });
+
+/**
+ * The workspace's cross-project "in progress" limit was exceeded by this command
+ * (GAP-20). A warning, never an error: the command succeeded, and the tasks listed are
+ * everything currently started so the user can decide what to put back.
+ */
+export const wipWarningSchema = z.object({
+  code: z.literal("IN_PROGRESS_LIMIT_EXCEEDED"),
+  limit: z.number().int().positive(),
+  count: z.number().int().nonnegative(),
+  message: z.string(),
+  tasks: z.array(
+    z.object({
+      id: uuidSchema,
+      key: z.string(),
+      title: z.string(),
+      projectId: uuidSchema.nullable(),
+    }),
+  ),
+});
+
+/** Commands that can start work answer with the task and any limit warnings. */
+export const taskCommandResponseSchema = z.object({
+  data: taskSchema,
+  warnings: z.array(wipWarningSchema),
+});
 export const taskListResponseSchema = paginated(taskSchema);
 
 export type TaskDto = z.infer<typeof taskSchema>;
+export type WipWarningDto = z.infer<typeof wipWarningSchema>;
+export type TaskCommandResponse = z.infer<typeof taskCommandResponseSchema>;
 export type SubtaskProgress = z.infer<typeof subtaskProgressSchema>;
 export type RelationType = z.infer<typeof relationTypeSchema>;
 export type RelatedTaskDto = z.infer<typeof relatedTaskSchema>;

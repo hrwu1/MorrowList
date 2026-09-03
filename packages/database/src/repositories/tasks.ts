@@ -315,6 +315,24 @@ export function createTaskRepository(db: Database): TaskRepository {
       return rows.map(toTask);
     },
 
+    async listInProgress(workspaceId) {
+      const rows = await db
+        .select({ task: tasks })
+        .from(tasks)
+        .innerJoin(workflowStatuses, eq(workflowStatuses.id, tasks.statusId))
+        .where(
+          and(
+            eq(tasks.workspaceId, workspaceId),
+            isNull(tasks.deletedAt),
+            isNull(tasks.completedAt),
+            eq(workflowStatuses.category, "in_progress"),
+            isNull(workflowStatuses.archivedAt),
+          ),
+        )
+        .orderBy(asc(tasks.projectId), asc(tasks.rank), asc(tasks.id));
+      return rows.map((row) => toTask(row.task));
+    },
+
     async insert(task) {
       await db.insert(tasks).values(toTaskRow(task));
     },

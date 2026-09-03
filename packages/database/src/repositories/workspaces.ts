@@ -42,6 +42,7 @@ export function createWorkspaceRepository(db: Database): WorkspaceRepository {
         slug: workspace.slug,
         taskKeyPrefix: workspace.taskKeyPrefix,
         timezone: workspace.timezone,
+        inProgressLimit: workspace.inProgressLimit,
         createdByUserId: workspace.createdByUserId,
         version: workspace.version,
         createdAt: workspace.createdAt,
@@ -57,6 +58,7 @@ export function createWorkspaceRepository(db: Database): WorkspaceRepository {
           slug: workspace.slug,
           taskKeyPrefix: workspace.taskKeyPrefix,
           timezone: workspace.timezone,
+          inProgressLimit: workspace.inProgressLimit,
           version: workspace.version,
           updatedAt: workspace.updatedAt,
         })

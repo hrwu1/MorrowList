@@ -4,6 +4,8 @@ export interface Workspace {
   readonly slug: string;
   readonly taskKeyPrefix: string;
   readonly timezone: string;
+  /** Workspace-wide "in progress" limit across projects; null means none (GAP-20). */
+  readonly inProgressLimit: number | null;
   readonly createdByUserId: string;
   readonly version: number;
   readonly createdAt: Date;

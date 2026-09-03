@@ -6,3 +6,9 @@ export {
   type BootstrapUserInput,
   type BootstrapUserResult,
 } from "./bootstrap.js";
+export {
+  WorkspaceService,
+  toWorkspaceDto,
+  type WorkspaceServiceOptions,
+  type WorkspaceSummaryDto,
+} from "./service.js";

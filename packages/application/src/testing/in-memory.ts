@@ -1,6 +1,7 @@
 import {
   childProgress,
   isBlocked,
+  inProgressTasks,
   type DayPlan,
   type PlainDate,
   type Tag,
@@ -278,6 +279,17 @@ function taskRepository(data: InMemoryData): TaskRepository {
         .sort((a, b) =>
           a.rank === b.rank ? (a.id < b.id ? -1 : 1) : a.rank < b.rank ? -1 : 1,
         );
+    },
+    async listInProgress(workspaceId) {
+      return inProgressTasks(
+        [...data.tasks.values()].filter((task) => task.workspaceId === workspaceId),
+        [...data.statuses.values()],
+      ).sort((a, b) => {
+        if (a.projectId !== b.projectId) {
+          return (a.projectId ?? "") < (b.projectId ?? "") ? -1 : 1;
+        }
+        return a.rank === b.rank ? (a.id < b.id ? -1 : 1) : a.rank < b.rank ? -1 : 1;
+      });
     },
     async insert(task) {
       data.tasks.set(task.id, task);

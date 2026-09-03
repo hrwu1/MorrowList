@@ -58,4 +58,5 @@ export const SCOPES = {
   activityRead: "activity:read",
   tagsRead: "tags:read",
   tagsWrite: "tags:write",
+  workspaceWrite: "workspace:write",
 } as const;

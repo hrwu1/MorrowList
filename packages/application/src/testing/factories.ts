@@ -24,6 +24,7 @@ export function buildWorkspace(overrides: Partial<Workspace> = {}): Workspace {
     slug: overrides.slug ?? "test-workspace",
     taskKeyPrefix: overrides.taskKeyPrefix ?? "ML",
     timezone: overrides.timezone ?? TEST_TIMEZONE,
+    inProgressLimit: overrides.inProgressLimit ?? null,
     createdByUserId: overrides.createdByUserId ?? uuidv7(),
     version: overrides.version ?? 1,
     createdAt: now,

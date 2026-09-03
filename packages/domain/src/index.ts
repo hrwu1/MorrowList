@@ -97,6 +97,15 @@ export {
   type TaskRelation,
 } from "./task/relation.js";
 export {
+  entersInProgress,
+  inProgressCount,
+  inProgressTasks,
+  isInProgress,
+  normalizeInProgressLimit,
+  wipWarning,
+  type WipWarning,
+} from "./task/wip.js";
+export {
   DAY_PLAN_SOURCES,
   TODAY_REASONS,
   todayReasons,

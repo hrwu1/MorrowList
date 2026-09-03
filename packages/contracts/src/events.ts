@@ -75,6 +75,8 @@ export const TAG_EVENTS = {
 
 export const WORKSPACE_EVENTS = {
   created: "workspace.created",
+  /** Payload: `{ workspaceId, changes }` with the field-level diff (GAP-20). */
+  updated: "workspace.updated",
 } as const;
 
 export const PROJECT_EVENTS = {

@@ -22,6 +22,8 @@ export const workspaces = pgTable(
     slug: varchar("slug", { length: 80 }).notNull(),
     taskKeyPrefix: varchar("task_key_prefix", { length: 10 }).notNull(),
     timezone: varchar("timezone", { length: 100 }).notNull(),
+    // Cross-project WIP limit (GAP-20); added by migration 0005. Null means no limit.
+    inProgressLimit: integer("in_progress_limit"),
     createdByUserId: uuid("created_by_user_id").notNull(),
     version: integer("version").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),

@@ -75,7 +75,7 @@ export async function requireStatus(
 export function assertVersion(
   entity: { readonly id: string; readonly version: number },
   expectedVersion: number | undefined,
-  what: "project" | "status",
+  what: "project" | "status" | "workspace",
 ): void {
   if (expectedVersion === undefined || expectedVersion === entity.version) return;
   throw new DomainError(
@@ -91,7 +91,7 @@ export function assertVersion(
 
 export function versionConflict(
   entity: { readonly id: string; readonly version: number },
-  what: "project" | "status",
+  what: "project" | "status" | "workspace",
 ): DomainError {
   return new DomainError(
     "VERSION_CONFLICT",

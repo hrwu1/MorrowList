@@ -186,6 +186,7 @@ export function toWorkspace(row: WorkspaceRow): Workspace {
     slug: row.slug,
     taskKeyPrefix: row.taskKeyPrefix,
     timezone: row.timezone,
+    inProgressLimit: row.inProgressLimit,
     createdByUserId: row.createdByUserId,
     version: row.version,
     createdAt: row.createdAt,

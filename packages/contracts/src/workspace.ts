@@ -10,6 +10,9 @@ export const workspaceSchema = z.object({
   slug: z.string(),
   taskKeyPrefix: z.string(),
   timezone: timezoneSchema,
+  /** Started tasks allowed across every project; null means no limit (GAP-20). */
+  inProgressLimit: z.number().int().positive().nullable(),
+  version: z.number().int().positive(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
@@ -27,7 +30,13 @@ export const userSchema = z.object({
 export const meResponseSchema = z.object({
   data: z.object({
     user: userSchema,
-    workspaces: z.array(workspaceSchema.extend({ role: workspaceRoleSchema })),
+    workspaces: z.array(
+      workspaceSchema.extend({
+        role: workspaceRoleSchema,
+        /** Open tasks in in-progress columns across the workspace's projects. */
+        inProgressCount: z.number().int().nonnegative(),
+      }),
+    ),
     defaultWorkspaceId: uuidSchema,
     capabilities: z.object({
       actorKind: z.enum(["user", "api_key"]),
@@ -48,12 +57,18 @@ export const updateWorkspaceRequestSchema = z
       )
       .optional(),
     timezone: timezoneSchema.optional(),
+    inProgressLimit: z.number().int().positive().nullable().optional(),
+    expectedVersion: z.number().int().positive().optional(),
   })
-  .refine((body) => Object.keys(body).length > 0, {
+  .refine((body) => Object.keys(body).some((key) => key !== "expectedVersion"), {
     message: "at least one field must be supplied",
   });
+
+export const workspaceResponseSchema = z.object({ data: workspaceSchema });
 
 export type WorkspaceDto = z.infer<typeof workspaceSchema>;
 export type UserDto = z.infer<typeof userSchema>;
 export type MeResponse = z.infer<typeof meResponseSchema>;
 export type WorkspaceRole = z.infer<typeof workspaceRoleSchema>;
+export type UpdateWorkspaceRequest = z.infer<typeof updateWorkspaceRequestSchema>;
+export type WorkspaceResponse = z.infer<typeof workspaceResponseSchema>;

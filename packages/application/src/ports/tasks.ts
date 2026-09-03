@@ -132,6 +132,11 @@ export interface TaskRepository {
    * a column before it is archived (spec 8.6), so nothing may be left behind.
    */
   listInStatus(workspaceId: string, statusId: string): Promise<readonly Task[]>;
+  /**
+   * Every open task in an active in-progress column, across the workspace's projects, in
+   * project then rank order: the work the cross-project limit counts (GAP-20).
+   */
+  listInProgress(workspaceId: string): Promise<readonly Task[]>;
   insert(task: Task): Promise<void>;
   /**
    * Persist a task, guarding on the version the caller loaded. Returns false when the
