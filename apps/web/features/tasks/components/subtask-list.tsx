@@ -147,7 +147,7 @@ export function SubtaskList({ parent }: { readonly parent: TaskDto }) {
 
       <form className="subtask-list__form" aria-label="Add a subtask" onSubmit={add}>
         <label className="ml-visually-hidden" htmlFor={`${id}-title`}>
-          New subtask title
+          Subtask name
         </label>
         <TextInput
           id={`${id}-title`}

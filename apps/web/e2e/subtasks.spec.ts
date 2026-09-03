@@ -48,7 +48,7 @@ test("subtasks are added from the detail, tracked on the card, and hidden on the
   await ready.getByRole("link", { name: "Plan launch" }).click();
   const panel = page.getByRole("complementary", { name: /Task details for/ });
   const subtasks = panel.getByRole("list", { name: "Subtasks" });
-  const newSubtask = panel.getByLabel("New subtask title");
+  const newSubtask = panel.getByLabel("Subtask name");
 
   // The keyboard is enough: type a title, Enter adds it and keeps the field ready.
   await newSubtask.fill("Collect sources");
@@ -130,8 +130,8 @@ test("a subtask can be detached and a fourth nesting level is refused", async ({
   const ready = page.getByRole("region", { name: "Ready" });
   await ready.getByRole("link", { name: "Level one" }).click();
   const panel = page.getByRole("complementary", { name: /Task details for/ });
-  await panel.getByLabel("New subtask title").fill("Level two");
-  await panel.getByLabel("New subtask title").press("Enter");
+  await panel.getByLabel("Subtask name").fill("Level two");
+  await panel.getByLabel("Subtask name").press("Enter");
   await panel
     .getByRole("list", { name: "Subtasks" })
     .getByRole("link", { name: "Level two" })
@@ -141,7 +141,7 @@ test("a subtask can be detached and a fourth nesting level is refused", async ({
   await expect(page).toHaveURL(/\/tasks\/[A-Z]+-2$/);
   const levelTwoUrl = page.url();
   await expect(page.getByText(/Subtask of/)).toBeVisible();
-  const two = page.getByLabel("New subtask title");
+  const two = page.getByLabel("Subtask name");
   await two.fill("Level three");
   await two.press("Enter");
   await page
@@ -149,7 +149,7 @@ test("a subtask can be detached and a fourth nesting level is refused", async ({
     .getByRole("link", { name: "Level three" })
     .click();
   await expect(page).toHaveURL(/\/tasks\/[A-Z]+-3$/);
-  const three = page.getByLabel("New subtask title");
+  const three = page.getByLabel("Subtask name");
   await three.fill("Level four");
   await three.press("Enter");
   await expect(
