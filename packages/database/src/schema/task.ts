@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   bigint,
   check,
+  customType,
   date,
   index,
   integer,
@@ -20,6 +21,13 @@ import { projects, workflowStatuses } from "./project.js";
 import { workspaces } from "./workspace.js";
 
 /** The canonical task table (spec 18.2). Every projection reads from here. */
+
+/** Drizzle has no tsvector column; the generated expression lives in migration 0004. */
+const tsvector = customType<{ data: string }>({
+  dataType() {
+    return "tsvector";
+  },
+});
 
 export const tasks = pgTable(
   "tasks",
@@ -77,9 +85,16 @@ export const tasks = pgTable(
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     deletedByActorKind: actorKindEnum("deleted_by_actor_kind"),
     deletedByActorId: varchar("deleted_by_actor_id", { length: 200 }),
+    // Full-text search over the title (weight A) and description (weight B) in the
+    // 'simple' configuration, so a word matches the same way in every language (spec
+    // 9.8). Stored and generated: it is never written by the application.
+    searchVector: tsvector("search_vector").generatedAlwaysAs(
+      sql`setweight(to_tsvector('simple', "title"), 'A') || setweight(to_tsvector('simple', coalesce("description_md", '')), 'B')`,
+    ),
   },
   (table) => [
     uniqueIndex("tasks_workspace_number_key").on(table.workspaceId, table.taskNumber),
+    index("tasks_search_idx").using("gin", table.searchVector),
     index("tasks_workspace_state_idx").on(
       table.workspaceId,
       table.deletedAt,

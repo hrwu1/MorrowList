@@ -45,6 +45,7 @@ export const aggregateTypeEnum = pgEnum("aggregate_type", [
   "status",
   "tag",
   "workspace",
+  "saved_view",
 ]);
 
 export const relationTypeEnum = pgEnum("task_relation_type", ["blocks", "related_to"]);

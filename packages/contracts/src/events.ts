@@ -21,6 +21,7 @@ export const aggregateTypeSchema = z.enum([
   "status",
   "tag",
   "workspace",
+  "saved_view",
 ]);
 
 export const domainEventSchema = z.object({

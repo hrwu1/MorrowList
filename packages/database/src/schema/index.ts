@@ -5,3 +5,4 @@ export * from "./task.js";
 export * from "./events.js";
 export * from "./tag.js";
 export * from "./flow.js";
+export * from "./saved-view.js";

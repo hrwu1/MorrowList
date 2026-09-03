@@ -3614,7 +3614,8 @@
                     "project",
                     "status",
                     "tag",
-                    "workspace"
+                    "workspace",
+                    "saved_view"
                   ]
                 },
                 "aggregateId": {

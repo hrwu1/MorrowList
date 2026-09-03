@@ -7,7 +7,13 @@ import type { Cursor, Page } from "./tasks.js";
  * the same transaction as the data change they describe; a failure rolls back all three.
  */
 
-export type AggregateType = "task" | "project" | "status" | "tag" | "workspace";
+export type AggregateType =
+  | "task"
+  | "project"
+  | "status"
+  | "tag"
+  | "workspace"
+  | "saved_view";
 
 export interface ActivityEventInput {
   readonly id: string;

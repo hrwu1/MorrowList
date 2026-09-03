@@ -24,6 +24,8 @@ import type {
  */
 
 type TaskRow = typeof tasks.$inferSelect;
+/** The writable columns: `search_vector` is generated and can never be assigned. */
+type TaskInsertRow = typeof tasks.$inferInsert;
 type ProjectRow = typeof projects.$inferSelect;
 type StatusRow = typeof workflowStatuses.$inferSelect;
 type WorkspaceRow = typeof workspaces.$inferSelect;
@@ -70,7 +72,7 @@ export function toTask(row: TaskRow): Task {
   };
 }
 
-export function toTaskRow(task: Task): TaskRow {
+export function toTaskRow(task: Task): TaskInsertRow {
   return {
     id: task.id,
     workspaceId: task.workspaceId,
