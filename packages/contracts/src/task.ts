@@ -50,6 +50,13 @@ export const recurrenceRuleSchema = z.object({
   until: plainDateSchema.nullable().default(null),
   count: z.number().int().min(1).max(1000).nullable().default(null),
 });
+/** Whole minutes before the due time, at most a week (GAP-13). */
+export const MAX_REMINDER_OFFSET_MINUTES = 7 * 24 * 60;
+export const reminderOffsetSchema = z
+  .number()
+  .int()
+  .min(0)
+  .max(MAX_REMINDER_OFFSET_MINUTES);
 
 /** Completed over total direct children (spec 8.3); null when a task has no children. */
 export const subtaskProgressSchema = z.object({
@@ -117,6 +124,8 @@ export const taskSchema = z.object({
    * codes say which pair is out of order so a client can warn (GAP-16).
    */
   dateWarnings: z.array(dateWarningSchema),
+  /** Minutes before the due time a reminder fires; null when there is no reminder. */
+  reminderOffsetMinutes: reminderOffsetSchema.nullable(),
   parentTaskId: uuidSchema.nullable(),
   recurrence: recurrenceRuleSchema.nullable(),
   /** Shared by every occurrence of a repeating task; the first occurrence's id. */
@@ -172,6 +181,8 @@ export const createTaskRequestSchema = z
     deferUntil: plainDateSchema.nullish(),
     deadline: plainDateSchema.nullish(),
     deadlineTime: plainTimeSchema.nullish(),
+    /** Omitted applies the default when there is a due time; null means no reminder. */
+    reminderOffsetMinutes: reminderOffsetSchema.nullish(),
     parentTaskId: uuidSchema.nullish(),
     recurrence: recurrenceRuleSchema.nullish(),
     /** Add the new task to a My Day date in the same command (spec 20.4). */
@@ -208,6 +219,8 @@ export const updateTaskRequestSchema = z
     deferUntil: plainDateSchema.nullable().optional(),
     deadline: plainDateSchema.nullable().optional(),
     deadlineTime: plainTimeSchema.nullable().optional(),
+    /** Requires a due time; null removes the reminder (GAP-13). */
+    reminderOffsetMinutes: reminderOffsetSchema.nullable().optional(),
     expectedVersion: z.number().int().positive().optional(),
   })
   .refine((body) => Object.keys(body).some((key) => key !== "expectedVersion"), {

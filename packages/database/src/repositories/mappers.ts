@@ -53,6 +53,7 @@ export function toTask(row: TaskRow): Task {
     deadlineTime: (row.deadlineTime
       ? row.deadlineTime.slice(0, 5)
       : null) as Task["deadlineTime"],
+    reminderOffsetMinutes: row.reminderOffsetMinutes,
     parentTaskId: row.parentTaskId,
     recurrence: (row.recurrence as RecurrenceRule | null) ?? null,
     seriesId: row.seriesId,
@@ -90,6 +91,7 @@ export function toTaskRow(task: Task): TaskInsertRow {
     deferUntil: task.deferUntil,
     deadline: task.deadline,
     deadlineTime: task.deadlineTime,
+    reminderOffsetMinutes: task.reminderOffsetMinutes,
     parentTaskId: task.parentTaskId,
     recurrence: task.recurrence,
     seriesId: task.seriesId,

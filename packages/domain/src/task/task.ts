@@ -29,6 +29,11 @@ export interface Task {
   readonly deadline: PlainDate | null;
   /** Wall-clock time of the deadline in the workspace timezone; requires `deadline`. */
   readonly deadlineTime: PlainTime | null;
+  /**
+   * Minutes before the due instant a reminder fires; null means no reminder. Only a task
+   * with a due time can carry one (GAP-13).
+   */
+  readonly reminderOffsetMinutes: number | null;
   readonly parentTaskId: string | null;
   /** How the task repeats; completing it creates the next occurrence (GAP-12). */
   readonly recurrence: RecurrenceRule | null;

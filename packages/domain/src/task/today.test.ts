@@ -22,6 +22,7 @@ function task(overrides: Partial<Task> & { readonly id: string }): Task {
     deferUntil: null,
     deadline: null,
     deadlineTime: null,
+    reminderOffsetMinutes: null,
     parentTaskId: null,
     rank: "a0",
     lastActiveStatusId: null,

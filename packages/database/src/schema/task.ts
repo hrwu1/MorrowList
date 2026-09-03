@@ -54,6 +54,8 @@ export const tasks = pgTable(
     deferUntil: date("defer_until"),
     deadline: date("deadline"),
     deadlineTime: time("deadline_time"),
+    // Null means no reminder; the schedule itself lives in task_reminders (GAP-13).
+    reminderOffsetMinutes: integer("reminder_offset_minutes"),
     // Drizzle cannot infer a self-referencing foreign key: the callback's return type
     // depends on the table being declared. The annotation breaks that cycle.
     parentTaskId: uuid("parent_task_id").references(
@@ -125,6 +127,11 @@ export const tasks = pgTable(
     check(
       "tasks_deadline_time_requires_date",
       sql`${table.deadlineTime} IS NULL OR ${table.deadline} IS NOT NULL`,
+    ),
+    // A reminder is an offset from the due time, so it needs one (GAP-13).
+    check(
+      "tasks_reminder_requires_due_time",
+      sql`${table.reminderOffsetMinutes} IS NULL OR ${table.dueTime} IS NOT NULL`,
     ),
     // Invariant 1: an Inbox task has no workflow status (spec 8.2).
     check(

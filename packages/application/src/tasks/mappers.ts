@@ -106,6 +106,7 @@ export function toTaskDto(
     deadline: task.deadline,
     deadlineTime: task.deadlineTime,
     dateWarnings: dateOrderWarnings(task),
+    reminderOffsetMinutes: task.reminderOffsetMinutes,
     parentTaskId: task.parentTaskId,
     recurrence: task.recurrence
       ? {

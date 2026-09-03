@@ -152,6 +152,14 @@ export {
   type UpcomingGroup,
 } from "./task/today.js";
 export {
+  SNOOZE_MINUTES,
+  dueInstant,
+  scheduleReminder,
+  type Reminder,
+} from "./task/reminders.js";
+export {
+  DEFAULT_REMINDER_OFFSET_MINUTES,
+  MAX_REMINDER_OFFSET_MINUTES,
   PRIORITIES,
   TITLE_MAX_LENGTH,
   addDays,
@@ -160,9 +168,11 @@ export {
   localDateFormatter,
   normalizeDescription,
   normalizeTitle,
+  toInstant,
   toLocalDate,
   toPlainDate,
   toPlainTime,
+  toReminderOffset,
   toTimezone,
   type PlainDate,
   type PlainTime,

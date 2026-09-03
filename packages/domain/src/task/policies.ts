@@ -23,10 +23,12 @@ import {
 import { normalizeBlockedReason } from "./relation.js";
 import { isCompleted, isDeleted, type Task } from "./task.js";
 import {
+  DEFAULT_REMINDER_OFFSET_MINUTES,
   addDays,
   daysBetween,
   normalizeDescription,
   normalizeTitle,
+  toReminderOffset,
   type PlainDate,
   type PlainTime,
   type Priority,
@@ -63,6 +65,12 @@ export interface CreateTaskInput {
   readonly deferUntil?: PlainDate | null;
   readonly deadline?: PlainDate | null;
   readonly deadlineTime?: PlainTime | null;
+  /**
+   * Omitted applies `defaultReminderOffsetMinutes` when there is a due time; null means
+   * no reminder (GAP-13).
+   */
+  readonly reminderOffsetMinutes?: number | null;
+  readonly defaultReminderOffsetMinutes?: number;
   readonly parentTaskId?: string | null;
   readonly recurrence?: RecurrenceRuleInput | null;
   /** The series this task continues; a new repeating task starts its own. */
@@ -100,6 +108,12 @@ export function createTask(input: CreateTaskInput, context: PolicyContext): Task
     deferUntil: input.deferUntil ?? null,
     deadline: input.deadline ?? null,
     deadlineTime: input.deadlineTime ?? null,
+    reminderOffsetMinutes: resolveReminderOffset(
+      input.dueTime ?? null,
+      null,
+      input.reminderOffsetMinutes,
+      input.defaultReminderOffsetMinutes,
+    ),
     parentTaskId: input.parentTaskId ?? null,
     recurrence: input.recurrence ? toRecurrenceRule(input.recurrence) : null,
     seriesId: input.seriesId ?? (input.recurrence ? input.id : null),
@@ -133,6 +147,27 @@ export interface UpdateTaskFieldsInput {
   readonly deferUntil?: Patch<PlainDate>;
   readonly deadline?: Patch<PlainDate>;
   readonly deadlineTime?: Patch<PlainTime>;
+  /** Omitted keeps the current offset, or applies the default when a due time first appears. */
+  readonly reminderOffsetMinutes?: Patch<number>;
+  readonly defaultReminderOffsetMinutes?: number;
+}
+
+/**
+ * The reminder offset a task ends up with (GAP-13): none without a due time; an explicit
+ * value when the caller gave one; otherwise the current one, or the default the first
+ * time a due time is set so a timed task reminds by default.
+ */
+function resolveReminderOffset(
+  dueTime: PlainTime | null,
+  current: number | null,
+  requested: Patch<number>,
+  fallback: number | undefined,
+): number | null {
+  if (dueTime === null) return null;
+  if (requested !== undefined) {
+    return requested === null ? null : toReminderOffset(requested);
+  }
+  return current ?? fallback ?? DEFAULT_REMINDER_OFFSET_MINUTES;
 }
 
 /**
@@ -185,6 +220,13 @@ export function updateTaskFields(
     deferUntil: input.deferUntil === undefined ? task.deferUntil : input.deferUntil,
     deadline,
     deadlineTime: deadline === null ? null : requestedDeadlineTime,
+    reminderOffsetMinutes: resolveReminderOffset(
+      dueTime,
+      // A due time set for the first time takes the default, not a stale offset.
+      task.dueTime === null ? null : task.reminderOffsetMinutes,
+      input.reminderOffsetMinutes,
+      input.defaultReminderOffsetMinutes,
+    ),
   };
 
   return touch(next, task, context);
@@ -654,6 +696,7 @@ const MATERIAL_FIELDS = [
   "deferUntil",
   "deadline",
   "deadlineTime",
+  "reminderOffsetMinutes",
   "parentTaskId",
   "recurrence",
   "seriesId",

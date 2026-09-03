@@ -111,6 +111,67 @@ export function localDateFormatter(timezone: string): (instant: Date) => PlainDa
   return (instant) => format.format(instant) as PlainDate;
 }
 
+/** A reminder fires this many minutes before the due instant unless the task says otherwise. */
+export const DEFAULT_REMINDER_OFFSET_MINUTES = 30;
+/** A week is the furthest ahead a reminder can be pulled (GAP-13). */
+export const MAX_REMINDER_OFFSET_MINUTES = 7 * 24 * 60;
+
+export function toReminderOffset(
+  value: number,
+  field = "reminderOffsetMinutes",
+): number {
+  if (!Number.isInteger(value) || value < 0 || value > MAX_REMINDER_OFFSET_MINUTES) {
+    throw new ValidationError(
+      `Reminder offset must be a whole number of minutes between 0 and ${MAX_REMINDER_OFFSET_MINUTES}.`,
+      { field, value },
+    );
+  }
+  return value;
+}
+
+/**
+ * The instant a wall-clock date and time occur in an IANA timezone (spec 12.3). The zone
+ * offset is read from the host's timezone database at the instant itself, so DST changes
+ * are honoured; a time inside a spring-forward gap resolves to the instant after the gap.
+ */
+export function toInstant(date: PlainDate, time: PlainTime, timezone: string): Date {
+  const [year, month, day] = date.split("-").map(Number) as [number, number, number];
+  const [hour, minute] = time.split(":").map(Number) as [number, number];
+  const wallClock = Date.UTC(year, month - 1, day, hour, minute);
+
+  // Two passes: the offset at the naive guess may differ from the offset at the answer
+  // when the guess straddles a transition.
+  let instant = wallClock - zoneOffsetMs(wallClock, timezone);
+  const adjusted = wallClock - zoneOffsetMs(instant, timezone);
+  if (adjusted !== instant) instant = adjusted;
+  return new Date(instant);
+}
+
+/** Milliseconds the zone is ahead of UTC at `instantMs`. */
+function zoneOffsetMs(instantMs: number, timezone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(new Date(instantMs));
+  const read = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? "0");
+  const local = Date.UTC(
+    read("year"),
+    read("month") - 1,
+    read("day"),
+    read("hour"),
+    read("minute"),
+    read("second"),
+  );
+  return local - Math.floor(instantMs / 1000) * 1000;
+}
+
 /** Calendar arithmetic on a plain date; unaffected by DST because it never leaves UTC. */
 export function addDays(date: PlainDate, days: number): PlainDate {
   const [year, month, day] = date.split("-").map(Number) as [number, number, number];

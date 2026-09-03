@@ -54,6 +54,14 @@ export function assertTaskInvariants(task: Task): void {
     });
   }
 
+  // A reminder is an offset from the due instant, so it needs a due time (GAP-13).
+  if (task.reminderOffsetMinutes !== null && task.dueTime === null) {
+    throw new ValidationError("A reminder requires a due time.", {
+      field: "reminderOffsetMinutes",
+      taskId: task.id,
+    });
+  }
+
   // 4. A task must not be its own parent.
   if (task.parentTaskId !== null && task.parentTaskId === task.id) {
     throw new DomainError("TASK_RELATION_CYCLE", "A task cannot be its own parent.", {
