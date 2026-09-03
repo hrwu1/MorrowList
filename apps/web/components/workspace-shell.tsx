@@ -255,6 +255,14 @@ export function WorkspaceShell({
               <Icon name="settings" />
               <span>Manage projects</span>
             </Link>
+            <Link
+              className="workspace-nav__link workspace-nav__link--quiet"
+              href="/settings/tags"
+              aria-current={pathname === "/settings/tags" ? "page" : undefined}
+            >
+              <Icon name="tag" />
+              <span>Manage tags</span>
+            </Link>
 
             <details className="workspace-account" key={`account-${pathname}`}>
               <summary>
@@ -815,6 +823,15 @@ function MobileHeader({
               <Icon name="settings" />
               Manage projects
             </Link>
+            <Link
+              className="workspace-nav__link workspace-nav__link--quiet"
+              href="/settings/tags"
+              aria-current={pathname === "/settings/tags" ? "page" : undefined}
+              onClick={closeMenu}
+            >
+              <Icon name="tag" />
+              Manage tags
+            </Link>
           </nav>
           <button
             type="button"
@@ -1076,7 +1093,8 @@ type IconName =
   | "plus"
   | "settings"
   | "sign-out"
-  | "sun";
+  | "sun"
+  | "tag";
 
 function Icon({
   name,
@@ -1118,6 +1136,12 @@ function Icon({
       <>
         <circle cx="12" cy="12" r="4" />
         <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4" />
+      </>
+    ),
+    tag: (
+      <>
+        <path d="M3 12V4h8l9 9-8 8-9-9Z" />
+        <circle cx="7.5" cy="8.5" r="1" />
       </>
     ),
   };

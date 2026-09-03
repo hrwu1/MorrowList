@@ -28,6 +28,7 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     isCompleted: false,
     completedAt: null,
     version: 1,
+    tags: [],
     createdBy: { kind: "user", id: "u1" },
     lastActor: { kind: "user", id: "u1" },
     createdAt: "2026-08-29T09:00:00.000Z",
@@ -56,6 +57,7 @@ describe("readTaskView", () => {
     ).toEqual({
       priority: "high",
       due: "overdue",
+      tag: "any",
       completion: "any",
       sort: "dueDate",
       order: "desc",
@@ -127,6 +129,25 @@ describe("matchesFilters", () => {
     expect(matchesFilters(trashed, { inbox: true })).toBe(false);
     expect(matchesFilters(trashed, { deleted: true })).toBe(true);
     expect(matchesFilters(task(), { deleted: true })).toBe(false);
+  });
+
+  it("respects a tag filter and carries it through the URL and the query", () => {
+    const tag = {
+      id: "01a04e0f-2e8a-7000-ae0a-989d784c0299",
+      workspaceId: "01a04e0f-2e8a-7000-ae0a-989d784c0288",
+      name: "Deep Work",
+      colorToken: "teal" as const,
+      description: null,
+      createdAt: "2026-09-03T09:00:00.000Z",
+      updatedAt: "2026-09-03T09:00:00.000Z",
+    };
+    const view = readTaskView(new URLSearchParams(`tag=${tag.id}`));
+    expect(view.tag).toBe(tag.id);
+    expect(writeTaskView(view)).toBe(`tag=${tag.id}`);
+    expect(toListQuery("inbox", view)).toMatchObject({ tagId: tag.id });
+
+    expect(matchesFilters(task({ tags: [tag] }), { tagId: tag.id })).toBe(true);
+    expect(matchesFilters(task(), { tagId: tag.id })).toBe(false);
   });
 
   it("respects a priority filter", () => {

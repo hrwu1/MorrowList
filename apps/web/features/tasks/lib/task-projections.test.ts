@@ -53,6 +53,7 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     isCompleted: false,
     completedAt: null,
     version: 1,
+    tags: [],
     createdBy: { kind: "user", id: "user-1" },
     lastActor: { kind: "user", id: "user-1" },
     createdAt: "2026-08-30T12:00:00.000Z",

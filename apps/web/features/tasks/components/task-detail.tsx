@@ -34,6 +34,7 @@ import { DueDateInput, DueTimeInput, PrioritySelect } from "./task-fields";
 
 import { ActivityList } from "@/features/activity/components/activity-list";
 import { useProjects } from "@/features/projects/hooks/use-projects";
+import { TagPicker } from "@/features/tags/components/tag-picker";
 
 /**
  * Task detail (TASK-011, spec 10.2).
@@ -507,6 +508,8 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
           />
         </Field>
       </div>
+
+      <TagPicker task={task} disabled={!editable} />
 
       <details className="task-detail__disclosure">
         <summary className="task-detail__disclosure-summary">

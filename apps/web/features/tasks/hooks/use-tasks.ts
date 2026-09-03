@@ -440,27 +440,34 @@ export function useReorderTask() {
 }
 
 /**
- * Complete, reopen, delete, and restore differ only in the request they send and the
- * shape of their optimistic guess; everything about snapshotting, patching, rollback, and
- * invalidation is identical, so it lives here once.
+ * Complete, reopen, delete, restore, and tag changes differ only in the request they
+ * send and the shape of their optimistic guess; everything about snapshotting, patching,
+ * rollback, and invalidation is identical, so it lives here once. `alsoInvalidate`
+ * lists any other cache the action affects.
  */
-function useTaskAction(
-  send: (task: TaskDto) => Promise<TaskDto>,
-  guess: (task: TaskDto, today: string) => TaskDto,
+export function useTaskAction<V = TaskDto>(
+  send: (variables: V) => Promise<TaskDto>,
+  guess: (variables: V, today: string) => TaskDto,
+  alsoInvalidate: readonly QueryKey[] = [],
 ) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: send,
-    onMutate: async (task: TaskDto) => {
+    onMutate: async (variables: V) => {
       await cancelTaskProjections(queryClient);
       const previous = snapshotTaskProjections(queryClient);
-      patchTaskEverywhere(queryClient, guess(task, workspaceToday(queryClient)));
+      patchTaskEverywhere(queryClient, guess(variables, workspaceToday(queryClient)));
       return { previous };
     },
-    onError: (_error, _task, context) => {
+    onError: (_error, _variables, context) => {
       if (context) restoreTaskProjections(queryClient, context.previous);
     },
     onSuccess: (task) => patchTaskEverywhere(queryClient, task),
-    onSettled: () => invalidateTaskProjections(queryClient),
+    onSettled: () => {
+      invalidateTaskProjections(queryClient);
+      for (const key of alsoInvalidate) {
+        void queryClient.invalidateQueries({ queryKey: key });
+      }
+    },
   });
 }

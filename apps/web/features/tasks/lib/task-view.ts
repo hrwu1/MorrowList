@@ -23,6 +23,8 @@ export type Completion = (typeof COMPLETIONS)[number];
 export interface TaskView {
   readonly priority: Priority | "any";
   readonly due: DueFilter | "any";
+  /** A tag id, or "any". Ids are opaque, so anything non-empty is accepted from the URL. */
+  readonly tag: string | "any";
   readonly completion: Completion;
   readonly sort: TaskSort;
   readonly order: TaskOrder;
@@ -34,6 +36,7 @@ export type TaskScope = "inbox" | "completed" | "trash";
 export const DEFAULT_VIEW: TaskView = {
   priority: "any",
   due: "any",
+  tag: "any",
   completion: "open",
   sort: "rank",
   order: "asc",
@@ -54,6 +57,7 @@ export function readTaskView(
   return {
     priority: oneOf(PRIORITIES, params.get("priority")) ?? base.priority,
     due: oneOf(DUE_FILTERS, params.get("due")) ?? base.due,
+    tag: params.get("tag")?.trim() || base.tag,
     completion: oneOf(COMPLETIONS, params.get("completed")) ?? base.completion,
     sort: oneOf(SORTS, params.get("sort")) ?? base.sort,
     order: oneOf(ORDERS, params.get("order")) ?? base.order,
@@ -77,6 +81,7 @@ export function writeTaskView(
 
   set("priority", view.priority, base.priority);
   set("due", view.due, base.due);
+  set("tag", view.tag, base.tag);
   set("completed", view.completion, base.completion);
   set("sort", view.sort, base.sort);
   set("order", view.order, base.order);
@@ -98,6 +103,7 @@ export function toListQuery(scope: TaskScope, view: TaskView): Partial<ListTasks
     ...(scope === "trash" ? { deleted: true } : {}),
     ...(view.priority === "any" ? {} : { priority: view.priority }),
     ...(view.due === "any" ? {} : { due: view.due }),
+    ...(view.tag === "any" ? {} : { tagId: view.tag }),
     sort: view.sort,
     order: view.order,
   };
@@ -136,5 +142,7 @@ export function matchesFilters(
   ) {
     return false;
   }
+  if (filters.tagId !== undefined && !task.tags.some((tag) => tag.id === filters.tagId))
+    return false;
   return true;
 }

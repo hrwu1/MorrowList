@@ -27,6 +27,8 @@ import {
   SubtaskProgressBadge,
 } from "./task-fields";
 
+import { TagChips } from "@/features/tags/components/tag-chip";
+
 /**
  * A task row and its inline actions (VIEW-001, spec 9.1).
  *
@@ -124,6 +126,7 @@ export function TaskRow({ task, detailHref, selected, today }: TaskRowProps) {
               </time>
             ) : null}
           </span>
+          <TagChips tags={task.tags} />
         </div>
 
         <Button
@@ -236,6 +239,7 @@ export function TrashRow({ task }: { readonly task: TaskDto }) {
               </time>
             ) : null}
           </span>
+          <TagChips tags={task.tags} />
         </div>
         <Button
           loading={restore.isPending}

@@ -20,6 +20,8 @@ import {
 
 import { PRIORITY_LABELS } from "./task-fields";
 
+import { useTags } from "@/features/tags/hooks/use-tags";
+
 /**
  * Filter and sort controls (VIEW-002, spec 9.4).
  *
@@ -72,9 +74,13 @@ export function TaskFilters({
   resultCount,
 }: TaskFiltersProps) {
   const id = useId();
+  const tags = useTags();
+  const tagItems = tags.data?.data ?? [];
+  const activeTag = tagItems.find((tag) => tag.id === view.tag);
   const isDefault =
     view.priority === base.priority &&
     view.due === base.due &&
+    view.tag === base.tag &&
     view.sort === base.sort &&
     view.order === base.order &&
     (!showCompletion || view.completion === base.completion);
@@ -89,6 +95,9 @@ export function TaskFilters({
     ...(view.due === base.due
       ? []
       : [view.due === "any" ? "Any due date" : DUE_LABELS[view.due]]),
+    ...(view.tag === base.tag
+      ? []
+      : [view.tag === "any" ? "Any tag" : `Tag: ${activeTag?.name ?? "…"}`]),
     ...(!showCompletion || view.completion === base.completion
       ? []
       : [COMPLETION_LABELS[view.completion]]),
@@ -157,6 +166,25 @@ export function TaskFilters({
               {DUE_FILTERS.map((due) => (
                 <option key={due} value={due}>
                   {DUE_LABELS[due]}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="filters__control">
+            <label className="ml-field__label" htmlFor={`${id}-tag`}>
+              Tag
+            </label>
+            <Select
+              id={`${id}-tag`}
+              value={activeTag ? view.tag : "any"}
+              disabled={tags.isPending}
+              onChange={(event) => onChange({ ...view, tag: event.target.value })}
+            >
+              <option value="any">Any tag</option>
+              {tagItems.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
                 </option>
               ))}
             </Select>

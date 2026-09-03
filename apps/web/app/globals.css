@@ -2115,6 +2115,160 @@
     overflow-y: auto;
   }
 
+  /* Tags (spec 12.1). Chips pair a --tag-* background with its on-colour text token. */
+  .tag-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .tag-chip {
+    display: inline-flex;
+    max-width: 12rem;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.05rem 0.55rem;
+    border-radius: 99px;
+    background: var(--tag-neutral-bg);
+    color: var(--tag-neutral-text);
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+  .tag-chip__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tag-chip[data-color="red"] {
+    background: var(--tag-red-bg);
+    color: var(--tag-red-text);
+  }
+  .tag-chip[data-color="orange"] {
+    background: var(--tag-orange-bg);
+    color: var(--tag-orange-text);
+  }
+  .tag-chip[data-color="amber"] {
+    background: var(--tag-amber-bg);
+    color: var(--tag-amber-text);
+  }
+  .tag-chip[data-color="green"] {
+    background: var(--tag-green-bg);
+    color: var(--tag-green-text);
+  }
+  .tag-chip[data-color="teal"] {
+    background: var(--tag-teal-bg);
+    color: var(--tag-teal-text);
+  }
+  .tag-chip[data-color="blue"] {
+    background: var(--tag-blue-bg);
+    color: var(--tag-blue-text);
+  }
+  .tag-chip[data-color="violet"] {
+    background: var(--tag-violet-bg);
+    color: var(--tag-violet-text);
+  }
+  .tag-chip[data-color="pink"] {
+    background: var(--tag-pink-bg);
+    color: var(--tag-pink-text);
+  }
+  .tag-chip--more {
+    background: var(--surface-sunken);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+  }
+  .tag-chip__remove {
+    display: grid;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin-right: -0.3rem;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .tag-chip__remove:hover {
+    background: color-mix(in oklch, currentColor 18%, transparent);
+  }
+  .task-row .tag-chips {
+    margin-top: 0.25rem;
+  }
+  .board-card__tags {
+    grid-column: 1 / -1;
+  }
+  .tag-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .tag-picker__form {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .tag-picker__form .ml-input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Tag settings */
+  .tag-settings {
+    width: 100%;
+    max-width: var(--content-max);
+    margin: 0 auto;
+  }
+  .tag-settings__create,
+  .tag-settings__edit {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface-raised);
+  }
+  .tag-settings__field {
+    display: flex;
+    flex: 1 1 12rem;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+  .tag-settings__field--color {
+    flex: 0 1 9rem;
+  }
+  .tag-settings__field--wide {
+    flex: 2 1 16rem;
+  }
+  .tag-settings__preview {
+    display: flex;
+    flex: 1 1 100%;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .tag-settings__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .tag-settings__error {
+    flex: 1 1 100%;
+  }
+  .tag-settings__list {
+    display: grid;
+    gap: 0.65rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
   @media (min-width: 60rem) {
     .board-page__layout[data-panel-open] {
       grid-template-columns: minmax(0, 1fr) minmax(19rem, 22rem);

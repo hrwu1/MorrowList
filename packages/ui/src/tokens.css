@@ -42,6 +42,32 @@
   --priority-high: oklch(55% 0.17 40);
   --priority-urgent: oklch(50% 0.19 25);
 
+  /*
+   * Tag palette (spec 12.1, GAP-03). Each token is a background/text pair; every pair
+   * reads at 4.5:1 or better in both themes and stays inside sRGB (packages/ui checks
+   * this in tokens.test.ts). Eight hues plus a neutral, spaced around the wheel so they
+   * remain distinguishable under the common colour-vision deficiencies; the chip always
+   * shows the tag's name too, so colour is never the only signal.
+   */
+  --tag-neutral-bg: oklch(93% 0.006 75);
+  --tag-neutral-text: oklch(40% 0.012 75);
+  --tag-red-bg: oklch(93% 0.03 25);
+  --tag-red-text: oklch(40% 0.14 25);
+  --tag-orange-bg: oklch(93% 0.03 50);
+  --tag-orange-text: oklch(40% 0.1 50);
+  --tag-amber-bg: oklch(93% 0.05 80);
+  --tag-amber-text: oklch(40% 0.08 80);
+  --tag-green-bg: oklch(93% 0.06 150);
+  --tag-green-text: oklch(40% 0.1 150);
+  --tag-teal-bg: oklch(93% 0.05 195);
+  --tag-teal-text: oklch(40% 0.06 195);
+  --tag-blue-bg: oklch(93% 0.03 255);
+  --tag-blue-text: oklch(40% 0.12 255);
+  --tag-violet-bg: oklch(93% 0.03 295);
+  --tag-violet-text: oklch(40% 0.14 295);
+  --tag-pink-bg: oklch(93% 0.035 350);
+  --tag-pink-text: oklch(40% 0.14 350);
+
   --focus-ring: oklch(52% 0.16 258);
 
   --radius-sm: 0.25rem;
@@ -98,6 +124,25 @@
     --priority-high: oklch(72% 0.14 40);
     --priority-urgent: oklch(70% 0.16 25);
 
+    --tag-neutral-bg: oklch(30% 0.008 75);
+    --tag-neutral-text: oklch(87% 0.008 85);
+    --tag-red-bg: oklch(30% 0.07 25);
+    --tag-red-text: oklch(87% 0.06 25);
+    --tag-orange-bg: oklch(30% 0.06 50);
+    --tag-orange-text: oklch(87% 0.07 50);
+    --tag-amber-bg: oklch(30% 0.05 80);
+    --tag-amber-text: oklch(87% 0.1 80);
+    --tag-green-bg: oklch(30% 0.06 150);
+    --tag-green-text: oklch(87% 0.12 150);
+    --tag-teal-bg: oklch(30% 0.045 195);
+    --tag-teal-text: oklch(87% 0.1 195);
+    --tag-blue-bg: oklch(30% 0.07 255);
+    --tag-blue-text: oklch(87% 0.055 255);
+    --tag-violet-bg: oklch(30% 0.08 295);
+    --tag-violet-text: oklch(87% 0.065 295);
+    --tag-pink-bg: oklch(30% 0.07 350);
+    --tag-pink-text: oklch(87% 0.07 350);
+
     --focus-ring: oklch(75% 0.13 258);
 
     --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.3);
@@ -138,6 +183,25 @@
   --priority-medium: oklch(74% 0.11 75);
   --priority-high: oklch(72% 0.14 40);
   --priority-urgent: oklch(70% 0.16 25);
+
+  --tag-neutral-bg: oklch(30% 0.008 75);
+  --tag-neutral-text: oklch(87% 0.008 85);
+  --tag-red-bg: oklch(30% 0.07 25);
+  --tag-red-text: oklch(87% 0.06 25);
+  --tag-orange-bg: oklch(30% 0.06 50);
+  --tag-orange-text: oklch(87% 0.07 50);
+  --tag-amber-bg: oklch(30% 0.05 80);
+  --tag-amber-text: oklch(87% 0.1 80);
+  --tag-green-bg: oklch(30% 0.06 150);
+  --tag-green-text: oklch(87% 0.12 150);
+  --tag-teal-bg: oklch(30% 0.045 195);
+  --tag-teal-text: oklch(87% 0.1 195);
+  --tag-blue-bg: oklch(30% 0.07 255);
+  --tag-blue-text: oklch(87% 0.055 255);
+  --tag-violet-bg: oklch(30% 0.08 295);
+  --tag-violet-text: oklch(87% 0.065 295);
+  --tag-pink-bg: oklch(30% 0.07 350);
+  --tag-pink-text: oklch(87% 0.07 350);
 
   --focus-ring: oklch(75% 0.13 258);
 

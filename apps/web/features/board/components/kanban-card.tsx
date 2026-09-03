@@ -5,6 +5,7 @@ import type { TaskDto, WorkflowStatusDto } from "@morrowlist/contracts";
 import Link from "next/link";
 import type { CSSProperties, KeyboardEventHandler } from "react";
 
+import { TagChips } from "@/features/tags/components/tag-chip";
 import {
   DueBadge,
   MyDayBadge,
@@ -141,6 +142,12 @@ export function KanbanCard({
         <MyDayBadge dayPlans={task.dayPlans} />
         <SubtaskProgressBadge progress={task.subtaskProgress} />
       </div>
+
+      {task.tags.length > 0 ? (
+        <div className="board-card__tags">
+          <TagChips tags={task.tags} />
+        </div>
+      ) : null}
     </li>
   );
 }
