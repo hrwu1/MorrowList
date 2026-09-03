@@ -1,9 +1,12 @@
 import type {
+  AddTaskRelationRequest,
   AddTaskToDayRequest,
+  CompleteTaskRequest,
   CreateTaskRequest,
   ListTasksQuery,
   MoveTaskRequest,
   ReorderTaskRequest,
+  SetTaskBlockedRequest,
   SetTaskParentRequest,
   TaskDto,
   UpdateTaskRequest,
@@ -14,10 +17,15 @@ import {
   MAX_TAGS_PER_TASK,
   ValidationError,
   assertExpectedVersion,
+  assertNoBlocksCycle,
   assertParentIsAssignable,
+  canonicalizeRelation,
+  clearBlocked as applyClearBlocked,
   completeTask,
   createTask,
   deleteTask,
+  flagBlocked,
+  isBlocked,
   isTerminal,
   materialChanges,
   moveTask as applyTaskMove,
@@ -38,12 +46,14 @@ import {
   type PlainTime,
   type Tag,
   type Task,
+  type TaskRelation,
   type WorkflowStatus,
 } from "@morrowlist/domain";
 
 import type {
   Page,
   RankScope,
+  RelationEdge,
   TransactionContext,
   UnitOfWork,
   Workspace,
@@ -495,21 +505,33 @@ export class TaskService {
 
   /**
    * Complete a task (spec 8.5). A project task moves to the project's Done status at the
-   * end of that column; an Inbox task keeps its null project and status.
+   * end of that column; an Inbox task keeps its null project and status. A blocked task
+   * completes only once the caller has acknowledged the warning (spec 8.4): the product
+   * warns, it does not enforce one productivity philosophy.
    */
   async complete(
     context: ActorContext,
     workspaceId: string,
     taskId: string,
-    expectedVersion?: number,
+    request: CompleteTaskRequest = {},
   ): Promise<TaskDto> {
     assertWorkspaceAccess(context, workspaceId);
     assertScope(context, SCOPES.tasksWrite);
 
-    return this.mutate(context, workspaceId, taskId, expectedVersion, {
+    return this.mutate(context, workspaceId, taskId, request.expectedVersion, {
       eventType: TASK_EVENTS.completed,
       summarize: () => "Completed task",
       apply: async (task, tx) => {
+        if (
+          !request.acknowledgeBlocked &&
+          isBlocked(task, await this.blockersOf(tx, task))
+        ) {
+          throw new DomainError(
+            "TASK_BLOCKED",
+            "This task is blocked. Acknowledge the warning to complete it anyway.",
+            { taskId: task.id },
+          );
+        }
         const doneStatus = task.projectId
           ? await this.resolveDoneStatus(tx, task)
           : undefined;
@@ -689,6 +711,202 @@ export class TaskService {
   }
 
   /**
+   * Flag a task as blocked with a reason (spec 8.4, GAP-06). The flag is a task column,
+   * so the version moves like any other edit; the task stays in its workflow status.
+   */
+  async setBlocked(
+    context: ActorContext,
+    workspaceId: string,
+    taskId: string,
+    request: SetTaskBlockedRequest,
+  ): Promise<TaskDto> {
+    assertWorkspaceAccess(context, workspaceId);
+    assertScope(context, SCOPES.tasksWrite);
+
+    return this.mutate(context, workspaceId, taskId, request.expectedVersion, {
+      eventType: TASK_EVENTS.blocked,
+      summarize: (next) => `Marked task blocked: ${next.blockedReason ?? ""}`,
+      payload: (next) => ({
+        taskId: next.id,
+        reason: next.blockedReason,
+        since: next.blockedSince?.toISOString() ?? null,
+      }),
+      apply: (task) =>
+        flagBlocked(task, request.reason, {
+          actor: actorRef(context),
+          clock: this.clock,
+        }),
+    });
+  }
+
+  /** Clear the blocker flag; a no-op that records nothing when the task is not flagged. */
+  async clearBlocked(
+    context: ActorContext,
+    workspaceId: string,
+    taskId: string,
+    expectedVersion?: number,
+  ): Promise<TaskDto> {
+    assertWorkspaceAccess(context, workspaceId);
+    assertScope(context, SCOPES.tasksWrite);
+
+    return this.mutate(context, workspaceId, taskId, expectedVersion, {
+      eventType: TASK_EVENTS.unblocked,
+      summarize: () => "Cleared the blocked flag",
+      payload: (next, previous) => ({
+        taskId: next.id,
+        reason: previous.blockedReason,
+        since: previous.blockedSince?.toISOString() ?? null,
+        clearedAt: next.updatedAt.toISOString(),
+      }),
+      apply: (task) =>
+        applyClearBlocked(task, { actor: actorRef(context), clock: this.clock }),
+    });
+  }
+
+  /**
+   * Relate two tasks (spec 8.4). `taskId` is the source of a `blocks` edge; `related_to`
+   * is stored once in canonical order. Neither task's row changes, so their versions are
+   * untouched; adding an edge that already exists is a no-op with no event. A `blocks`
+   * edge that would close a loop is TASK_RELATION_CYCLE.
+   */
+  async addRelation(
+    context: ActorContext,
+    workspaceId: string,
+    taskId: string,
+    request: AddTaskRelationRequest,
+  ): Promise<TaskDto> {
+    assertWorkspaceAccess(context, workspaceId);
+    assertScope(context, SCOPES.tasksWrite);
+
+    return this.unitOfWork.execute(async (tx) => {
+      const workspace = await this.requireWorkspace(tx, workspaceId);
+      const task = await this.requireTask(tx, workspaceId, taskId);
+      const target = await this.requireTask(tx, workspaceId, request.targetTaskId);
+      const endpoints = canonicalizeRelation(request.type, task, target);
+      if (request.type === "blocks") {
+        assertNoBlocksCycle(
+          endpoints.sourceTaskId,
+          endpoints.targetTaskId,
+          await tx.tasks.downstreamOf(workspaceId, endpoints.targetTaskId, "blocks"),
+        );
+      }
+
+      const relation: TaskRelation = {
+        id: uuidv7(),
+        workspaceId,
+        ...endpoints,
+        type: request.type,
+        metadata: {},
+        createdBy: actorRef(context),
+        createdAt: this.clock.now(),
+      };
+      if (await tx.tasks.insertRelation(relation)) {
+        await this.recordRelationEvent(
+          tx,
+          context,
+          workspace,
+          TASK_EVENTS.relationAdded,
+          relation,
+          task,
+          target,
+        );
+      }
+      return this.toDto(tx, workspace, task);
+    });
+  }
+
+  /** Remove a relation from either of its endpoints. */
+  async removeRelation(
+    context: ActorContext,
+    workspaceId: string,
+    taskId: string,
+    relationId: string,
+  ): Promise<TaskDto> {
+    assertWorkspaceAccess(context, workspaceId);
+    assertScope(context, SCOPES.tasksWrite);
+
+    return this.unitOfWork.execute(async (tx) => {
+      const workspace = await this.requireWorkspace(tx, workspaceId);
+      const task = await this.requireTask(tx, workspaceId, taskId);
+      const relation = await tx.tasks.findRelation(workspaceId, relationId);
+      if (
+        !relation ||
+        (relation.sourceTaskId !== task.id && relation.targetTaskId !== task.id)
+      ) {
+        throw new DomainError("TASK_RELATION_NOT_FOUND", "Relation not found.", {
+          taskId,
+          relationId,
+        });
+      }
+      const otherId =
+        relation.sourceTaskId === task.id
+          ? relation.targetTaskId
+          : relation.sourceTaskId;
+      const other = await this.requireTask(tx, workspaceId, otherId, {
+        allowDeleted: true,
+      });
+
+      await tx.tasks.deleteRelation(workspaceId, relation.id);
+      await this.recordRelationEvent(
+        tx,
+        context,
+        workspace,
+        TASK_EVENTS.relationRemoved,
+        relation,
+        task,
+        other,
+      );
+      return this.toDto(tx, workspace, task);
+    });
+  }
+
+  /**
+   * A relation belongs to both of its endpoints, so each gets an activity and an outbox
+   * row (spec 8.4 "captured in activity history") in the one transaction.
+   */
+  private async recordRelationEvent(
+    tx: TransactionContext,
+    context: ActorContext,
+    workspace: Workspace,
+    eventType: string,
+    relation: TaskRelation,
+    task: Task,
+    other: Task,
+  ): Promise<void> {
+    const verb = eventType === TASK_EVENTS.relationAdded ? "Added" : "Removed";
+    for (const [subject, counterpart] of [
+      [task, other],
+      [other, task],
+    ] as const) {
+      const counterpartKey = `${workspace.taskKeyPrefix}-${counterpart.taskNumber}`;
+      await recordEvent(tx, context, this.clock, {
+        workspaceId: workspace.id,
+        aggregateType: "task",
+        aggregateId: subject.id,
+        eventType,
+        summary: `${verb} relation: ${describeRelation(relation, subject.id)} ${counterpartKey}`,
+        payload: {
+          taskId: subject.id,
+          relationId: relation.id,
+          type: relation.type,
+          sourceTaskId: relation.sourceTaskId,
+          targetTaskId: relation.targetTaskId,
+          otherTaskId: counterpart.id,
+          otherTaskKey: counterpartKey,
+        },
+      });
+    }
+  }
+
+  /** The live `blocks` predecessors of one task, for the completion guard. */
+  private async blockersOf(tx: TransactionContext, task: Task): Promise<Task[]> {
+    const edges = await tx.tasks.relationsFor(task.workspaceId, [task.id]);
+    return edges
+      .filter((edge) => edge.relation.type === "blocks" && edge.target.id === task.id)
+      .map((edge) => edge.source);
+  }
+
+  /**
    * Shared mutation pipeline: load, guard the expected version, apply a policy, persist
    * with an optimistic-concurrency check, and record activity plus an outbox event — all
    * in one transaction.
@@ -786,10 +1004,10 @@ export class TaskService {
   }
 
   /**
-   * Map tasks with their upcoming My Day dates (spec 9.5), their child progress and
-   * their tags (spec 29.3), each loaded in one query for the whole page. Tags survive
-   * every command here: completion, moves, deletion and restore all leave the relation
-   * alone (spec 8.5).
+   * Map tasks with their upcoming My Day dates (spec 9.5), their child progress, their
+   * tags and their relations (spec 29.3), each loaded in one query for the whole page.
+   * Tags and relations survive every command here: completion, moves, deletion and
+   * restore all leave them alone (spec 8.5).
    */
   private async toDtos(
     tx: TransactionContext,
@@ -797,10 +1015,16 @@ export class TaskService {
     tasks: readonly Task[],
   ): Promise<TaskDto[]> {
     const ids = tasks.map((task) => task.id);
-    const [plans, progress, tags] = await Promise.all([
+    const [plans, progress, tags, edges]: [
+      ReadonlyMap<string, readonly string[]>,
+      ReadonlyMap<string, { completed: number; total: number }>,
+      ReadonlyMap<string, readonly Tag[]>,
+      readonly RelationEdge[],
+    ] = await Promise.all([
       tx.dayPlans.listForTasks(ids, this.workspaceToday(workspace.timezone)),
       tx.tasks.childSummary(workspace.id, ids),
       tx.tasks.tagsFor(workspace.id, ids),
+      tx.tasks.relationsFor(workspace.id, ids),
     ]);
     return tasks.map((task) =>
       toTaskDto(
@@ -809,6 +1033,7 @@ export class TaskService {
         plans.get(task.id) ?? [],
         progress.get(task.id) ?? null,
         tags.get(task.id) ?? [],
+        edges,
       ),
     );
   }
@@ -1001,6 +1226,12 @@ export class TaskService {
   private workspaceToday(timezone: string): PlainDate {
     return toLocalDate(this.clock.now(), timezone);
   }
+}
+
+/** "blocks", "blocked by", or "related to", as read from one endpoint. */
+function describeRelation(relation: TaskRelation, fromTaskId: string): string {
+  if (relation.type === "related_to") return "related to";
+  return relation.sourceTaskId === fromTaskId ? "blocks" : "blocked by";
 }
 
 function parentChangePayload(next: Task, previous: Task): Record<string, unknown> {

@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addTaskRelationRequestSchema,
+  completeTaskRequestSchema,
   createTaskRequestSchema,
   listTasksQuerySchema,
+  setTaskBlockedRequestSchema,
   moveTaskRequestSchema,
   reorderTaskRequestSchema,
   setTaskParentRequestSchema,
@@ -129,5 +132,31 @@ describe("setTaskParentRequestSchema", () => {
     expect(setTaskParentRequestSchema.safeParse({ parentTaskId: "ML-1" }).success).toBe(
       false,
     );
+  });
+});
+
+describe("relation and blocked schemas", () => {
+  it("accepts the MVP relation types only", () => {
+    expect(
+      addTaskRelationRequestSchema.parse({ type: "blocks", targetTaskId: TASK_ID }),
+    ).toEqual({ type: "blocks", targetTaskId: TASK_ID });
+    expect(
+      addTaskRelationRequestSchema.safeParse({
+        type: "duplicates",
+        targetTaskId: TASK_ID,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires a non-blank reason and passes the blocked acknowledgement", () => {
+    expect(setTaskBlockedRequestSchema.parse({ reason: "  vendor " }).reason).toBe(
+      "vendor",
+    );
+    expect(setTaskBlockedRequestSchema.safeParse({ reason: "   " }).success).toBe(
+      false,
+    );
+    expect(completeTaskRequestSchema.parse({ acknowledgeBlocked: true })).toEqual({
+      acknowledgeBlocked: true,
+    });
   });
 });

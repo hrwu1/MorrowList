@@ -315,15 +315,16 @@ export class ProjectService {
         includeSubtasks: query.includeSubtasks ?? false,
       });
       const boardTaskIds = tasks.items.map((task) => task.id);
-      // Cards show the My Day indicator (spec 9.5), subtask progress and tag chips
-      // (spec 29.3); one query each covers the whole board.
-      const [plans, progress, tags] = await Promise.all([
+      // Cards show the My Day indicator (spec 9.5), subtask progress, tag chips and
+      // the blocked indicator (spec 29.3); one query each covers the whole board.
+      const [plans, progress, tags, edges] = await Promise.all([
         tx.dayPlans.listForTasks(
           boardTaskIds,
           toLocalDate(this.clock.now(), workspace.timezone),
         ),
         tx.tasks.childSummary(workspaceId, boardTaskIds),
         tx.tasks.tagsFor(workspaceId, boardTaskIds),
+        tx.tasks.relationsFor(workspaceId, boardTaskIds),
       ]);
 
       return {
@@ -337,6 +338,7 @@ export class ProjectService {
               plans.get(task.id) ?? [],
               progress.get(task.id) ?? null,
               tags.get(task.id) ?? [],
+              edges,
             ),
           ),
         },

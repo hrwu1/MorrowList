@@ -75,10 +75,11 @@ export class ViewService {
 
       const candidateIds = [...page.items, ...unfinished].map((task) => task.id);
       // My Day dates, subtask progress and tags each come from one query for the view.
-      const [plans, progress, tags] = await Promise.all([
+      const [plans, progress, tags, edges] = await Promise.all([
         tx.dayPlans.listForTasks(candidateIds, date < today ? date : today),
         tx.tasks.childSummary(workspace.id, candidateIds),
         tx.tasks.tagsFor(workspace.id, candidateIds),
+        tx.tasks.relationsFor(workspace.id, candidateIds),
       ]);
       const plannedFor = (task: Task, day: PlainDate) =>
         plans.get(task.id)?.includes(day) ?? false;
@@ -89,6 +90,7 @@ export class ViewService {
           (plans.get(task.id) ?? []).filter((planDate) => planDate >= today),
           progress.get(task.id) ?? null,
           tags.get(task.id) ?? [],
+          edges,
         );
 
       const planned = new Set(
@@ -137,10 +139,11 @@ export class ViewService {
         limit: UPCOMING_LIMIT,
       });
       const taskIds = page.items.map((task) => task.id);
-      const [plans, progress, tags] = await Promise.all([
+      const [plans, progress, tags, edges] = await Promise.all([
         tx.dayPlans.listForTasks(taskIds, today),
         tx.tasks.childSummary(workspace.id, taskIds),
         tx.tasks.tagsFor(workspace.id, taskIds),
+        tx.tasks.relationsFor(workspace.id, taskIds),
       ]);
 
       return {
@@ -156,6 +159,7 @@ export class ViewService {
                 plans.get(task.id) ?? [],
                 progress.get(task.id) ?? null,
                 tags.get(task.id) ?? [],
+                edges,
               ),
             ),
           })),

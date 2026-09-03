@@ -55,6 +55,16 @@ export const TASK_EVENTS = {
   /** Payload: `{ taskId, tagId, tagName }`. */
   tagAdded: "task.tag_added",
   tagRemoved: "task.tag_removed",
+  /**
+   * Relationship add/remove (spec 8.4), recorded on both endpoint tasks. Payload:
+   * `{ taskId, relationId, type, sourceTaskId, targetTaskId, otherTaskId, otherTaskKey }`.
+   */
+  relationAdded: "task.relation_added",
+  relationRemoved: "task.relation_removed",
+  /** The blocker flag (spec 8.4, GAP-06). Payload: `{ taskId, reason, since }`. */
+  blocked: "task.blocked",
+  /** Payload: `{ taskId, reason, since, clearedAt }`. */
+  unblocked: "task.unblocked",
 } as const;
 
 export const TAG_EVENTS = {

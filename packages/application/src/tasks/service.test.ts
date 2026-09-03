@@ -644,7 +644,9 @@ describe("TaskService.complete and reopen", () => {
     });
 
     await expect(
-      service.complete(seeded.context, seeded.workspace.id, created.id, 99),
+      service.complete(seeded.context, seeded.workspace.id, created.id, {
+        expectedVersion: 99,
+      }),
     ).rejects.toMatchObject({ code: "TASK_VERSION_CONFLICT" });
   });
 });
@@ -1092,5 +1094,306 @@ describe("My Day", () => {
     expect(unitOfWork.data.dayPlans.size).toBe(0);
     expect(unitOfWork.data.activity).toHaveLength(activityBefore);
     expect(unitOfWork.data.outbox).toHaveLength(activityBefore);
+  });
+});
+
+describe("TaskService relations", () => {
+  const workspaceId = () => seeded.workspace.id;
+  const create = (title: string) =>
+    service.create(seeded.context, { workspaceId: workspaceId(), title });
+  const blocks = (source: { id: string }, target: { id: string }) =>
+    service.addRelation(seeded.context, workspaceId(), source.id, {
+      type: "blocks",
+      targetTaskId: target.id,
+    });
+
+  it("adds a blocks relation seen from both ends, with history on both tasks", async () => {
+    const a = await create("Collect sources");
+    const b = await create("Make slides");
+
+    const source = await blocks(a, b);
+    expect(source.relations).toEqual([
+      expect.objectContaining({
+        type: "blocks",
+        sourceTaskId: a.id,
+        targetTaskId: b.id,
+        task: { id: b.id, key: "ML-2", title: "Make slides", isCompleted: false },
+      }),
+    ]);
+    // A relation is not a task column: neither version moves (spec 8.2 invariant 12).
+    expect(source.version).toBe(1);
+    expect(source.isBlocked).toBe(false);
+
+    const target = await service.get(seeded.context, workspaceId(), b.id);
+    expect(target.isBlocked).toBe(true);
+    expect(target.relations[0]?.task.key).toBe("ML-1");
+    expect(target.version).toBe(1);
+
+    const events = unitOfWork.data.activity.filter(
+      (event) => event.eventType === "task.relation_added",
+    );
+    expect(events.map((event) => [event.aggregateId, event.summary])).toEqual([
+      [a.id, "Added relation: blocks ML-2"],
+      [b.id, "Added relation: blocked by ML-1"],
+    ]);
+    expect(
+      unitOfWork.data.outbox.filter((e) => e.eventType === "task.relation_added"),
+    ).toHaveLength(2);
+  });
+
+  it("stores related_to once in canonical order and ignores a duplicate", async () => {
+    const a = await create("A");
+    const b = await create("B");
+    const [low, high] = [a.id, b.id].sort();
+
+    const first = await service.addRelation(seeded.context, workspaceId(), b.id, {
+      type: "related_to",
+      targetTaskId: a.id,
+    });
+    expect(first.relations[0]).toMatchObject({
+      type: "related_to",
+      sourceTaskId: low,
+      targetTaskId: high,
+    });
+    const again = await service.addRelation(seeded.context, workspaceId(), a.id, {
+      type: "related_to",
+      targetTaskId: b.id,
+    });
+    expect(again.relations).toHaveLength(1);
+    expect(unitOfWork.data.relations.size).toBe(1);
+    expect(
+      unitOfWork.data.activity.filter((e) => e.eventType === "task.relation_added"),
+    ).toHaveLength(2);
+  });
+
+  it("rejects a direct and a transitive blocks cycle, and a self relation", async () => {
+    const a = await create("A");
+    const b = await create("B");
+    const c = await create("C");
+    await blocks(a, b);
+
+    await expect(blocks(b, a)).rejects.toMatchObject({ code: "TASK_RELATION_CYCLE" });
+    await blocks(b, c);
+    await expect(blocks(c, a)).rejects.toMatchObject({ code: "TASK_RELATION_CYCLE" });
+    await expect(blocks(a, a)).rejects.toMatchObject({ code: "TASK_RELATION_CYCLE" });
+    expect(unitOfWork.data.relations.size).toBe(2);
+  });
+
+  it("rejects a target in another workspace or in the Trash", async () => {
+    const a = await create("A");
+    const other = seedWorkspace(unitOfWork.data);
+    const foreign = await service.create(other.context, {
+      workspaceId: other.workspace.id,
+      title: "Foreign",
+    });
+    const trashed = await create("Trashed");
+    await service.delete(seeded.context, workspaceId(), trashed.id);
+
+    await expect(blocks(a, foreign)).rejects.toMatchObject({ code: "TASK_NOT_FOUND" });
+    await expect(blocks(a, trashed)).rejects.toMatchObject({ code: "TASK_NOT_FOUND" });
+  });
+
+  it("removes a relation from either endpoint and rejects a stranger's id", async () => {
+    const a = await create("A");
+    const b = await create("B");
+    const c = await create("C");
+    const withRelation = await blocks(a, b);
+    const relationId = withRelation.relations[0]?.id as string;
+
+    await expect(
+      service.removeRelation(seeded.context, workspaceId(), c.id, relationId),
+    ).rejects.toMatchObject({ code: "TASK_RELATION_NOT_FOUND" });
+
+    const removed = await service.removeRelation(
+      seeded.context,
+      workspaceId(),
+      b.id,
+      relationId,
+    );
+    expect(removed.relations).toEqual([]);
+    expect(removed.isBlocked).toBe(false);
+    expect(
+      unitOfWork.data.activity
+        .filter((e) => e.eventType === "task.relation_removed")
+        .map((e) => [e.aggregateId, e.summary]),
+    ).toEqual([
+      [b.id, "Removed relation: blocked by ML-1"],
+      [a.id, "Removed relation: blocks ML-2"],
+    ]);
+  });
+
+  it("rolls back the relation with its events when the commit fails", async () => {
+    const a = await create("A");
+    const b = await create("B");
+    unitOfWork.failNextCommit();
+
+    await expect(blocks(a, b)).rejects.toThrow("simulated commit failure");
+    expect(unitOfWork.data.relations.size).toBe(0);
+    expect(
+      unitOfWork.data.activity.filter((e) => e.eventType === "task.relation_added"),
+    ).toHaveLength(0);
+  });
+
+  it("clears the blocked projection when the predecessor completes, and hides a trashed one", async () => {
+    const a = await create("A");
+    const b = await create("B");
+    await blocks(a, b);
+    expect(
+      (await service.list(seeded.context, listQuery({ isBlocked: true }))).data.map(
+        (task) => task.title,
+      ),
+    ).toEqual(["B"]);
+
+    await service.complete(seeded.context, workspaceId(), a.id);
+    const freed = await service.get(seeded.context, workspaceId(), b.id);
+    expect(freed.isBlocked).toBe(false);
+    expect(freed.relations[0]?.task.isCompleted).toBe(true);
+
+    await service.reopen(seeded.context, workspaceId(), a.id);
+    await service.delete(seeded.context, workspaceId(), a.id);
+    const orphaned = await service.get(seeded.context, workspaceId(), b.id);
+    expect(orphaned.isBlocked).toBe(false);
+    expect(orphaned.relations).toEqual([]);
+
+    await service.restore(seeded.context, workspaceId(), a.id);
+    expect((await service.get(seeded.context, workspaceId(), b.id)).isBlocked).toBe(
+      true,
+    );
+  });
+
+  it("keeps relations across project moves", async () => {
+    const a = await create("A");
+    const b = await create("B");
+    await blocks(a, b);
+    const ready = statusByCategory(seeded.statuses, "ready");
+
+    const moved = await service.move(seeded.context, workspaceId(), b.id, {
+      projectId: seeded.project.id,
+      statusId: ready.id,
+    });
+    expect(moved.relations).toHaveLength(1);
+    expect(moved.isBlocked).toBe(true);
+    const back = await service.move(seeded.context, workspaceId(), b.id, {
+      projectId: null,
+    });
+    expect(back.relations).toHaveLength(1);
+  });
+
+  it("completes a blocked task only with an acknowledgement", async () => {
+    const a = await create("A");
+    const b = await create("B");
+    await blocks(a, b);
+
+    await expect(
+      service.complete(seeded.context, workspaceId(), b.id),
+    ).rejects.toMatchObject({ code: "TASK_BLOCKED" });
+    expect((await service.get(seeded.context, workspaceId(), b.id)).isCompleted).toBe(
+      false,
+    );
+
+    const done = await service.complete(seeded.context, workspaceId(), b.id, {
+      acknowledgeBlocked: true,
+    });
+    expect(done.isCompleted).toBe(true);
+    expect(done.isBlocked).toBe(false);
+    expect(done.relations).toHaveLength(1);
+  });
+});
+
+describe("TaskService blocked flag", () => {
+  it("flags with a reason, keeps the status, filters, and clears with events", async () => {
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Waiting on vendor",
+      projectId: seeded.project.id,
+      statusId: ready.id,
+    });
+    await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Free",
+    });
+
+    const flagged = await service.setBlocked(
+      seeded.context,
+      seeded.workspace.id,
+      task.id,
+      { reason: "  waiting on   vendor " },
+    );
+    expect(flagged.blocked).toEqual({
+      reason: "waiting on vendor",
+      since: NOW.toISOString(),
+    });
+    expect(flagged.isBlocked).toBe(true);
+    expect(flagged.statusId).toBe(ready.id);
+    expect(flagged.version).toBe(2);
+    expect(unitOfWork.data.activity.at(-1)).toMatchObject({
+      eventType: "task.blocked",
+      summary: "Marked task blocked: waiting on vendor",
+      payload: {
+        taskId: task.id,
+        reason: "waiting on vendor",
+        since: NOW.toISOString(),
+      },
+    });
+
+    const blockedOnly = await service.list(
+      seeded.context,
+      listQuery({ isBlocked: true }),
+    );
+    expect(blockedOnly.data.map((item) => item.title)).toEqual(["Waiting on vendor"]);
+    const openOnly = await service.list(
+      seeded.context,
+      listQuery({ isBlocked: false }),
+    );
+    expect(openOnly.data.map((item) => item.title)).toEqual(["Free"]);
+
+    // Completing a flagged task needs the acknowledgement; the flag then survives.
+    await expect(
+      service.complete(seeded.context, seeded.workspace.id, task.id),
+    ).rejects.toMatchObject({ code: "TASK_BLOCKED" });
+
+    const cleared = await service.clearBlocked(
+      seeded.context,
+      seeded.workspace.id,
+      task.id,
+      flagged.version,
+    );
+    expect(cleared.blocked).toBeNull();
+    expect(cleared.isBlocked).toBe(false);
+    expect(cleared.version).toBe(3);
+    expect(unitOfWork.data.activity.at(-1)).toMatchObject({
+      eventType: "task.unblocked",
+      payload: {
+        taskId: task.id,
+        reason: "waiting on vendor",
+        since: NOW.toISOString(),
+        clearedAt: NOW.toISOString(),
+      },
+    });
+    // Clearing again changes nothing and records nothing.
+    const count = unitOfWork.data.activity.length;
+    await service.clearBlocked(seeded.context, seeded.workspace.id, task.id);
+    expect(unitOfWork.data.activity).toHaveLength(count);
+  });
+
+  it("rejects a stale version and a blank reason without recording anything", async () => {
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Task",
+    });
+
+    await expect(
+      service.setBlocked(seeded.context, seeded.workspace.id, task.id, {
+        reason: "x",
+        expectedVersion: 5,
+      }),
+    ).rejects.toMatchObject({ code: "TASK_VERSION_CONFLICT" });
+    await expect(
+      service.setBlocked(seeded.context, seeded.workspace.id, task.id, {
+        reason: "   ",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    expect(unitOfWork.data.activity).toHaveLength(1);
   });
 });
