@@ -1,4 +1,5 @@
 import type {
+  AddTaskToDayRequest,
   CreateTaskRequest,
   ListTasksQuery,
   MoveTaskRequest,
@@ -23,9 +24,11 @@ import {
   restoreTask,
   systemClock,
   toLocalDate,
+  toPlainDate,
   updateTaskFields,
   uuidv7,
   type Clock,
+  type DayPlanSource,
   type PlainDate,
   type PlainTime,
   type Task,
@@ -37,6 +40,7 @@ import type {
   RankScope,
   TransactionContext,
   UnitOfWork,
+  Workspace,
 } from "../ports/index.js";
 import {
   SCOPES,
@@ -148,7 +152,75 @@ export class TaskService {
         },
       });
 
-      return toTaskDto(task, workspace.taskKeyPrefix);
+      if (request.addToDay) {
+        // Capturing straight into My Day is the same dated relation as adding later,
+        // recorded in the same transaction as the task itself (spec 20.4).
+        await this.insertDayPlan(
+          tx,
+          context,
+          task,
+          toPlainDate(request.addToDay, "addToDay"),
+          "capture",
+        );
+      }
+
+      return this.toDto(tx, workspace, task);
+    });
+  }
+
+  /**
+   * Add a task to My Day for a date, defaulting to the workspace's current date (spec
+   * 9.2). The selection is a dated relation: the task row is untouched, so its version
+   * does not change and nothing about its due date or status moves.
+   */
+  async addToDay(
+    context: ActorContext,
+    workspaceId: string,
+    taskId: string,
+    request: AddTaskToDayRequest = {},
+  ): Promise<TaskDto> {
+    assertWorkspaceAccess(context, workspaceId);
+    assertScope(context, SCOPES.tasksWrite);
+
+    return this.unitOfWork.execute(async (tx) => {
+      const workspace = await this.requireWorkspace(tx, workspaceId);
+      const task = await this.requireTask(tx, workspaceId, taskId);
+      const date = request.date
+        ? toPlainDate(request.date, "date")
+        : this.workspaceToday(workspace.timezone);
+
+      await this.insertDayPlan(tx, context, task, date, "manual");
+      return this.toDto(tx, workspace, task);
+    });
+  }
+
+  /** Remove a My Day selection. Removing one that does not exist is a harmless no-op. */
+  async removeFromDay(
+    context: ActorContext,
+    workspaceId: string,
+    taskId: string,
+    date: string,
+  ): Promise<TaskDto> {
+    assertWorkspaceAccess(context, workspaceId);
+    assertScope(context, SCOPES.tasksWrite);
+
+    return this.unitOfWork.execute(async (tx) => {
+      const workspace = await this.requireWorkspace(tx, workspaceId);
+      const task = await this.requireTask(tx, workspaceId, taskId);
+      const planDate = toPlainDate(date, "date");
+
+      const removed = await tx.dayPlans.delete(task.id, planDate);
+      if (removed) {
+        await recordEvent(tx, context, this.clock, {
+          workspaceId,
+          aggregateType: "task",
+          aggregateId: task.id,
+          eventType: TASK_EVENTS.dayRemoved,
+          summary: `Removed task from My Day for ${planDate}`,
+          payload: { taskId: task.id, planDate, source: "manual" },
+        });
+      }
+      return this.toDto(tx, workspace, task);
     });
   }
 
@@ -164,7 +236,7 @@ export class TaskService {
     return this.unitOfWork.execute(async (tx) => {
       const workspace = await this.requireWorkspace(tx, workspaceId);
       const task = await this.resolveTask(tx, workspaceId, idOrKey);
-      return toTaskDto(task, workspace.taskKeyPrefix);
+      return this.toDto(tx, workspace, task);
     });
   }
 
@@ -205,7 +277,7 @@ export class TaskService {
 
       const last = page.items.at(-1);
       return {
-        data: page.items.map((task) => toTaskDto(task, workspace.taskKeyPrefix)),
+        data: await this.toDtos(tx, workspace, page.items),
         page: {
           hasMore: page.hasMore,
           nextCursor:
@@ -484,7 +556,7 @@ export class TaskService {
       const next = await step.apply(previous, tx);
       if (next === previous) {
         // The policy decided nothing material changed: no version bump, no event.
-        return toTaskDto(previous, workspace.taskKeyPrefix);
+        return this.toDto(tx, workspace, previous);
       }
 
       const persisted = await tx.tasks.update(next, previous.version);
@@ -511,8 +583,59 @@ export class TaskService {
         payload: { taskId, changes: materialChanges(next, previous) },
       });
 
-      return toTaskDto(next, workspace.taskKeyPrefix);
+      return this.toDto(tx, workspace, next);
     });
+  }
+
+  private async insertDayPlan(
+    tx: TransactionContext,
+    context: ActorContext,
+    task: Task,
+    planDate: PlainDate,
+    source: DayPlanSource,
+  ): Promise<void> {
+    const inserted = await tx.dayPlans.insert({
+      taskId: task.id,
+      planDate,
+      source,
+      createdBy: actorRef(context),
+      createdAt: this.clock.now(),
+    });
+    // Already planned for that day: nothing changed, so nothing is recorded.
+    if (!inserted) return;
+
+    await recordEvent(tx, context, this.clock, {
+      workspaceId: task.workspaceId,
+      aggregateType: "task",
+      aggregateId: task.id,
+      eventType: TASK_EVENTS.dayAdded,
+      summary: `Added task to My Day for ${planDate}`,
+      payload: { taskId: task.id, planDate, source },
+    });
+  }
+
+  private async toDto(
+    tx: TransactionContext,
+    workspace: Workspace,
+    task: Task,
+  ): Promise<TaskDto> {
+    const [dto] = await this.toDtos(tx, workspace, [task]);
+    return dto as TaskDto;
+  }
+
+  /** Map tasks with their upcoming My Day dates, loaded in one query (spec 9.5). */
+  private async toDtos(
+    tx: TransactionContext,
+    workspace: Workspace,
+    tasks: readonly Task[],
+  ): Promise<TaskDto[]> {
+    const plans = await tx.dayPlans.listForTasks(
+      tasks.map((task) => task.id),
+      this.workspaceToday(workspace.timezone),
+    );
+    return tasks.map((task) =>
+      toTaskDto(task, workspace.taskKeyPrefix, plans.get(task.id) ?? []),
+    );
   }
 
   private async requireWorkspace(tx: TransactionContext, workspaceId: string) {

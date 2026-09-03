@@ -613,3 +613,145 @@ describe("TaskService.get", () => {
     ).rejects.toMatchObject({ code: "TASK_NOT_FOUND" });
   });
 });
+
+describe("My Day", () => {
+  it("adds a task to the workspace's current day and records both event rows", async () => {
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Plan me",
+    });
+
+    const planned = await service.addToDay(
+      seeded.context,
+      seeded.workspace.id,
+      task.id,
+    );
+
+    // NOW is 09:00Z, which is the same calendar day in Europe/Berlin.
+    expect(planned.dayPlans).toEqual(["2026-08-29"]);
+    // The selection is a relation, not a task edit: no version bump (spec 9.2).
+    expect(planned.version).toBe(1);
+    expect(unitOfWork.data.dayPlans.size).toBe(1);
+    const added = unitOfWork.data.activity.filter(
+      (event) => event.eventType === "task.day_added",
+    );
+    expect(added).toHaveLength(1);
+    expect(added[0]?.payload).toEqual({
+      taskId: task.id,
+      planDate: "2026-08-29",
+      source: "manual",
+    });
+    expect(unitOfWork.data.outbox.at(-1)?.eventType).toBe("task.day_added");
+  });
+
+  it("is idempotent: adding the same day twice records one plan and one event", async () => {
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Twice",
+    });
+
+    await service.addToDay(seeded.context, seeded.workspace.id, task.id, {
+      date: "2026-08-30",
+    });
+    const again = await service.addToDay(seeded.context, seeded.workspace.id, task.id, {
+      date: "2026-08-30",
+    });
+
+    expect(again.dayPlans).toEqual(["2026-08-30"]);
+    expect(unitOfWork.data.dayPlans.size).toBe(1);
+    expect(
+      unitOfWork.data.activity.filter((e) => e.eventType === "task.day_added"),
+    ).toHaveLength(1);
+  });
+
+  it("captures straight into My Day with addToDay on create", async () => {
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Captured for today",
+      addToDay: "2026-08-29",
+    });
+
+    expect(task.dayPlans).toEqual(["2026-08-29"]);
+    expect(unitOfWork.data.activity.map((event) => event.eventType)).toEqual([
+      "task.created",
+      "task.day_added",
+    ]);
+    expect(unitOfWork.data.activity[1]?.payload).toMatchObject({ source: "capture" });
+  });
+
+  it("removes a selection and records the removal; removing again changes nothing", async () => {
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Remove me",
+    });
+    await service.addToDay(seeded.context, seeded.workspace.id, task.id);
+
+    const removed = await service.removeFromDay(
+      seeded.context,
+      seeded.workspace.id,
+      task.id,
+      "2026-08-29",
+    );
+    await service.removeFromDay(
+      seeded.context,
+      seeded.workspace.id,
+      task.id,
+      "2026-08-29",
+    );
+
+    expect(removed.dayPlans).toEqual([]);
+    expect(unitOfWork.data.dayPlans.size).toBe(0);
+    expect(
+      unitOfWork.data.activity.filter((e) => e.eventType === "task.day_removed"),
+    ).toHaveLength(1);
+  });
+
+  it("does not expose past selections on the task", async () => {
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "History",
+    });
+    await service.addToDay(seeded.context, seeded.workspace.id, task.id, {
+      date: "2026-08-28",
+    });
+
+    const fetched = await service.get(seeded.context, seeded.workspace.id, task.key);
+
+    expect(fetched.dayPlans).toEqual([]);
+    expect(unitOfWork.data.dayPlans.size).toBe(1);
+  });
+
+  it("rejects a deleted task and a date that is not a real calendar date", async () => {
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Gone",
+    });
+    await expect(
+      service.addToDay(seeded.context, seeded.workspace.id, task.id, {
+        date: "2026-02-30",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+
+    await service.delete(seeded.context, seeded.workspace.id, task.id);
+    await expect(
+      service.addToDay(seeded.context, seeded.workspace.id, task.id),
+    ).rejects.toMatchObject({ code: "TASK_NOT_FOUND" });
+  });
+
+  it("rolls back the plan and both event rows together when the commit fails", async () => {
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Doomed plan",
+    });
+    const activityBefore = unitOfWork.data.activity.length;
+    unitOfWork.failNextCommit();
+
+    await expect(
+      service.addToDay(seeded.context, seeded.workspace.id, task.id),
+    ).rejects.toThrow("simulated commit failure");
+
+    expect(unitOfWork.data.dayPlans.size).toBe(0);
+    expect(unitOfWork.data.activity).toHaveLength(activityBefore);
+    expect(unitOfWork.data.outbox).toHaveLength(activityBefore);
+  });
+});

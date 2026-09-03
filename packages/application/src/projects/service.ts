@@ -12,6 +12,7 @@ import {
   ValidationError,
   ranksBetween,
   systemClock,
+  toLocalDate,
   uuidv7,
   type Clock,
   type WorkflowStatus,
@@ -171,12 +172,19 @@ export class ProjectService {
         projectId,
         limit: Math.min(query.limit ?? BOARD_TASK_LIMIT, BOARD_TASK_LIMIT),
       });
+      // Cards show the My Day indicator (spec 9.5); one query covers the whole board.
+      const plans = await tx.dayPlans.listForTasks(
+        tasks.items.map((task) => task.id),
+        toLocalDate(this.clock.now(), workspace.timezone),
+      );
 
       return {
         data: {
           project: toProjectDto(project),
           statuses: statuses.map(toWorkflowStatusDto),
-          tasks: tasks.items.map((task) => toTaskDto(task, workspace.taskKeyPrefix)),
+          tasks: tasks.items.map((task) =>
+            toTaskDto(task, workspace.taskKeyPrefix, plans.get(task.id) ?? []),
+          ),
         },
         page: { hasMore: tasks.hasMore, truncated: tasks.truncated },
       };
