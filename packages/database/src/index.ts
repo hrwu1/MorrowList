@@ -7,6 +7,7 @@ export {
 } from "./client.js";
 export { migrate, type MigrateOptions, type MigrateResult } from "./migrate.js";
 export { buildTransactionContext, createUnitOfWork } from "./unit-of-work.js";
+export { createDayPlanRepository } from "./repositories/day-plans.js";
 export {
   createActivityRepository,
   createOutboxRepository,

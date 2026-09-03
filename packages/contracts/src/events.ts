@@ -47,6 +47,9 @@ export const TASK_EVENTS = {
   reopened: "task.reopened",
   deleted: "task.deleted",
   restored: "task.restored",
+  /** My Day add/remove (spec 9.2). Payload: `{ taskId, planDate, source }`. */
+  dayAdded: "task.day_added",
+  dayRemoved: "task.day_removed",
 } as const;
 
 export const WORKSPACE_EVENTS = {

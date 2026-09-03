@@ -1,3 +1,4 @@
+import type { DayPlanRepository } from "./day-plans.js";
 import type { ActivityRepository, OutboxRepository } from "./events.js";
 import type { ProjectRepository, WorkflowStatusRepository } from "./projects.js";
 import type { TaskCounterRepository, TaskRepository } from "./tasks.js";
@@ -11,6 +12,7 @@ import type { WorkspaceRepository } from "./workspace.js";
 export interface TransactionContext {
   readonly tasks: TaskRepository;
   readonly taskCounters: TaskCounterRepository;
+  readonly dayPlans: DayPlanRepository;
   readonly projects: ProjectRepository;
   readonly statuses: WorkflowStatusRepository;
   readonly workspaces: WorkspaceRepository;

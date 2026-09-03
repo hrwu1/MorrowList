@@ -1,6 +1,7 @@
 export type { TransactionContext, UnitOfWork } from "./unit-of-work.js";
 export {
   BOARD_TASK_LIMIT,
+  UPCOMING_LIMIT,
   type BoardTaskPage,
   type BoardTaskQuery,
   type Cursor,
@@ -9,7 +10,10 @@ export {
   type TaskCounterRepository,
   type TaskFilter,
   type TaskRepository,
+  type TodayTaskQuery,
+  type UpcomingTaskQuery,
 } from "./tasks.js";
+export type { DayPlanRepository } from "./day-plans.js";
 export type {
   Project,
   ProjectRepository,

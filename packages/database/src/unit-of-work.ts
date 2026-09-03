@@ -1,6 +1,7 @@
 import type { TransactionContext, UnitOfWork } from "@morrowlist/application";
 
 import type { Database, DatabaseHandle } from "./client.js";
+import { createDayPlanRepository } from "./repositories/day-plans.js";
 import {
   createActivityRepository,
   createOutboxRepository,
@@ -26,6 +27,7 @@ export function buildTransactionContext(db: Database): TransactionContext {
   return {
     tasks: createTaskRepository(db),
     taskCounters: createTaskCounterRepository(db),
+    dayPlans: createDayPlanRepository(db),
     projects: createProjectRepository(db),
     statuses: createWorkflowStatusRepository(db),
     workspaces: createWorkspaceRepository(db),

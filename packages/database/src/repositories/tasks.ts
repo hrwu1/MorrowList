@@ -1,5 +1,6 @@
 import {
   BOARD_TASK_LIMIT,
+  UPCOMING_LIMIT,
   type BoardTaskPage,
   type Cursor,
   type Page,
@@ -14,16 +15,24 @@ import {
   asc,
   desc,
   eq,
+  exists,
   gt,
   inArray,
   isNotNull,
   isNull,
   lt,
+  lte,
+  or,
   sql,
 } from "drizzle-orm";
 
 import type { Database } from "../client.js";
-import { tasks, workflowStatuses, workspaceTaskCounters } from "../schema/index.js";
+import {
+  taskDayPlans,
+  tasks,
+  workflowStatuses,
+  workspaceTaskCounters,
+} from "../schema/index.js";
 
 import { toTask, toTaskRow } from "./mappers.js";
 
@@ -183,6 +192,70 @@ export function createTaskRepository(db: Database): TaskRepository {
         hasMore,
         truncated: hasMore,
       };
+    },
+
+    async listToday(query): Promise<BoardTaskPage> {
+      const limit = Math.max(
+        1,
+        Math.min(query.limit ?? BOARD_TASK_LIMIT, BOARD_TASK_LIMIT),
+      );
+
+      // One query for the whole day: the due-date predicate uses tasks_due_idx and the
+      // plan lookup uses task_day_plans_date_idx, so Today stays flat as the workspace
+      // grows (spec 9.2, the 300 ms budget).
+      const rows = await db
+        .select()
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.workspaceId, query.workspaceId),
+            isNull(tasks.deletedAt),
+            isNull(tasks.completedAt),
+            or(
+              lte(tasks.dueDate, query.date),
+              exists(
+                db
+                  .select({ one: sql`1` })
+                  .from(taskDayPlans)
+                  .where(
+                    and(
+                      eq(taskDayPlans.taskId, tasks.id),
+                      eq(taskDayPlans.planDate, query.date),
+                    ),
+                  ),
+              ),
+            ),
+          ),
+        )
+        .orderBy(sql`${tasks.dueDate} asc nulls last`, asc(tasks.rank), asc(tasks.id))
+        .limit(limit + 1);
+
+      const hasMore = rows.length > limit;
+      return { items: rows.slice(0, limit).map(toTask), hasMore, truncated: hasMore };
+    },
+
+    async listUpcoming(query): Promise<BoardTaskPage> {
+      const limit = Math.max(
+        1,
+        Math.min(query.limit ?? UPCOMING_LIMIT, UPCOMING_LIMIT),
+      );
+      const conditions = [
+        eq(tasks.workspaceId, query.workspaceId),
+        isNull(tasks.deletedAt),
+        isNull(tasks.completedAt),
+        gt(tasks.dueDate, query.from),
+      ];
+      if (query.to !== null) conditions.push(lte(tasks.dueDate, query.to));
+
+      const rows = await db
+        .select()
+        .from(tasks)
+        .where(and(...conditions))
+        .orderBy(asc(tasks.dueDate), asc(tasks.rank), asc(tasks.id))
+        .limit(limit + 1);
+
+      const hasMore = rows.length > limit;
+      return { items: rows.slice(0, limit).map(toTask), hasMore, truncated: hasMore };
     },
 
     async insert(task) {

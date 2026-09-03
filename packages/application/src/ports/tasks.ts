@@ -1,5 +1,5 @@
-import { PROJECT_BOARD_TASK_LIMIT } from "@morrowlist/contracts";
-import type { Task } from "@morrowlist/domain";
+import { PROJECT_BOARD_TASK_LIMIT, UPCOMING_TASK_LIMIT } from "@morrowlist/contracts";
+import type { PlainDate, Task } from "@morrowlist/domain";
 
 /** Persistence ports for tasks. Implemented by `@morrowlist/database`. */
 
@@ -61,6 +61,26 @@ export interface BoardTaskQuery {
 }
 
 export const BOARD_TASK_LIMIT = PROJECT_BOARD_TASK_LIMIT;
+export const UPCOMING_LIMIT = UPCOMING_TASK_LIMIT;
+
+/**
+ * The Today read: every open task that is overdue, due on `date`, or planned for `date`,
+ * in one bounded query (spec 9.2). The projection is complete for any realistic day; the
+ * cap only guards a pathological workspace.
+ */
+export interface TodayTaskQuery {
+  readonly workspaceId: string;
+  readonly date: PlainDate;
+  readonly limit?: number | undefined;
+}
+
+/** Open tasks due after `from` and, when `to` is set, on or before it (spec 9.3). */
+export interface UpcomingTaskQuery {
+  readonly workspaceId: string;
+  readonly from: PlainDate;
+  readonly to: PlainDate | null;
+  readonly limit?: number | undefined;
+}
 
 /** The ordering scope a rank is unique within: an Inbox, or a project status column. */
 export interface RankScope {
@@ -75,6 +95,9 @@ export interface TaskRepository {
   list(filter: TaskFilter, cursor: Cursor): Promise<Page<Task>>;
   /** Active project tasks ordered by status rank, then task rank, in one data query. */
   listBoard(query: BoardTaskQuery): Promise<BoardTaskPage>;
+  listToday(query: TodayTaskQuery): Promise<BoardTaskPage>;
+  /** Ordered by due date, then rank. */
+  listUpcoming(query: UpcomingTaskQuery): Promise<BoardTaskPage>;
   insert(task: Task): Promise<void>;
   /**
    * Persist a task, guarding on the version the caller loaded. Returns false when the

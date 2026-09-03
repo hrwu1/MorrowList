@@ -5,7 +5,11 @@ import { isCompleted, taskKey, type Task } from "@morrowlist/domain";
  * Domain-to-contract mapping (spec 17.3 step 8). Keeping this in one place means a
  * transport change cannot quietly alter what the domain exposes.
  */
-export function toTaskDto(task: Task, taskKeyPrefix: string): TaskDto {
+export function toTaskDto(
+  task: Task,
+  taskKeyPrefix: string,
+  dayPlans: readonly string[] = [],
+): TaskDto {
   return {
     id: task.id,
     key: taskKey(taskKeyPrefix, task.taskNumber),
@@ -29,5 +33,6 @@ export function toTaskDto(task: Task, taskKeyPrefix: string): TaskDto {
     createdAt: task.createdAt.toISOString(),
     updatedAt: task.updatedAt.toISOString(),
     deletedAt: task.deletedAt?.toISOString() ?? null,
+    dayPlans: [...dayPlans],
   };
 }

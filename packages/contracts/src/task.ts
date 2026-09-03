@@ -36,6 +36,12 @@ export const taskSchema = z.object({
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   deletedAt: z.iso.datetime().nullable(),
+  /**
+   * My Day selections on or after the workspace's current date, ascending (spec 9.2,
+   * 9.5). Today's selection, when present, is the first entry, so a card can show the
+   * My Day indicator without knowing the workspace timezone.
+   */
+  dayPlans: z.array(plainDateSchema),
 });
 
 export const titleSchema = z.string().trim().min(1).max(500);
@@ -140,6 +146,11 @@ export const completeTaskRequestSchema = z.object({
 
 export const reopenTaskRequestSchema = completeTaskRequestSchema;
 
+/** `POST /tasks/{id}/today`: the date defaults to the workspace's current date. */
+export const addTaskToDayRequestSchema = z.object({
+  date: plainDateSchema.optional(),
+});
+
 export const dueFilterSchema = z.enum(["overdue", "today", "future", "none"]);
 
 /** Task list query fields (spec 20.5). */
@@ -176,5 +187,6 @@ export type UpdateTaskRequest = z.infer<typeof updateTaskRequestSchema>;
 export type MoveTaskRequest = z.infer<typeof moveTaskRequestSchema>;
 export type ReorderTaskRequest = z.infer<typeof reorderTaskRequestSchema>;
 export type CompleteTaskRequest = z.infer<typeof completeTaskRequestSchema>;
+export type AddTaskToDayRequest = z.infer<typeof addTaskToDayRequestSchema>;
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;
 export type TaskListResponse = z.infer<typeof taskListResponseSchema>;

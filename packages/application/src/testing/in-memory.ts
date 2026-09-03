@@ -1,4 +1,4 @@
-import type { Task, WorkflowStatus } from "@morrowlist/domain";
+import type { DayPlan, PlainDate, Task, WorkflowStatus } from "@morrowlist/domain";
 
 import type {
   ActivityEvent,
@@ -6,6 +6,7 @@ import type {
   ActivityRepository,
   AggregateType,
   Cursor,
+  DayPlanRepository,
   OutboxEventInput,
   OutboxRepository,
   Page,
@@ -23,7 +24,7 @@ import type {
   WorkspaceRepository,
   WorkspaceRole,
 } from "../ports/index.js";
-import { BOARD_TASK_LIMIT } from "../ports/tasks.js";
+import { BOARD_TASK_LIMIT, UPCOMING_LIMIT } from "../ports/tasks.js";
 
 /**
  * In-memory adapters for the application ports.
@@ -36,6 +37,8 @@ import { BOARD_TASK_LIMIT } from "../ports/tasks.js";
 export interface InMemoryData {
   tasks: Map<string, Task>;
   counters: Map<string, number>;
+  /** Keyed by `${taskId}:${planDate}`, mirroring the composite primary key. */
+  dayPlans: Map<string, DayPlan>;
   projects: Map<string, Project>;
   statuses: Map<string, WorkflowStatus>;
   workspaces: Map<string, Workspace>;
@@ -48,6 +51,7 @@ export function emptyData(): InMemoryData {
   return {
     tasks: new Map(),
     counters: new Map(),
+    dayPlans: new Map(),
     projects: new Map(),
     statuses: new Map(),
     workspaces: new Map(),
@@ -189,6 +193,48 @@ function taskRepository(data: InMemoryData): TaskRepository {
         truncated: hasMore,
       };
     },
+    async listToday(query) {
+      const limit = Math.max(
+        1,
+        Math.min(query.limit ?? BOARD_TASK_LIMIT, BOARD_TASK_LIMIT),
+      );
+      const planned = new Set(
+        [...data.dayPlans.values()]
+          .filter((plan) => plan.planDate === query.date)
+          .map((plan) => plan.taskId),
+      );
+      const items = [...data.tasks.values()]
+        .filter(
+          (task) =>
+            task.workspaceId === query.workspaceId &&
+            task.deletedAt === null &&
+            task.completedAt === null &&
+            ((task.dueDate !== null && task.dueDate <= query.date) ||
+              planned.has(task.id)),
+        )
+        .sort(byDueThenRank);
+      const hasMore = items.length > limit;
+      return { items: items.slice(0, limit), hasMore, truncated: hasMore };
+    },
+    async listUpcoming(query) {
+      const limit = Math.max(
+        1,
+        Math.min(query.limit ?? UPCOMING_LIMIT, UPCOMING_LIMIT),
+      );
+      const items = [...data.tasks.values()]
+        .filter(
+          (task) =>
+            task.workspaceId === query.workspaceId &&
+            task.deletedAt === null &&
+            task.completedAt === null &&
+            task.dueDate !== null &&
+            task.dueDate > query.from &&
+            (query.to === null || task.dueDate <= query.to),
+        )
+        .sort(byDueThenRank);
+      const hasMore = items.length > limit;
+      return { items: items.slice(0, limit), hasMore, truncated: hasMore };
+    },
     async insert(task) {
       data.tasks.set(task.id, task);
     },
@@ -234,6 +280,57 @@ function taskRepository(data: InMemoryData): TaskRepository {
         current = parent;
       }
       return chain;
+    },
+  };
+}
+
+function byDueThenRank(left: Task, right: Task): number {
+  const leftDue = left.dueDate ?? "9999-12-31";
+  const rightDue = right.dueDate ?? "9999-12-31";
+  if (leftDue !== rightDue) return leftDue < rightDue ? -1 : 1;
+  if (left.rank !== right.rank) return left.rank < right.rank ? -1 : 1;
+  return left.id < right.id ? -1 : 1;
+}
+
+function dayPlanKey(taskId: string, planDate: PlainDate): string {
+  return `${taskId}:${planDate}`;
+}
+
+function dayPlanRepository(data: InMemoryData): DayPlanRepository {
+  return {
+    async insert(plan) {
+      const key = dayPlanKey(plan.taskId, plan.planDate);
+      if (data.dayPlans.has(key)) return false;
+      data.dayPlans.set(key, plan);
+      return true;
+    },
+    async delete(taskId, planDate) {
+      return data.dayPlans.delete(dayPlanKey(taskId, planDate));
+    },
+    async listForTasks(taskIds, from) {
+      const wanted = new Set(taskIds);
+      const result = new Map<string, PlainDate[]>();
+      for (const plan of data.dayPlans.values()) {
+        if (!wanted.has(plan.taskId) || plan.planDate < from) continue;
+        const dates = result.get(plan.taskId) ?? [];
+        dates.push(plan.planDate);
+        result.set(plan.taskId, dates.sort());
+      }
+      return result;
+    },
+    async listUnfinished(workspaceId, date) {
+      return [...data.dayPlans.values()]
+        .filter((plan) => plan.planDate === date && plan.source === "manual")
+        .flatMap((plan) => {
+          const task = data.tasks.get(plan.taskId);
+          return task &&
+            task.workspaceId === workspaceId &&
+            task.deletedAt === null &&
+            task.completedAt === null
+            ? [task]
+            : [];
+        })
+        .sort((left, right) => (left.rank < right.rank ? -1 : 1));
     },
   };
 }
@@ -438,6 +535,7 @@ export function createInMemoryUnitOfWork(
   const snapshot = (source: InMemoryData): InMemoryData => ({
     tasks: new Map(source.tasks),
     counters: new Map(source.counters),
+    dayPlans: new Map(source.dayPlans),
     projects: new Map(source.projects),
     statuses: new Map(source.statuses),
     workspaces: new Map(source.workspaces),
@@ -449,6 +547,7 @@ export function createInMemoryUnitOfWork(
   const restore = (target: InMemoryData, source: InMemoryData): void => {
     target.tasks = source.tasks;
     target.counters = source.counters;
+    target.dayPlans = source.dayPlans;
     target.projects = source.projects;
     target.statuses = source.statuses;
     target.workspaces = source.workspaces;
@@ -470,6 +569,7 @@ export function createInMemoryUnitOfWork(
       const tx: TransactionContext = {
         tasks: taskRepository(working),
         taskCounters: counterRepository(working),
+        dayPlans: dayPlanRepository(working),
         projects: projectRepository(working),
         statuses: statusRepository(working),
         workspaces: workspaceRepository(working),
