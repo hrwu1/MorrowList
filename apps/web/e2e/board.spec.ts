@@ -261,7 +261,13 @@ async function addSecondProject(page: Page) {
   ).toBeVisible();
 }
 
-async function addReadyTask(page: Page, title: string) {
+/**
+ * Waits for the named board before opening its capture input: the sidebar link that
+ * precedes this is a soft navigation, and clicking "+ Add to Ready" while the previous
+ * board is still on screen files the task under that project instead.
+ */
+async function addReadyTask(page: Page, project: string, title: string) {
+  await expect(page.getByRole("heading", { level: 1, name: project })).toBeVisible();
   await page.getByRole("button", { name: "+ Add to Ready" }).click();
   const capture = page.getByPlaceholder("Add to Ready and press Enter");
   await capture.fill(title);
@@ -278,7 +284,7 @@ test("the Project field moves a task to another project or back to the Inbox", a
   await createProject(page);
   await addSecondProject(page);
   await page.getByRole("link", { name: "Research Launch", exact: true }).click();
-  await addReadyTask(page, "Write launch FAQ");
+  await addReadyTask(page, "Research Launch", "Write launch FAQ");
 
   const ready = page.getByRole("region", { name: "Ready" });
   await ready.getByRole("link", { name: "Write launch FAQ" }).click();
@@ -320,7 +326,7 @@ test("dragging a card or row onto a sidebar destination moves it there", async (
   await createProject(page);
   await addSecondProject(page);
   await page.getByRole("link", { name: "Research Launch", exact: true }).click();
-  await addReadyTask(page, "Sketch onboarding flow");
+  await addReadyTask(page, "Research Launch", "Sketch onboarding flow");
 
   const ready = page.getByRole("region", { name: "Ready" });
   const card = ready
