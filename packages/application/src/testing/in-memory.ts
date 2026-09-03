@@ -1,4 +1,10 @@
-import type { DayPlan, PlainDate, Task, WorkflowStatus } from "@morrowlist/domain";
+import {
+  childProgress,
+  type DayPlan,
+  type PlainDate,
+  type Task,
+  type WorkflowStatus,
+} from "@morrowlist/domain";
 
 import type {
   ActivityEvent,
@@ -166,7 +172,8 @@ function taskRepository(data: InMemoryData): TaskRepository {
             task.workspaceId !== query.workspaceId ||
             task.projectId !== query.projectId ||
             task.deletedAt !== null ||
-            task.statusId === null
+            task.statusId === null ||
+            (!query.includeSubtasks && task.parentTaskId !== null)
           ) {
             return false;
           }
@@ -280,6 +287,31 @@ function taskRepository(data: InMemoryData): TaskRepository {
         current = parent;
       }
       return chain;
+    },
+    async descendantDepth(workspaceId, taskId) {
+      const depthBelow = (id: string, seen: Set<string>): number => {
+        if (seen.has(id)) return 0;
+        seen.add(id);
+        const children = [...data.tasks.values()].filter(
+          (task) => task.workspaceId === workspaceId && task.parentTaskId === id,
+        );
+        return children.length === 0
+          ? 0
+          : 1 + Math.max(...children.map((child) => depthBelow(child.id, seen)));
+      };
+      return depthBelow(taskId, new Set());
+    },
+    async childSummary(workspaceId, taskIds) {
+      const result = new Map<string, ReturnType<typeof childProgress>>();
+      for (const id of taskIds) {
+        const progress = childProgress(
+          [...data.tasks.values()].filter(
+            (task) => task.workspaceId === workspaceId && task.parentTaskId === id,
+          ),
+        );
+        if (progress.total > 0) result.set(id, progress);
+      }
+      return result;
     },
   };
 }

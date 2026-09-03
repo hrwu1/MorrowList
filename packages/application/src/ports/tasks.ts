@@ -1,5 +1,5 @@
 import { PROJECT_BOARD_TASK_LIMIT, UPCOMING_TASK_LIMIT } from "@morrowlist/contracts";
-import type { PlainDate, Task } from "@morrowlist/domain";
+import type { ChildProgress, PlainDate, Task } from "@morrowlist/domain";
 
 /** Persistence ports for tasks. Implemented by `@morrowlist/database`. */
 
@@ -58,6 +58,8 @@ export interface BoardTaskQuery {
   readonly workspaceId: string;
   readonly projectId: string;
   readonly limit?: number | undefined;
+  /** Boards hide subtasks unless asked to show them (spec 8.3). */
+  readonly includeSubtasks?: boolean | undefined;
 }
 
 export const BOARD_TASK_LIMIT = PROJECT_BOARD_TASK_LIMIT;
@@ -115,6 +117,16 @@ export interface TaskRepository {
   ): Promise<Map<string, string>>;
   /** Ancestor chain of a task, nearest parent first, for cycle and depth checks. */
   ancestorIds(workspaceId: string, taskId: string): Promise<readonly string[]>;
+  /** Levels below a task: 0 for a leaf, 1 with children, 2 with grandchildren. */
+  descendantDepth(workspaceId: string, taskId: string): Promise<number>;
+  /**
+   * Direct-child progress for many parents in one query (spec 8.3, 29.3). Parents with
+   * no live children are absent from the result.
+   */
+  childSummary(
+    workspaceId: string,
+    taskIds: readonly string[],
+  ): Promise<ReadonlyMap<string, ChildProgress>>;
 }
 
 export interface TaskCounterRepository {

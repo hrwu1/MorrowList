@@ -9,7 +9,7 @@ import {
   type TaskFilter,
   type TaskRepository,
 } from "@morrowlist/application";
-import type { Task } from "@morrowlist/domain";
+import type { ChildProgress, Task } from "@morrowlist/domain";
 import {
   and,
   asc,
@@ -179,6 +179,7 @@ export function createTaskRepository(db: Database): TaskRepository {
             eq(tasks.workspaceId, query.workspaceId),
             eq(tasks.projectId, query.projectId),
             isNull(tasks.deletedAt),
+            query.includeSubtasks ? undefined : isNull(tasks.parentTaskId),
             eq(workflowStatuses.projectId, query.projectId),
             isNull(workflowStatuses.archivedAt),
           ),
@@ -325,6 +326,50 @@ export function createTaskRepository(db: Database): TaskRepository {
         select id from chain where id <> ${taskId} order by depth
       `);
       return result.rows.map((row) => row.id);
+    },
+
+    async descendantDepth(workspaceId, taskId) {
+      // Deleted descendants count: restoring one must never yield a tree over the limit.
+      const result = await db.execute<{ depth: number | string }>(sql`
+        with recursive subtree as (
+          select t.id, 0 as depth
+          from ${tasks} t
+          where t.id = ${taskId} and t.workspace_id = ${workspaceId}
+          union all
+          select c.id, subtree.depth + 1
+          from ${tasks} c
+          join subtree on c.parent_task_id = subtree.id
+          where subtree.depth < 16 and c.workspace_id = ${workspaceId}
+        )
+        select coalesce(max(depth), 0) as depth from subtree
+      `);
+      return Number(result.rows[0]?.depth ?? 0);
+    },
+
+    async childSummary(workspaceId, taskIds) {
+      if (taskIds.length === 0) return new Map();
+      const rows = await db
+        .select({
+          parentTaskId: tasks.parentTaskId,
+          total: sql<number>`count(*)::int`,
+          completed: sql<number>`count(${tasks.completedAt})::int`,
+        })
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.workspaceId, workspaceId),
+            inArray(tasks.parentTaskId, [...taskIds]),
+            isNull(tasks.deletedAt),
+          ),
+        )
+        .groupBy(tasks.parentTaskId);
+      return new Map<string, ChildProgress>(
+        rows.flatMap((row) =>
+          row.parentTaskId
+            ? [[row.parentTaskId, { completed: row.completed, total: row.total }]]
+            : [],
+        ),
+      );
     },
   };
 }

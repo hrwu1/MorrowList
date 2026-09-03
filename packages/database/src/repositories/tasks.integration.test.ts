@@ -1,4 +1,9 @@
-import { TaskService, bootstrapUser, type ActorContext } from "@morrowlist/application";
+import {
+  ProjectService,
+  TaskService,
+  bootstrapUser,
+  type ActorContext,
+} from "@morrowlist/application";
 import { fixedClock, rankBetween, uuidv7 } from "@morrowlist/domain";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -358,6 +363,88 @@ describe("trash", () => {
       order: "asc",
     } as never);
     expect(afterRestore.data).toHaveLength(0);
+  });
+});
+
+describe("subtask tree", () => {
+  it("summarises child progress and measures depth on a three-level tree", async () => {
+    // Root -> child -> grandchild, plus a sibling of the child that is completed and one
+    // that is deleted. The summary is one grouped query for every parent asked for.
+    const root = await service.create(context, { workspaceId, title: "Root" });
+    const child = await service.create(context, {
+      workspaceId,
+      title: "Child",
+      parentTaskId: root.id,
+    });
+    const doneSibling = await service.create(context, {
+      workspaceId,
+      title: "Done sibling",
+      parentTaskId: root.id,
+    });
+    const deletedSibling = await service.create(context, {
+      workspaceId,
+      title: "Deleted sibling",
+      parentTaskId: root.id,
+    });
+    const grandchild = await service.create(context, {
+      workspaceId,
+      title: "Grandchild",
+      parentTaskId: child.id,
+    });
+    await service.complete(context, workspaceId, doneSibling.id);
+    await service.delete(context, workspaceId, deletedSibling.id);
+
+    const unitOfWork = createUnitOfWork(handle);
+    const summary = await unitOfWork.execute((tx) =>
+      tx.tasks.childSummary(workspaceId, [root.id, child.id, grandchild.id]),
+    );
+    expect(summary.get(root.id)).toEqual({ completed: 1, total: 2 });
+    expect(summary.get(child.id)).toEqual({ completed: 0, total: 1 });
+    expect(summary.has(grandchild.id)).toBe(false);
+
+    const depths = await unitOfWork.execute(async (tx) => ({
+      root: await tx.tasks.descendantDepth(workspaceId, root.id),
+      child: await tx.tasks.descendantDepth(workspaceId, child.id),
+      grandchild: await tx.tasks.descendantDepth(workspaceId, grandchild.id),
+      ancestors: await tx.tasks.ancestorIds(workspaceId, grandchild.id),
+    }));
+    expect(depths).toEqual({
+      root: 2,
+      child: 1,
+      grandchild: 0,
+      ancestors: [child.id, root.id],
+    });
+  });
+
+  it("hides subtasks from the board unless asked to include them", async () => {
+    const unitOfWork = createUnitOfWork(handle);
+    const { project } = await new ProjectService({
+      unitOfWork,
+      clock: fixedClock(NOW),
+    }).create(context, { workspaceId, name: "Research Launch" });
+
+    const parent = await service.create(context, {
+      workspaceId,
+      title: "Parent",
+      projectId: project.id,
+    });
+    const subtask = await service.create(context, {
+      workspaceId,
+      title: "Subtask",
+      projectId: project.id,
+      parentTaskId: parent.id,
+    });
+
+    const hidden = await unitOfWork.execute((tx) =>
+      tx.tasks.listBoard({ workspaceId, projectId: project.id }),
+    );
+    const shown = await unitOfWork.execute((tx) =>
+      tx.tasks.listBoard({ workspaceId, projectId: project.id, includeSubtasks: true }),
+    );
+    expect(hidden.items.map((task) => task.id)).toEqual([parent.id]);
+    expect(shown.items.map((task) => task.id).sort()).toEqual(
+      [parent.id, subtask.id].sort(),
+    );
   });
 });
 
