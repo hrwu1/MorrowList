@@ -252,6 +252,8 @@ function buildTask(
     rank,
     lastActiveStatusId: null,
     completedAt: null,
+    blockedReason: null,
+    blockedSince: null,
     version: 1,
     createdBy: { kind: "user", id: seededWorkspace.userId },
     lastActor: { kind: "user", id: seededWorkspace.userId },

@@ -1,5 +1,6 @@
 export type { TransactionContext, UnitOfWork } from "./unit-of-work.js";
 export {
+  BLOCKS_WALK_DEPTH,
   BOARD_TASK_LIMIT,
   UPCOMING_LIMIT,
   type BoardTaskPage,
@@ -7,6 +8,7 @@ export {
   type Cursor,
   type Page,
   type RankScope,
+  type RelationEdge,
   type TaskCounterRepository,
   type TaskFilter,
   type TaskRepository,

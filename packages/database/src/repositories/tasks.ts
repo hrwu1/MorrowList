@@ -1,10 +1,12 @@
 import {
+  BLOCKS_WALK_DEPTH,
   BOARD_TASK_LIMIT,
   UPCOMING_LIMIT,
   type BoardTaskPage,
   type Cursor,
   type Page,
   type RankScope,
+  type RelationEdge,
   type TaskCounterRepository,
   type TaskFilter,
   type TaskRepository,
@@ -25,20 +27,46 @@ import {
   or,
   sql,
 } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import type { Database } from "../client.js";
 import {
   tags,
   taskDayPlans,
+  taskRelations,
   taskTags,
   tasks,
   workflowStatuses,
   workspaceTaskCounters,
 } from "../schema/index.js";
 
-import { toTag, toTask, toTaskRow } from "./mappers.js";
+import {
+  toTag,
+  toTask,
+  toTaskRelation,
+  toTaskRelationRow,
+  toTaskRow,
+} from "./mappers.js";
 
 /** Drizzle implementation of the task ports (TASK-003). */
+
+/**
+ * The blocked predicate as the domain defines it (spec 8.4): open, and either flagged
+ * or waiting on a live, incomplete `blocks` predecessor. The self-join is aliased by
+ * name because Drizzle's `exists` needs a table reference distinct from the outer one.
+ */
+const BLOCKED = sql`(
+  ${tasks.completedAt} is null and (
+    ${tasks.blockedReason} is not null or exists (
+      select 1 from ${taskRelations} r
+      join ${tasks} p on p.id = r.source_task_id
+      where r.target_task_id = ${tasks.id}
+        and r.type = 'blocks'
+        and p.completed_at is null
+        and p.deleted_at is null
+    )
+  )
+)`;
 
 const PRIORITY_RANK = sql`
   case ${tasks.priority}
@@ -115,6 +143,9 @@ export function createTaskRepository(db: Database): TaskRepository {
         conditions.push(
           filter.isCompleted ? isNotNull(tasks.completedAt) : isNull(tasks.completedAt),
         );
+      }
+      if (filter.isBlocked !== undefined) {
+        conditions.push(filter.isBlocked ? BLOCKED : sql`not ${BLOCKED}`);
       }
       if (filter.due && filter.today) {
         const today = filter.today;
@@ -432,6 +463,100 @@ export function createTaskRepository(db: Database): TaskRepository {
       await db
         .delete(taskTags)
         .where(and(eq(taskTags.taskId, taskId), eq(taskTags.tagId, tagId)));
+    },
+
+    async relationsFor(workspaceId, taskIds) {
+      if (taskIds.length === 0) return [];
+      // One query for the page (spec 29.3): the relation plus both endpoint rows, so
+      // the caller can show the other task and evaluate its completion state.
+      const source = alias(tasks, "source_task");
+      const target = alias(tasks, "target_task");
+      const ids = [...taskIds];
+      const rows = await db
+        .select({ relation: taskRelations, source, target })
+        .from(taskRelations)
+        .innerJoin(source, eq(source.id, taskRelations.sourceTaskId))
+        .innerJoin(target, eq(target.id, taskRelations.targetTaskId))
+        .where(
+          and(
+            eq(taskRelations.workspaceId, workspaceId),
+            or(
+              inArray(taskRelations.sourceTaskId, ids),
+              inArray(taskRelations.targetTaskId, ids),
+            ),
+          ),
+        )
+        .orderBy(asc(taskRelations.createdAt), asc(taskRelations.id));
+      return rows.map(
+        (row): RelationEdge => ({
+          relation: toTaskRelation(row.relation),
+          source: toTask(row.source),
+          target: toTask(row.target),
+        }),
+      );
+    },
+
+    async findRelation(workspaceId, relationId) {
+      const [row] = await db
+        .select()
+        .from(taskRelations)
+        .where(
+          and(
+            eq(taskRelations.workspaceId, workspaceId),
+            eq(taskRelations.id, relationId),
+          ),
+        )
+        .limit(1);
+      return row ? toTaskRelation(row) : null;
+    },
+
+    async insertRelation(relation) {
+      const inserted = await db
+        .insert(taskRelations)
+        .values(toTaskRelationRow(relation))
+        .onConflictDoNothing({
+          target: [
+            taskRelations.sourceTaskId,
+            taskRelations.targetTaskId,
+            taskRelations.type,
+          ],
+        })
+        .returning({ id: taskRelations.id });
+      return inserted.length === 1;
+    },
+
+    async deleteRelation(workspaceId, relationId) {
+      await db
+        .delete(taskRelations)
+        .where(
+          and(
+            eq(taskRelations.workspaceId, workspaceId),
+            eq(taskRelations.id, relationId),
+          ),
+        );
+    },
+
+    async downstreamOf(workspaceId, taskId, type) {
+      // A bounded recursive walk along source → target edges; the depth cap guards
+      // against a cycle that predates the application-level check.
+      const result = await db.execute<{ id: string }>(sql`
+        with recursive downstream as (
+          select r.target_task_id as id, 1 as depth
+          from ${taskRelations} r
+          where r.source_task_id = ${taskId}
+            and r.workspace_id = ${workspaceId}
+            and r.type = ${type}
+          union
+          select r.target_task_id, downstream.depth + 1
+          from ${taskRelations} r
+          join downstream on r.source_task_id = downstream.id
+          where downstream.depth < ${BLOCKS_WALK_DEPTH}
+            and r.workspace_id = ${workspaceId}
+            and r.type = ${type}
+        )
+        select distinct id from downstream
+      `);
+      return result.rows.map((row) => row.id);
     },
   };
 }

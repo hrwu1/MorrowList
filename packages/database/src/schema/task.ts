@@ -5,6 +5,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   time,
@@ -14,7 +15,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { actorKindEnum, priorityEnum } from "./enums.js";
+import { actorKindEnum, priorityEnum, relationTypeEnum } from "./enums.js";
 import { projects, workflowStatuses } from "./project.js";
 import { workspaces } from "./workspace.js";
 
@@ -53,6 +54,9 @@ export const tasks = pgTable(
     // column collation, so the migration is the source of truth for it.
     lastActiveStatusId: uuid("last_active_status_id"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    // The explicit blocker flag (spec 8.4, GAP-06); added in migration 0005.
+    blockedReason: text("blocked_reason"),
+    blockedSince: timestamp("blocked_since", { withTimezone: true }),
     version: integer("version").notNull().default(1),
     createdByActorKind: actorKindEnum("created_by_actor_kind").notNull(),
     createdByActorId: varchar("created_by_actor_id", { length: 200 }).notNull(),
@@ -90,6 +94,51 @@ export const tasks = pgTable(
       sql`${table.parentTaskId} IS NULL OR ${table.parentTaskId} <> ${table.id}`,
     ),
     check("tasks_version_positive", sql`${table.version} >= 1`),
+    // A blocker flag carries its reason and its start together (spec 8.4).
+    check(
+      "tasks_blocked_reason_with_since",
+      sql`(${table.blockedReason} IS NULL) = (${table.blockedSince} IS NULL)`,
+    ),
+  ],
+);
+
+/**
+ * Task relationships (spec 8.4, 18.4). `blocks` is directed source → target; `related_to`
+ * is symmetric and stored once in canonical id order (spec 8.2 invariant 8). Rows go
+ * with a hard-deleted endpoint; a soft-deleted one merely hides them.
+ */
+export const taskRelations = pgTable(
+  "task_relations",
+  {
+    id: uuid("id").primaryKey(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    sourceTaskId: uuid("source_task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    targetTaskId: uuid("target_task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    type: relationTypeEnum("type").notNull(),
+    metadata: jsonb("metadata").notNull().default({}),
+    createdByActorKind: actorKindEnum("created_by_actor_kind").notNull(),
+    createdByActorId: varchar("created_by_actor_id", { length: 200 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("task_relations_edge_key").on(
+      table.sourceTaskId,
+      table.targetTaskId,
+      table.type,
+    ),
+    index("task_relations_source_idx").on(table.sourceTaskId),
+    index("task_relations_target_idx").on(table.targetTaskId),
+    // Invariant 4: a task cannot be its own relationship target (spec 8.2).
+    check(
+      "task_relations_no_self",
+      sql`${table.sourceTaskId} <> ${table.targetTaskId}`,
+    ),
   ],
 );
 

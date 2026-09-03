@@ -265,6 +265,8 @@ describe("transactional event recording", () => {
           rank: "a0",
           lastActiveStatusId: null,
           completedAt: null,
+          blockedReason: null,
+          blockedSince: null,
           version: 1,
           createdBy: { kind: "user", id: context.actorId },
           lastActor: { kind: "user", id: context.actorId },

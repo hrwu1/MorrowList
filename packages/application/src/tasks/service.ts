@@ -289,6 +289,7 @@ export class TaskService {
           tagId: query.tagId,
           inboxOnly: query.inbox,
           isCompleted: query.isCompleted,
+          isBlocked: query.isBlocked,
           deletedOnly: query.deleted,
           includeSubtasks: query.includeSubtasks,
           due: query.due,

@@ -1,9 +1,11 @@
 import {
   childProgress,
+  isBlocked,
   type DayPlan,
   type PlainDate,
   type Tag,
   type Task,
+  type TaskRelation,
   type WorkflowStatus,
 } from "@morrowlist/domain";
 
@@ -20,6 +22,7 @@ import type {
   Project,
   ProjectRepository,
   RankScope,
+  RelationEdge,
   TagRepository,
   TaskCounterRepository,
   TaskFilter,
@@ -32,7 +35,7 @@ import type {
   WorkspaceRepository,
   WorkspaceRole,
 } from "../ports/index.js";
-import { BOARD_TASK_LIMIT, UPCOMING_LIMIT } from "../ports/tasks.js";
+import { BLOCKS_WALK_DEPTH, BOARD_TASK_LIMIT, UPCOMING_LIMIT } from "../ports/tasks.js";
 
 /**
  * In-memory adapters for the application ports.
@@ -51,6 +54,7 @@ export interface InMemoryData {
   statuses: Map<string, WorkflowStatus>;
   tags: Map<string, Tag>;
   taskTags: { taskId: string; tagId: string; createdAt: Date }[];
+  relations: Map<string, TaskRelation>;
   workspaces: Map<string, Workspace>;
   memberships: WorkspaceMembership[];
   activity: ActivityEvent[];
@@ -66,6 +70,7 @@ export function emptyData(): InMemoryData {
     statuses: new Map(),
     tags: new Map(),
     taskTags: [],
+    relations: new Map(),
     workspaces: new Map(),
     memberships: [],
     activity: [],
@@ -128,6 +133,9 @@ function taskRepository(data: InMemoryData): TaskRepository {
       }
       if (filter.isCompleted !== undefined) {
         items = items.filter((t) => (t.completedAt !== null) === filter.isCompleted);
+      }
+      if (filter.isBlocked !== undefined) {
+        items = items.filter((t) => blockedIn(data, t) === filter.isBlocked);
       }
       if (filter.due && filter.today) {
         const today = filter.today;
@@ -283,6 +291,11 @@ function taskRepository(data: InMemoryData): TaskRepository {
     async hardDelete(_workspaceId, taskId) {
       data.tasks.delete(taskId);
       data.taskTags = data.taskTags.filter((link) => link.taskId !== taskId);
+      for (const [id, relation] of data.relations) {
+        if (relation.sourceTaskId === taskId || relation.targetTaskId === taskId) {
+          data.relations.delete(id);
+        }
+      }
     },
     async firstRankIn(scope) {
       const ranks = [...data.tasks.values()]
@@ -366,7 +379,80 @@ function taskRepository(data: InMemoryData): TaskRepository {
         (link) => !(link.taskId === taskId && link.tagId === tagId),
       );
     },
+    async relationsFor(workspaceId, taskIds) {
+      const wanted = new Set(taskIds);
+      return [...data.relations.values()]
+        .filter(
+          (relation) =>
+            relation.workspaceId === workspaceId &&
+            (wanted.has(relation.sourceTaskId) || wanted.has(relation.targetTaskId)),
+        )
+        .sort((left, right) => {
+          const byTime = left.createdAt.getTime() - right.createdAt.getTime();
+          if (byTime !== 0) return byTime;
+          return left.id < right.id ? -1 : 1;
+        })
+        .flatMap((relation): RelationEdge[] => {
+          const source = data.tasks.get(relation.sourceTaskId);
+          const target = data.tasks.get(relation.targetTaskId);
+          return source && target ? [{ relation, source, target }] : [];
+        });
+    },
+    async findRelation(workspaceId, relationId) {
+      const relation = data.relations.get(relationId);
+      return relation && relation.workspaceId === workspaceId ? relation : null;
+    },
+    async insertRelation(relation) {
+      const duplicate = [...data.relations.values()].some(
+        (existing) =>
+          existing.sourceTaskId === relation.sourceTaskId &&
+          existing.targetTaskId === relation.targetTaskId &&
+          existing.type === relation.type,
+      );
+      if (duplicate) return false;
+      data.relations.set(relation.id, relation);
+      return true;
+    },
+    async deleteRelation(workspaceId, relationId) {
+      const relation = data.relations.get(relationId);
+      if (relation && relation.workspaceId === workspaceId) {
+        data.relations.delete(relationId);
+      }
+    },
+    async downstreamOf(workspaceId, taskId, type) {
+      const seen = new Set<string>();
+      let frontier = [taskId];
+      for (let depth = 0; depth < BLOCKS_WALK_DEPTH && frontier.length > 0; depth++) {
+        const next: string[] = [];
+        for (const relation of data.relations.values()) {
+          if (
+            relation.workspaceId === workspaceId &&
+            relation.type === type &&
+            frontier.includes(relation.sourceTaskId) &&
+            !seen.has(relation.targetTaskId)
+          ) {
+            seen.add(relation.targetTaskId);
+            next.push(relation.targetTaskId);
+          }
+        }
+        frontier = next;
+      }
+      return [...seen];
+    },
   };
+}
+
+/** The live, incomplete `blocks` predecessors decide blocked state (spec 8.4). */
+function blockedIn(data: InMemoryData, task: Task): boolean {
+  const predecessors = [...data.relations.values()]
+    .filter(
+      (relation) => relation.type === "blocks" && relation.targetTaskId === task.id,
+    )
+    .flatMap((relation) => {
+      const source = data.tasks.get(relation.sourceTaskId);
+      return source ? [source] : [];
+    });
+  return isBlocked(task, predecessors);
 }
 
 function byDueThenRank(left: Task, right: Task): number {
@@ -677,6 +763,7 @@ export function createInMemoryUnitOfWork(
     statuses: new Map(source.statuses),
     tags: new Map(source.tags),
     taskTags: [...source.taskTags],
+    relations: new Map(source.relations),
     workspaces: new Map(source.workspaces),
     memberships: [...source.memberships],
     activity: [...source.activity],
@@ -691,6 +778,7 @@ export function createInMemoryUnitOfWork(
     target.statuses = source.statuses;
     target.tags = source.tags;
     target.taskTags = source.taskTags;
+    target.relations = source.relations;
     target.workspaces = source.workspaces;
     target.memberships = source.memberships;
     target.activity = source.activity;

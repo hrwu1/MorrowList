@@ -1,5 +1,12 @@
 import { PROJECT_BOARD_TASK_LIMIT, UPCOMING_TASK_LIMIT } from "@morrowlist/contracts";
-import type { ChildProgress, PlainDate, Tag, Task } from "@morrowlist/domain";
+import type {
+  ChildProgress,
+  PlainDate,
+  RelationType,
+  Tag,
+  Task,
+  TaskRelation,
+} from "@morrowlist/domain";
 
 /** Persistence ports for tasks. Implemented by `@morrowlist/database`. */
 
@@ -14,6 +21,11 @@ export interface TaskFilter {
   /** True selects Inbox tasks only: those with no project (spec 9.1). */
   readonly inboxOnly?: boolean | undefined;
   readonly isCompleted?: boolean | undefined;
+  /**
+   * Blocked state as the domain defines it (spec 8.4): open and either flagged or
+   * waiting on a live, incomplete `blocks` predecessor.
+   */
+  readonly isBlocked?: boolean | undefined;
   /**
    * Select soft-deleted tasks instead of live ones — the Trash view (spec 9.7). Off by
    * default, because a deleted task is excluded from every normal view (spec 8.2
@@ -86,6 +98,19 @@ export interface UpcomingTaskQuery {
   readonly limit?: number | undefined;
 }
 
+/**
+ * A relation with both endpoints loaded, so a page can show the other task's key and
+ * title and decide whether an incomplete predecessor blocks it (spec 8.4).
+ */
+export interface RelationEdge {
+  readonly relation: TaskRelation;
+  readonly source: Task;
+  readonly target: Task;
+}
+
+/** How far the blocks-cycle walk follows edges before giving up (spec 29.1 scale). */
+export const BLOCKS_WALK_DEPTH = 64;
+
 /** The ordering scope a rank is unique within: an Inbox, or a project status column. */
 export interface RankScope {
   readonly workspaceId: string;
@@ -144,6 +169,27 @@ export interface TaskRepository {
   ): Promise<Map<string, readonly Tag[]>>;
   addTag(taskId: string, tagId: string, createdAt: Date): Promise<void>;
   removeTag(taskId: string, tagId: string): Promise<void>;
+  /**
+   * Every relation touching any of the tasks, each once, with both endpoints, in one
+   * query (spec 29.3). Ordered by creation then id so lists are stable.
+   */
+  relationsFor(
+    workspaceId: string,
+    taskIds: readonly string[],
+  ): Promise<readonly RelationEdge[]>;
+  findRelation(workspaceId: string, relationId: string): Promise<TaskRelation | null>;
+  /** Returns false when the same edge already exists (unique source, target, type). */
+  insertRelation(relation: TaskRelation): Promise<boolean>;
+  deleteRelation(workspaceId: string, relationId: string): Promise<void>;
+  /**
+   * Ids reachable from a task by following `type` edges source → target, walked at
+   * most `BLOCKS_WALK_DEPTH` levels, for the cycle check (spec 8.2 invariant 5).
+   */
+  downstreamOf(
+    workspaceId: string,
+    taskId: string,
+    type: RelationType,
+  ): Promise<readonly string[]>;
 }
 
 export interface TaskCounterRepository {

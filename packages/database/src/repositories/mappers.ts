@@ -4,12 +4,14 @@ import type {
   Tag,
   TagColorToken,
   Task,
+  TaskRelation,
   WorkflowStatus,
 } from "@morrowlist/domain";
 
 import type {
   projects,
   tags,
+  taskRelations,
   tasks,
   workflowStatuses,
   workspaces,
@@ -25,6 +27,7 @@ type ProjectRow = typeof projects.$inferSelect;
 type StatusRow = typeof workflowStatuses.$inferSelect;
 type WorkspaceRow = typeof workspaces.$inferSelect;
 type TagRow = typeof tags.$inferSelect;
+type RelationRow = typeof taskRelations.$inferSelect;
 
 export function toTask(row: TaskRow): Task {
   return {
@@ -44,6 +47,8 @@ export function toTask(row: TaskRow): Task {
     rank: row.rank,
     lastActiveStatusId: row.lastActiveStatusId,
     completedAt: row.completedAt,
+    blockedReason: row.blockedReason,
+    blockedSince: row.blockedSince,
     version: row.version,
     createdBy: { kind: row.createdByActorKind as ActorKind, id: row.createdByActorId },
     lastActor: { kind: row.lastActorKind as ActorKind, id: row.lastActorId },
@@ -74,6 +79,8 @@ export function toTaskRow(task: Task): TaskRow {
     rank: task.rank,
     lastActiveStatusId: task.lastActiveStatusId,
     completedAt: task.completedAt,
+    blockedReason: task.blockedReason,
+    blockedSince: task.blockedSince,
     version: task.version,
     createdByActorKind: task.createdBy.kind,
     createdByActorId: task.createdBy.id,
@@ -129,6 +136,33 @@ export function toTag(row: TagRow): Tag {
     description: row.description,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+  };
+}
+
+export function toTaskRelation(row: RelationRow): TaskRelation {
+  return {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    sourceTaskId: row.sourceTaskId,
+    targetTaskId: row.targetTaskId,
+    type: row.type,
+    metadata: (row.metadata ?? {}) as Record<string, unknown>,
+    createdBy: { kind: row.createdByActorKind as ActorKind, id: row.createdByActorId },
+    createdAt: row.createdAt,
+  };
+}
+
+export function toTaskRelationRow(relation: TaskRelation): RelationRow {
+  return {
+    id: relation.id,
+    workspaceId: relation.workspaceId,
+    sourceTaskId: relation.sourceTaskId,
+    targetTaskId: relation.targetTaskId,
+    type: relation.type,
+    metadata: relation.metadata,
+    createdByActorKind: relation.createdBy.kind,
+    createdByActorId: relation.createdBy.id,
+    createdAt: relation.createdAt,
   };
 }
 
