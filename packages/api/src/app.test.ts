@@ -520,6 +520,40 @@ describe("project and board endpoints", () => {
     expect(board.page).toEqual({ hasMore: true, truncated: true });
   });
 
+  it("hides subtasks from the board unless includeSubtasks is set", async () => {
+    const project = await (
+      await jsonRequest("/api/v1/projects", "POST", { name: "Research Launch" })
+    ).json();
+    const parent = await (
+      await jsonRequest("/api/v1/tasks", "POST", {
+        title: "Parent",
+        projectId: project.data.project.id,
+      })
+    ).json();
+    await jsonRequest("/api/v1/tasks", "POST", {
+      title: "Child",
+      parentTaskId: parent.data.id,
+    });
+
+    const hidden = await (
+      await request(`/api/v1/projects/${project.data.project.id}/board`)
+    ).json();
+    expect(hidden.data.tasks.map((t: { title: string }) => t.title)).toEqual([
+      "Parent",
+    ]);
+    expect(hidden.data.tasks[0].subtaskProgress).toEqual({ completed: 0, total: 1 });
+
+    const shown = await (
+      await request(
+        `/api/v1/projects/${project.data.project.id}/board?includeSubtasks=true`,
+      )
+    ).json();
+    expect(shown.data.tasks.map((t: { title: string }) => t.title)).toEqual([
+      "Parent",
+      "Child",
+    ]);
+  });
+
   it("moves a task across statuses and reorders from neighbour IDs", async () => {
     const created = await (
       await jsonRequest("/api/v1/projects", "POST", { name: "Research launch" })
