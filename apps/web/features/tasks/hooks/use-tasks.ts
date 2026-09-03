@@ -6,6 +6,8 @@ import type {
   ProjectBoardResponse,
   TaskDto,
   TaskListResponse,
+  TodayViewResponse,
+  UpcomingViewResponse,
   UpdateTaskRequest,
 } from "@morrowlist/contracts";
 import {
@@ -18,9 +20,13 @@ import {
 
 import { activityKeys } from "../../activity/hooks/use-activity";
 import { projectKeys } from "../../projects/hooks/use-projects";
+import { localToday, patchTaskInToday } from "../../today/lib/today-view";
+import { patchTaskInUpcoming } from "../../upcoming/lib/upcoming-view";
 import { patchTaskInBoard, selectInboxDestination } from "../lib/task-projections";
 import { matchesFilters } from "../lib/task-view";
 
+import { todayKeys } from "@/features/today/hooks/use-today";
+import { upcomingKeys } from "@/features/upcoming/hooks/use-upcoming";
 import { apiClient } from "@/lib/api-client";
 
 /**
@@ -41,11 +47,13 @@ export const taskKeys = {
 };
 
 type ListSnapshot = readonly [QueryKey, TaskListResponse | undefined][];
-type BoardSnapshot = readonly [QueryKey, ProjectBoardResponse | undefined][];
+type Snapshot<T> = readonly [QueryKey, T | undefined][];
 
 interface TaskProjectionSnapshot {
   readonly lists: ListSnapshot;
-  readonly boards: BoardSnapshot;
+  readonly boards: Snapshot<ProjectBoardResponse>;
+  readonly today: Snapshot<TodayViewResponse>;
+  readonly upcoming: Snapshot<UpcomingViewResponse>;
   readonly byId: TaskDto | undefined;
   readonly byKey: TaskDto | undefined;
 }
@@ -84,6 +92,19 @@ function patchTaskEverywhere(queryClient: QueryClient, task: TaskDto): void {
     }
   }
 
+  for (const [key, current] of snapshotViews<TodayViewResponse>(
+    queryClient,
+    todayKeys.all,
+  )) {
+    if (current) queryClient.setQueryData(key, patchTaskInToday(current, task));
+  }
+  for (const [key, current] of snapshotViews<UpcomingViewResponse>(
+    queryClient,
+    upcomingKeys.all,
+  )) {
+    if (current) queryClient.setQueryData(key, patchTaskInUpcoming(current, task));
+  }
+
   patchDetail(queryClient, task.id, task);
   patchDetail(queryClient, task.key, task);
 }
@@ -102,10 +123,14 @@ function snapshotLists(queryClient: QueryClient): ListSnapshot {
   return queryClient.getQueriesData<TaskListResponse>({ queryKey: taskKeys.lists() });
 }
 
-function snapshotBoards(queryClient: QueryClient): BoardSnapshot {
+function snapshotBoards(queryClient: QueryClient): Snapshot<ProjectBoardResponse> {
   return queryClient.getQueriesData<ProjectBoardResponse>({
     queryKey: projectKeys.boards(),
   });
+}
+
+function snapshotViews<T>(queryClient: QueryClient, queryKey: QueryKey): Snapshot<T> {
+  return queryClient.getQueriesData<T>({ queryKey });
 }
 
 function snapshotTaskProjections(
@@ -115,16 +140,14 @@ function snapshotTaskProjections(
   return {
     lists: snapshotLists(queryClient),
     boards: snapshotBoards(queryClient),
+    today: snapshotViews(queryClient, todayKeys.all),
+    upcoming: snapshotViews(queryClient, upcomingKeys.all),
     byId: queryClient.getQueryData<TaskDto>(taskKeys.detail(task.id)),
     byKey: queryClient.getQueryData<TaskDto>(taskKeys.detail(task.key)),
   };
 }
 
-function restoreLists(queryClient: QueryClient, snapshot: ListSnapshot): void {
-  for (const [key, value] of snapshot) queryClient.setQueryData(key, value);
-}
-
-function restoreBoards(queryClient: QueryClient, snapshot: BoardSnapshot): void {
+function restoreSnapshot<T>(queryClient: QueryClient, snapshot: Snapshot<T>): void {
   for (const [key, value] of snapshot) queryClient.setQueryData(key, value);
 }
 
@@ -133,8 +156,10 @@ function restoreTaskProjections(
   task: TaskDto,
   snapshot: TaskProjectionSnapshot,
 ): void {
-  restoreLists(queryClient, snapshot.lists);
-  restoreBoards(queryClient, snapshot.boards);
+  restoreSnapshot(queryClient, snapshot.lists);
+  restoreSnapshot(queryClient, snapshot.boards);
+  restoreSnapshot(queryClient, snapshot.today);
+  restoreSnapshot(queryClient, snapshot.upcoming);
   patchDetail(queryClient, task.id, snapshot.byId);
   patchDetail(queryClient, task.key, snapshot.byKey);
 }
@@ -143,18 +168,33 @@ function invalidateLists(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
 }
 
+/** Every projection that shows tasks: lists, boards, and the Today and Upcoming views. */
 function invalidateTaskProjections(queryClient: QueryClient): void {
   invalidateLists(queryClient);
   void queryClient.invalidateQueries({ queryKey: projectKeys.boards() });
   // Every mutation records history, so any open activity list is now behind.
   void queryClient.invalidateQueries({ queryKey: activityKeys.all });
+  void queryClient.invalidateQueries({ queryKey: todayKeys.all });
+  void queryClient.invalidateQueries({ queryKey: upcomingKeys.all });
 }
 
 async function cancelTaskProjections(queryClient: QueryClient): Promise<void> {
   await Promise.all([
     queryClient.cancelQueries({ queryKey: taskKeys.all }),
     queryClient.cancelQueries({ queryKey: projectKeys.boards() }),
+    queryClient.cancelQueries({ queryKey: todayKeys.all }),
+    queryClient.cancelQueries({ queryKey: upcomingKeys.all }),
   ]);
+}
+
+/**
+ * The workspace's current date as the browser last saw it in a Today response, falling
+ * back to the browser's own date. Only an optimistic guess; the server's answer replaces
+ * it on success (spec 12.3).
+ */
+function workspaceToday(queryClient: QueryClient): string {
+  const cached = queryClient.getQueryData<TodayViewResponse>(todayKeys.view());
+  return cached?.data.date ?? localToday();
 }
 
 export function useTaskList(filters: Partial<ListTasksQuery>) {
@@ -304,6 +344,30 @@ export function useRestoreTask() {
   );
 }
 
+/** Add a task to My Day for the workspace's current date (spec 9.2, 23.3). */
+export function useAddToDay() {
+  return useTaskAction(
+    (task) => apiClient.addTaskToDay(task.id),
+    (task, today) => ({
+      ...task,
+      dayPlans: task.dayPlans.includes(today)
+        ? task.dayPlans
+        : [...task.dayPlans, today].sort(),
+    }),
+  );
+}
+
+/** Remove today's My Day selection: the first upcoming plan on the task. */
+export function useRemoveFromDay() {
+  return useTaskAction(
+    (task) => {
+      const date = task.dayPlans[0];
+      return date ? apiClient.removeTaskFromDay(task.id, date) : Promise.resolve(task);
+    },
+    (task) => ({ ...task, dayPlans: task.dayPlans.slice(1) }),
+  );
+}
+
 /**
  * Complete, reopen, delete, and restore differ only in the request they send and the
  * shape of their optimistic guess; everything about snapshotting, patching, rollback, and
@@ -311,7 +375,7 @@ export function useRestoreTask() {
  */
 function useTaskAction(
   send: (task: TaskDto) => Promise<TaskDto>,
-  guess: (task: TaskDto) => TaskDto,
+  guess: (task: TaskDto, today: string) => TaskDto,
 ) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -319,7 +383,7 @@ function useTaskAction(
     onMutate: async (task: TaskDto) => {
       await cancelTaskProjections(queryClient);
       const previous = snapshotTaskProjections(queryClient, task);
-      patchTaskEverywhere(queryClient, guess(task));
+      patchTaskEverywhere(queryClient, guess(task, workspaceToday(queryClient)));
       return { previous, task };
     },
     onError: (_error, _task, context) => {

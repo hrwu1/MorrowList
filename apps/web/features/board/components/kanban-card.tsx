@@ -5,7 +5,12 @@ import type { TaskDto, WorkflowStatusDto } from "@morrowlist/contracts";
 import Link from "next/link";
 import type { CSSProperties, KeyboardEventHandler } from "react";
 
-import { DueBadge, PriorityBadge } from "@/features/tasks/components/task-fields";
+import {
+  DueBadge,
+  MyDayBadge,
+  PriorityBadge,
+} from "@/features/tasks/components/task-fields";
+import { useAddToDay, useRemoveFromDay } from "@/features/tasks/hooks/use-tasks";
 import type { TaskDragData } from "@/features/tasks/lib/task-dnd";
 
 export interface KanbanCardProps {
@@ -35,6 +40,9 @@ export function KanbanCard({
       disabled: { draggable: dragDisabled, droppable: reorderDisabled },
       data: { type: "task", task, statusId: task.statusId } satisfies TaskDragData,
     });
+  const addToDay = useAddToDay();
+  const removeFromDay = useRemoveFromDay();
+  const inMyDay = task.dayPlans.length > 0;
   const style: CSSProperties = {
     transform: transform
       ? `translate3d(${transform.x}px, ${transform.y}px, 0) scaleX(${transform.scaleX}) scaleY(${transform.scaleY})`
@@ -53,7 +61,8 @@ export function KanbanCard({
       // The whole card is the pointer drag source; the handle is the keyboard one. The
       // Move menu opens on press, so it never starts a drag.
       onPointerDown={(event) => {
-        if ((event.target as HTMLElement).closest("select")) return;
+        if ((event.target as HTMLElement).closest("select, .board-card__my-day"))
+          return;
         listeners?.onPointerDown?.(event);
       }}
     >
@@ -81,6 +90,19 @@ export function KanbanCard({
             ))}
           </select>
         </label>
+        <button
+          type="button"
+          className="board-card__my-day"
+          aria-pressed={inMyDay}
+          aria-label={
+            inMyDay ? `Remove ${task.title} from My Day` : `Add ${task.title} to My Day`
+          }
+          title={inMyDay ? "Remove from My Day" : "Add to My Day"}
+          disabled={task.isCompleted || addToDay.isPending || removeFromDay.isPending}
+          onClick={() => (inMyDay ? removeFromDay.mutate(task) : addToDay.mutate(task))}
+        >
+          <span aria-hidden="true">☀</span>
+        </button>
         <button
           type="button"
           className="board-card__drag"
@@ -115,6 +137,7 @@ export function KanbanCard({
           dueTime={task.dueTime}
           isCompleted={task.isCompleted}
         />
+        <MyDayBadge dayPlans={task.dayPlans} />
       </div>
     </li>
   );

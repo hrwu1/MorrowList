@@ -106,29 +106,41 @@ export function PriorityBadge({ priority }: { readonly priority: Priority }) {
   );
 }
 
-/** A due date, marked as overdue in words as well as in colour. */
+/**
+ * A due date, marked as overdue in words as well as in colour. Views that know the
+ * workspace's calendar date pass it in; others fall back to the browser's date.
+ */
 export function DueBadge({
   dueDate,
   dueTime,
   isCompleted,
+  today = new Date().toISOString().slice(0, 10),
 }: {
   readonly dueDate: string | null;
   readonly dueTime: string | null;
   readonly isCompleted: boolean;
+  readonly today?: string | undefined;
 }) {
   if (!dueDate) return null;
-  const today = new Date().toISOString().slice(0, 10);
   const overdue = !isCompleted && dueDate < today;
+  const dueToday = !isCompleted && dueDate === today;
 
   return (
     <time
       className="task-row__due"
       dateTime={dueTime ? `${dueDate}T${dueTime}` : dueDate}
       data-overdue={overdue || undefined}
+      data-today={dueToday || undefined}
     >
-      {overdue ? "Overdue: " : "Due "}
-      {dueDate}
+      {overdue ? "Overdue: " : dueToday ? "Due today" : "Due "}
+      {dueToday ? "" : dueDate}
       {dueTime ? ` at ${dueTime}` : ""}
     </time>
   );
+}
+
+/** The My Day indicator (spec 9.5): shown while the task has an upcoming selection. */
+export function MyDayBadge({ dayPlans }: { readonly dayPlans: readonly string[] }) {
+  if (dayPlans.length === 0) return null;
+  return <span className="task-row__my-day">My Day</span>;
 }

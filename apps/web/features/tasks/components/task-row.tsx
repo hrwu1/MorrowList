@@ -7,15 +7,23 @@ import Link from "next/link";
 import { useId, useState } from "react";
 
 import {
+  useAddToDay,
   useCompleteTask,
   useDeleteTask,
+  useRemoveFromDay,
   useReopenTask,
   useRestoreTask,
   useUpdateTask,
 } from "../hooks/use-tasks";
 import type { TaskDragData } from "../lib/task-dnd";
 
-import { DueBadge, DueDateInput, PriorityBadge, PrioritySelect } from "./task-fields";
+import {
+  DueBadge,
+  DueDateInput,
+  MyDayBadge,
+  PriorityBadge,
+  PrioritySelect,
+} from "./task-fields";
 
 /**
  * A task row and its inline actions (VIEW-001, spec 9.1).
@@ -31,9 +39,11 @@ export interface TaskRowProps {
   /** Where the row's title links to; omitted in Trash, where detail cannot be loaded. */
   readonly detailHref?: string | undefined;
   readonly selected?: boolean | undefined;
+  /** The workspace's calendar date, when the view knows it (Today and Upcoming). */
+  readonly today?: string | undefined;
 }
 
-export function TaskRow({ task, detailHref, selected }: TaskRowProps) {
+export function TaskRow({ task, detailHref, selected, today }: TaskRowProps) {
   const complete = useCompleteTask();
   const reopen = useReopenTask();
   const remove = useDeleteTask();
@@ -97,7 +107,9 @@ export function TaskRow({ task, detailHref, selected }: TaskRowProps) {
               dueDate={task.dueDate}
               dueTime={task.dueTime}
               isCompleted={task.isCompleted}
+              today={today}
             />
+            <MyDayBadge dayPlans={task.dayPlans} />
             {task.completedAt ? (
               <time dateTime={task.completedAt}>
                 Completed {new Date(task.completedAt).toLocaleDateString()}
@@ -136,6 +148,9 @@ function RowActions({
   readonly onDelete: () => void;
 }) {
   const update = useUpdateTask();
+  const addToDay = useAddToDay();
+  const removeFromDay = useRemoveFromDay();
+  const inMyDay = task.dayPlans.length > 0;
 
   return (
     <div className="task-row__actions" id={id}>
@@ -170,6 +185,17 @@ function RowActions({
       </div>
 
       <div className="task-row__action task-row__action--end">
+        <Button
+          aria-pressed={inMyDay}
+          aria-label={
+            inMyDay ? `Remove ${task.title} from My Day` : `Add ${task.title} to My Day`
+          }
+          loading={addToDay.isPending || removeFromDay.isPending}
+          disabled={task.isCompleted}
+          onClick={() => (inMyDay ? removeFromDay.mutate(task) : addToDay.mutate(task))}
+        >
+          {inMyDay ? "Remove from My Day" : "Add to My Day"}
+        </Button>
         <Button variant="danger" aria-label={`Delete ${task.title}`} onClick={onDelete}>
           Delete
         </Button>

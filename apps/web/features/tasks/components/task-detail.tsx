@@ -15,9 +15,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  useAddToDay,
   useCompleteTask,
   useDeleteTask,
   useMoveTaskToProject,
+  useRemoveFromDay,
   useReopenTask,
   useRestoreTask,
   useTask,
@@ -117,7 +119,10 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
   const remove = useDeleteTask();
   const restore = useRestoreTask();
   const move = useMoveTaskToProject();
+  const addToDay = useAddToDay();
+  const removeFromDay = useRemoveFromDay();
   const projects = useProjects();
+  const inMyDay = task.dayPlans.length > 0;
 
   const [draft, setDraft] = useState(() => toDraft(task));
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -326,6 +331,14 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
           }
         >
           {task.isCompleted ? "Reopen task" : "Mark complete"}
+        </Button>
+        <Button
+          aria-pressed={inMyDay}
+          disabled={!editable || task.isCompleted}
+          loading={addToDay.isPending || removeFromDay.isPending}
+          onClick={() => (inMyDay ? removeFromDay.mutate(task) : addToDay.mutate(task))}
+        >
+          {inMyDay ? "Remove from My Day" : "Add to My Day"}
         </Button>
         {task.completedAt ? (
           <span className="task-detail__hint">

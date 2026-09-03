@@ -37,6 +37,10 @@ import {
   taskDropCollision,
   type DestinationDropData,
 } from "@/features/tasks/lib/task-dnd";
+import { useTodayView } from "@/features/today/hooks/use-today";
+import { countTodayTasks } from "@/features/today/lib/today-view";
+import { useUpcomingView } from "@/features/upcoming/hooks/use-upcoming";
+import { countUpcomingTasks } from "@/features/upcoming/lib/upcoming-view";
 import { authClient } from "@/lib/auth-client";
 
 export interface WorkspaceUser {
@@ -65,6 +69,8 @@ export function WorkspaceShell({
     order: "asc",
     limit: 200,
   });
+  const today = useTodayView();
+  const upcoming = useUpcomingView("14");
   const [inboxOpen, setInboxOpen] = useState(false);
   const restoreFocusTo = useRef<HTMLElement | null>(null);
   const dnd = useWorkspaceDragAndDrop();
@@ -118,6 +124,28 @@ export function WorkspaceShell({
 
   const projectItems = projects.data?.data ?? [];
   const historyCurrent = pathname === "/completed" || pathname === "/trash";
+  const planningLinks = [
+    {
+      href: "/today",
+      label: "Today",
+      icon: "sun" as const,
+      count: today.data
+        ? String(countTodayTasks(today.data))
+        : today.isError
+          ? "!"
+          : "·",
+    },
+    {
+      href: "/upcoming",
+      label: "Upcoming",
+      icon: "calendar" as const,
+      count: upcoming.data
+        ? String(countUpcomingTasks(upcoming.data))
+        : upcoming.isError
+          ? "!"
+          : "·",
+    },
+  ];
 
   return (
     <DndContext
@@ -175,6 +203,21 @@ export function WorkspaceShell({
                 <Icon name="arrow-up-right" />
               </Link>
             </div>
+
+            {planningLinks.map((link) => (
+              <Link
+                key={link.href}
+                className="workspace-nav__link"
+                href={link.href}
+                aria-current={pathname === link.href ? "page" : undefined}
+              >
+                <Icon name={link.icon} />
+                <span>{link.label}</span>
+                <span className="workspace-nav__count" aria-hidden="true">
+                  {link.count}
+                </span>
+              </Link>
+            ))}
 
             <div className="workspace-nav__section">
               <ProjectSection
@@ -235,6 +278,7 @@ export function WorkspaceShell({
         <MobileHeader
           inboxCount={inboxCountLabel}
           inboxUnavailable={inboxUnavailable}
+          planningLinks={planningLinks}
           pathname={pathname}
           projects={projectItems}
           projectsPending={projects.isPending}
@@ -282,7 +326,7 @@ export function WorkspaceShell({
 
 function Brand() {
   return (
-    <Link className="workspace-brand" href="/inbox" aria-label="MorrowList home">
+    <Link className="workspace-brand" href="/today" aria-label="MorrowList home">
       <span className="workspace-brand__mark" aria-hidden="true">
         <span />
         <span />
@@ -621,9 +665,17 @@ function useWorkspaceDragAndDrop() {
   };
 }
 
+interface PlanningLink {
+  readonly href: string;
+  readonly label: string;
+  readonly icon: IconName;
+  readonly count: string;
+}
+
 function MobileHeader({
   inboxCount,
   inboxUnavailable,
+  planningLinks,
   pathname,
   projects,
   projectsPending,
@@ -635,6 +687,7 @@ function MobileHeader({
 }: {
   readonly inboxCount: string;
   readonly inboxUnavailable: boolean;
+  readonly planningLinks: readonly PlanningLink[];
   readonly pathname: string;
   readonly projects: readonly ProjectDto[];
   readonly projectsPending: boolean;
@@ -718,6 +771,21 @@ function MobileHeader({
             Open full Inbox
           </Link>
           <nav aria-label="Mobile workspace">
+            {planningLinks.map((link) => (
+              <Link
+                key={link.href}
+                className="workspace-nav__link"
+                href={link.href}
+                aria-current={pathname === link.href ? "page" : undefined}
+                onClick={closeMenu}
+              >
+                <Icon name={link.icon} />
+                <span>{link.label}</span>
+                <span className="workspace-nav__count" aria-hidden="true">
+                  {link.count}
+                </span>
+              </Link>
+            ))}
             <ProjectSection
               projects={projects}
               pending={projectsPending}
@@ -998,6 +1066,7 @@ function sentenceCase(value: string): string {
 
 type IconName =
   | "arrow-up-right"
+  | "calendar"
   | "check"
   | "chevron-up"
   | "close"
@@ -1006,7 +1075,8 @@ type IconName =
   | "menu"
   | "plus"
   | "settings"
-  | "sign-out";
+  | "sign-out"
+  | "sun";
 
 function Icon({
   name,
@@ -1014,6 +1084,12 @@ function Icon({
 }: SVGProps<SVGSVGElement> & { readonly name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
     "arrow-up-right": <path d="M7 17 17 7M8 7h9v9" />,
+    calendar: (
+      <>
+        <rect x="4" y="5" width="16" height="15" rx="2" />
+        <path d="M4 10h16M8 3v4M16 3v4" />
+      </>
+    ),
     check: <path d="m5 12 4 4L19 6" />,
     "chevron-up": <path d="m6 15 6-6 6 6" />,
     close: <path d="M6 6l12 12M18 6 6 18" />,
@@ -1038,6 +1114,12 @@ function Icon({
       </>
     ),
     "sign-out": <path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10" />,
+    sun: (
+      <>
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4" />
+      </>
+    ),
   };
 
   return (
