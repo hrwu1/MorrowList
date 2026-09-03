@@ -13,6 +13,7 @@ import {
   assertStatusBelongsToProject,
   assertTaskInvariants,
 } from "./invariants.js";
+import { normalizeBlockedReason } from "./relation.js";
 import { isCompleted, isDeleted, type Task } from "./task.js";
 import {
   normalizeDescription,
@@ -85,6 +86,8 @@ export function createTask(input: CreateTaskInput, context: PolicyContext): Task
     rank: input.rank,
     lastActiveStatusId: null,
     completedAt: null,
+    blockedReason: null,
+    blockedSince: null,
     version: 1,
     createdBy: context.actor,
     lastActor: context.actor,
@@ -417,6 +420,31 @@ export function childProgress(children: readonly Task[]): ChildProgress {
   };
 }
 
+/**
+ * Flag a task as blocked with a reason (spec 8.4, GAP-06). The task stays in its
+ * workflow status: the flag is the signal, the column is only a view (spec 9.5). Changing
+ * the reason keeps the original start so blocked time is measured from the first flag.
+ */
+export function flagBlocked(task: Task, reason: string, context: PolicyContext): Task {
+  assertMutable(task);
+  const normalized = normalizeBlockedReason(reason);
+  return touch(
+    {
+      ...task,
+      blockedReason: normalized,
+      blockedSince: task.blockedSince ?? context.clock.now(),
+    },
+    task,
+    context,
+  );
+}
+
+/** Clear the blocker flag; a no-op when the task is not flagged. */
+export function clearBlocked(task: Task, context: PolicyContext): Task {
+  assertMutable(task);
+  return touch({ ...task, blockedReason: null, blockedSince: null }, task, context);
+}
+
 /** Soft deletion moves the task to Trash and keeps it restorable (spec 8.6). */
 export function deleteTask(task: Task, context: PolicyContext): Task {
   if (isDeleted(task)) return task;
@@ -483,6 +511,8 @@ const MATERIAL_FIELDS = [
   "rank",
   "lastActiveStatusId",
   "completedAt",
+  "blockedReason",
+  "blockedSince",
   "deletedAt",
 ] as const satisfies readonly (keyof Task)[];
 

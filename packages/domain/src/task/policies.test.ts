@@ -11,9 +11,11 @@ import { TEST_INSTANT, testContext, testStatus } from "./fixtures.js";
 import {
   assertExpectedVersion,
   childProgress,
+  clearBlocked,
   completeTask,
   createTask,
   deleteTask,
+  flagBlocked,
   materialChanges,
   moveTask,
   reopenTask,
@@ -621,5 +623,57 @@ describe("DomainError", () => {
 
     expect(error.code).toBe("TASK_NOT_FOUND");
     expect(error.details).toEqual({ taskId: "t1" });
+  });
+});
+
+describe("flagBlocked and clearBlocked", () => {
+  it("records the reason and the first flag time, keeping the task in its status", () => {
+    const status = testStatus({ category: "in_progress" });
+    const task = moveTask(
+      inboxTask(),
+      { destination: { projectId: status.projectId, status }, rank: "a1" },
+      testContext(),
+    );
+
+    const flagged = flagBlocked(task, "  waiting on   vendor ", testContext());
+    expect(flagged.blockedReason).toBe("waiting on vendor");
+    expect(flagged.blockedSince).toEqual(TEST_INSTANT);
+    expect(flagged.statusId).toBe(status.id);
+    expect(flagged.version).toBe(task.version + 1);
+    expect(materialChanges(flagged, task)).toEqual({
+      blockedReason: { from: null, to: "waiting on vendor" },
+      blockedSince: { from: null, to: TEST_INSTANT.toISOString() },
+    });
+
+    // A changed reason keeps the original start so blocked time is continuous.
+    const later = testContext({
+      clock: fixedClock(new Date("2026-08-30T09:00:00.000Z")),
+    });
+    const reworded = flagBlocked(flagged, "vendor replied, waiting on legal", later);
+    expect(reworded.blockedSince).toEqual(TEST_INSTANT);
+    expect(flagBlocked(reworded, "vendor replied, waiting on legal", later)).toBe(
+      reworded,
+    );
+
+    const cleared = clearBlocked(reworded, later);
+    expect(cleared.blockedReason).toBeNull();
+    expect(cleared.blockedSince).toBeNull();
+    expect(clearBlocked(cleared, later)).toBe(cleared);
+  });
+
+  it("rejects an empty reason and a deleted task", () => {
+    expect(() => flagBlocked(inboxTask(), "   ", testContext())).toThrow(
+      ValidationError,
+    );
+    expect(() =>
+      flagBlocked(deleteTask(inboxTask(), testContext()), "x", testContext()),
+    ).toThrow(ValidationError);
+  });
+
+  it("survives completion so a reopened task shows the same reason", () => {
+    const flagged = flagBlocked(inboxTask(), "vendor", testContext());
+    const done = completeTask(flagged, {}, testContext());
+    expect(done.blockedReason).toBe("vendor");
+    expect(reopenTask(done, {}, testContext()).blockedReason).toBe("vendor");
   });
 });

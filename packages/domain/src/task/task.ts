@@ -25,6 +25,12 @@ export interface Task {
   readonly rank: string;
   readonly lastActiveStatusId: string | null;
   readonly completedAt: Date | null;
+  /**
+   * The explicit blocker flag (spec 8.4, GAP-06): why the task cannot move, and since
+   * when. Independent of `blocks` relations, and both null or both set.
+   */
+  readonly blockedReason: string | null;
+  readonly blockedSince: Date | null;
   readonly version: number;
   readonly createdBy: ActorRef;
   readonly lastActor: ActorRef;

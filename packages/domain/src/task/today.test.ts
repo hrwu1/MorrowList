@@ -23,6 +23,8 @@ function task(overrides: Partial<Task> & { readonly id: string }): Task {
     rank: "a0",
     lastActiveStatusId: null,
     completedAt: null,
+    blockedReason: null,
+    blockedSince: null,
     version: 1,
     createdBy: testActor,
     lastActor: testActor,

@@ -53,6 +53,13 @@ export function assertTaskInvariants(task: Task): void {
     });
   }
 
+  // A blocker flag carries its reason and its start together (spec 8.4).
+  if ((task.blockedReason === null) !== (task.blockedSince === null)) {
+    throw new ValidationError("A blocked reason and its start time go together.", {
+      taskId: task.id,
+    });
+  }
+
   // 12. Version is monotonic and starts at 1.
   if (!Number.isInteger(task.version) || task.version < 1) {
     throw new ValidationError("Task version must be a positive integer.", {

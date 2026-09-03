@@ -61,9 +61,11 @@ export {
 export {
   assertExpectedVersion,
   childProgress,
+  clearBlocked,
   completeTask,
   createTask,
   deleteTask,
+  flagBlocked,
   materialChanges,
   moveTask,
   relocateTask,
@@ -83,6 +85,17 @@ export {
   type SetParentInput,
   type UpdateTaskFieldsInput,
 } from "./task/policies.js";
+export {
+  BLOCKED_REASON_MAX_LENGTH,
+  RELATION_TYPES,
+  assertNoBlocksCycle,
+  canonicalizeRelation,
+  isBlocked,
+  isRelationType,
+  normalizeBlockedReason,
+  type RelationType,
+  type TaskRelation,
+} from "./task/relation.js";
 export {
   DAY_PLAN_SOURCES,
   TODAY_REASONS,
