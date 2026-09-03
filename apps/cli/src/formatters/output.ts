@@ -119,6 +119,8 @@ export function formatActivity(entries: readonly ActivityEntryDto[]): string {
 
 function formatValue(value: string | null): string {
   return value === null ? "(none)" : JSON.stringify(value);
+}
+
 const TODAY_SECTION_LABELS: Record<TodayReason, string> = {
   overdue: "Overdue",
   due_today: "Due today",

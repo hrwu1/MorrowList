@@ -109,6 +109,9 @@ describe("formatActivity", () => {
     );
     expect(output).not.toContain("never printed");
     expect(formatActivity([])).toBe("No activity.");
+  });
+});
+
 describe("formatTodayView", () => {
   it("prints non-empty sections with the extra badges and the review", () => {
     const output = formatTodayView({

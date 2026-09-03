@@ -65,6 +65,10 @@ async function taskWithFullHistory(): Promise<TaskDto> {
   });
   task = await tasks.complete(seeded.context, workspaceId, task.id);
   task = await tasks.reopen(seeded.context, workspaceId, task.id);
+  task = await tasks.addToDay(seeded.context, workspaceId, task.id, {
+    date: "2026-08-29",
+  });
+  task = await tasks.removeFromDay(seeded.context, workspaceId, task.id, "2026-08-29");
   task = await tasks.delete(seeded.context, workspaceId, task.id);
   return tasks.restore(seeded.context, workspaceId, task.id);
 }
@@ -83,6 +87,8 @@ describe("ActivityService.listForTask", () => {
     expect(data.map((entry) => entry.eventType)).toEqual([
       TASK_EVENTS.restored,
       TASK_EVENTS.deleted,
+      TASK_EVENTS.dayRemoved,
+      TASK_EVENTS.dayAdded,
       TASK_EVENTS.reopened,
       TASK_EVENTS.completed,
       TASK_EVENTS.reordered,
@@ -147,8 +153,8 @@ describe("ActivityService.listForTask", () => {
       seen.push(...next.data);
       cursor = next.page.nextCursor;
     }
-    expect(seen).toHaveLength(8);
-    expect(new Set(seen.map((entry) => entry.id)).size).toBe(8);
+    expect(seen).toHaveLength(10);
+    expect(new Set(seen.map((entry) => entry.id)).size).toBe(10);
 
     const [body] = (first.page.nextCursor as string).split(".");
     await expect(
