@@ -4,7 +4,14 @@ import {
   bootstrapUser,
   type ActorContext,
 } from "@morrowlist/application";
-import { fixedClock, rankBetween, uuidv7 } from "@morrowlist/domain";
+import {
+  fixedClock,
+  rankBetween,
+  updateTaskFields,
+  uuidv7,
+  type PlainDate,
+  type UpdateTaskFieldsInput,
+} from "@morrowlist/domain";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { DatabaseHandle } from "../client.js";
@@ -488,5 +495,184 @@ describe("workspace isolation", () => {
     await expect(service.get(context, other.id, secret.id)).rejects.toMatchObject({
       code: "WORKSPACE_NOT_FOUND",
     });
+  });
+});
+
+describe("defer and deadline dates (GAP-16)", () => {
+  // NOW is 11:00 in Europe/Berlin on 29 August.
+  const TODAY = "2026-08-29" as PlainDate;
+  const day = (offset: number) =>
+    new Date(Date.UTC(2026, 7, 29 + offset)).toISOString().slice(0, 10) as PlainDate;
+
+  async function created(title: string, fields: UpdateTaskFieldsInput = {}) {
+    const task = await service.create(context, { workspaceId, title });
+    if (Object.keys(fields).length === 0) return task;
+    await createUnitOfWork(handle).execute(async (tx) => {
+      const current = await tx.tasks.findById(workspaceId, task.id);
+      if (!current) throw new Error("task vanished");
+      const next = updateTaskFields(current, fields, {
+        actor: { kind: "user", id: context.actorId },
+        clock: fixedClock(NOW),
+      });
+      await tx.tasks.update(next, current.version);
+    });
+    return task;
+  }
+
+  async function list(filter: Record<string, unknown>) {
+    const page = await createUnitOfWork(handle).execute((tx) =>
+      tx.tasks.list(
+        { workspaceId, today: TODAY, sort: "rank", order: "asc", ...filter },
+        { limit: 50 },
+      ),
+    );
+    return page.items.map((task) => task.id);
+  }
+
+  it("applies migration 0005: columns, the deadline-time check, and partial indexes", async () => {
+    const columns = await handle.pool.query<{ column_name: string; data_type: string }>(
+      `select column_name, data_type from information_schema.columns
+       where table_name = 'tasks' and column_name in ('defer_until', 'deadline', 'deadline_time')
+       order by column_name`,
+    );
+    expect(columns.rows).toEqual([
+      { column_name: "deadline", data_type: "date" },
+      { column_name: "deadline_time", data_type: "time without time zone" },
+      { column_name: "defer_until", data_type: "date" },
+    ]);
+
+    const indexes = await handle.pool.query<{ indexname: string; indexdef: string }>(
+      `select indexname, indexdef from pg_indexes
+       where tablename = 'tasks' and indexname in ('tasks_defer_idx', 'tasks_deadline_idx')
+       order by indexname`,
+    );
+    expect(indexes.rows.map((row) => row.indexname)).toEqual([
+      "tasks_deadline_idx",
+      "tasks_defer_idx",
+    ]);
+    for (const row of indexes.rows) {
+      expect(row.indexdef).toMatch(/WHERE .*deleted_at IS NULL.*completed_at IS NULL/);
+    }
+
+    await expect(
+      handle.pool.query(
+        `insert into tasks (id, workspace_id, task_number, title, rank, deadline_time,
+           priority, version, created_by_actor_kind, created_by_actor_id,
+           last_actor_kind, last_actor_id, created_at, updated_at)
+         values ($1, $2, 997, 'bad', 'a0', '17:00', 'none', 1, 'user', 'u', 'user', 'u', now(), now())`,
+        [uuidv7(), workspaceId],
+      ),
+    ).rejects.toThrow(/tasks_deadline_time_requires_date/);
+  });
+
+  it("round-trips the three dates and the deadline time", async () => {
+    const task = await created("Dated", {
+      deferUntil: day(-3),
+      dueDate: day(2),
+      deadline: day(5),
+      deadlineTime: "17:30" as never,
+    });
+
+    const stored = await createUnitOfWork(handle).execute((tx) =>
+      tx.tasks.findById(workspaceId, task.id),
+    );
+    expect(stored).toMatchObject({
+      deferUntil: day(-3),
+      dueDate: day(2),
+      deadline: day(5),
+      deadlineTime: "17:30",
+      version: 2,
+    });
+  });
+
+  it("filters by deferral and by deadline against the workspace date", async () => {
+    const deferred = await created("Deferred", { deferUntil: day(7) });
+    const returned = await created("Returned", { deferUntil: TODAY });
+    const plain = await created("Plain");
+    const pastDeadline = await created("Past deadline", { deadline: day(-1) });
+    const dueThisWeek = await created("This week", { deadline: day(7) });
+    const later = await created("Later", { deadline: day(8) });
+
+    expect(await list({ deferred: true })).toEqual([deferred.id]);
+    expect(await list({ deferred: false })).toEqual([
+      returned.id,
+      plain.id,
+      pastDeadline.id,
+      dueThisWeek.id,
+      later.id,
+    ]);
+    expect(await list({ deadline: "overdue" })).toEqual([pastDeadline.id]);
+    expect(await list({ deadline: "week" })).toEqual([dueThisWeek.id]);
+    expect(await list({ deadline: "none" })).toEqual([
+      deferred.id,
+      returned.id,
+      plain.id,
+    ]);
+  });
+
+  it("keeps a deferred task off the board, Today, and Upcoming until its date", async () => {
+    const unitOfWork = createUnitOfWork(handle);
+    const { project } = await new ProjectService({
+      unitOfWork,
+      clock: fixedClock(NOW),
+    }).create(context, { workspaceId, name: "Deferral" });
+    const card = await service.create(context, {
+      workspaceId,
+      title: "Card",
+      projectId: project.id,
+    });
+    await created("noop");
+    await unitOfWork.execute(async (tx) => {
+      const current = await tx.tasks.findById(workspaceId, card.id);
+      if (!current) throw new Error("card vanished");
+      await tx.tasks.update(
+        updateTaskFields(
+          current,
+          { deferUntil: day(7), dueDate: day(1) },
+          { actor: { kind: "user", id: context.actorId }, clock: fixedClock(NOW) },
+        ),
+        current.version,
+      );
+    });
+    const overdueDeferred = await created("Overdue but deferred", {
+      dueDate: day(-1),
+      deferUntil: day(7),
+    });
+    const overdueBack = await created("Overdue and back", {
+      dueDate: day(-1),
+      deferUntil: TODAY,
+    });
+    await service.addToDay(context, workspaceId, overdueDeferred.id, { date: TODAY });
+
+    const hidden = await unitOfWork.execute((tx) =>
+      tx.tasks.listBoard({ workspaceId, projectId: project.id, today: TODAY }),
+    );
+    const shown = await unitOfWork.execute((tx) =>
+      tx.tasks.listBoard({
+        workspaceId,
+        projectId: project.id,
+        today: TODAY,
+        includeDeferred: true,
+      }),
+    );
+    const today = await unitOfWork.execute((tx) =>
+      tx.tasks.listToday({ workspaceId, date: TODAY }),
+    );
+    const upcoming = await unitOfWork.execute((tx) =>
+      tx.tasks.listUpcoming({ workspaceId, from: TODAY, to: null }),
+    );
+    const onTheDay = await unitOfWork.execute((tx) =>
+      tx.tasks.listBoard({ workspaceId, projectId: project.id, today: day(7) }),
+    );
+
+    expect(hidden.items).toEqual([]);
+    expect(shown.items.map((task) => task.id)).toEqual([card.id]);
+    // The My Day selection brings the deferred task in; the plain deferred card stays out.
+    expect(today.items.map((task) => task.id)).toEqual([
+      overdueDeferred.id,
+      overdueBack.id,
+    ]);
+    expect(upcoming.items).toEqual([]);
+    expect(onTheDay.items.map((task) => task.id)).toEqual([card.id]);
   });
 });

@@ -36,7 +36,14 @@ export interface TaskFilter {
   readonly deletedOnly?: boolean | undefined;
   readonly includeSubtasks?: boolean | undefined;
   readonly due?: "overdue" | "today" | "future" | "none" | undefined;
-  /** The workspace's local date, for evaluating the `due` filter (spec 12.3). */
+  /**
+   * Deferral is a date comparison at read time (GAP-16): `true` selects tasks whose
+   * `deferUntil` is after `today`, `false` excludes them; omitted means both.
+   */
+  readonly deferred?: boolean | undefined;
+  /** `week` is a deadline from `today` through the next seven days inclusive. */
+  readonly deadline?: "overdue" | "week" | "none" | undefined;
+  /** The workspace's local date, for the `due`, `deferred`, and `deadline` filters (spec 12.3). */
   readonly today?: string | undefined;
   readonly sort?:
     | "rank"
@@ -76,6 +83,9 @@ export interface BoardTaskQuery {
   readonly limit?: number | undefined;
   /** Boards hide subtasks unless asked to show them (spec 8.3). */
   readonly includeSubtasks?: boolean | undefined;
+  /** Boards also hide deferred tasks by default (GAP-16); `today` decides deferral. */
+  readonly includeDeferred?: boolean | undefined;
+  readonly today?: PlainDate | undefined;
 }
 
 export const BOARD_TASK_LIMIT = PROJECT_BOARD_TASK_LIMIT;

@@ -41,6 +41,11 @@ export const tasks = pgTable(
     dueDate: date("due_date"),
     dueTime: time("due_time"),
     dueTimezone: varchar("due_timezone", { length: 100 }),
+    // Start/defer and deadline dates (GAP-16, migration 0005). Date-only like due_date;
+    // the deadline time is wall-clock in the workspace timezone.
+    deferUntil: date("defer_until"),
+    deadline: date("deadline"),
+    deadlineTime: time("deadline_time"),
     // Drizzle cannot infer a self-referencing foreign key: the callback's return type
     // depends on the table being declared. The annotation breaks that cycle.
     parentTaskId: uuid("parent_task_id").references(
@@ -84,10 +89,27 @@ export const tasks = pgTable(
     index("tasks_due_idx").on(table.workspaceId, table.dueDate),
     index("tasks_parent_idx").on(table.parentTaskId),
     index("tasks_series_idx").on(table.workspaceId, table.seriesId),
+    // Live, open rows with a defer date or a deadline: what the deferred and deadline
+    // filters and the Today/Upcoming predicates touch (GAP-16).
+    index("tasks_defer_idx")
+      .on(table.workspaceId, table.deferUntil)
+      .where(
+        sql`${table.deletedAt} IS NULL AND ${table.completedAt} IS NULL AND ${table.deferUntil} IS NOT NULL`,
+      ),
+    index("tasks_deadline_idx")
+      .on(table.workspaceId, table.deadline)
+      .where(
+        sql`${table.deletedAt} IS NULL AND ${table.completedAt} IS NULL AND ${table.deadline} IS NOT NULL`,
+      ),
     // Invariant 3: a due time cannot exist without a due date (spec 8.2).
     check(
       "tasks_due_time_requires_date",
       sql`${table.dueTime} IS NULL OR ${table.dueDate} IS NOT NULL`,
+    ),
+    // The deadline time follows the same rule (GAP-16).
+    check(
+      "tasks_deadline_time_requires_date",
+      sql`${table.deadlineTime} IS NULL OR ${table.deadline} IS NOT NULL`,
     ),
     // Invariant 1: an Inbox task has no workflow status (spec 8.2).
     check(

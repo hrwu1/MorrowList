@@ -1,7 +1,9 @@
 import {
+  addDays,
   childProgress,
   isBlocked,
   inProgressTasks,
+  isDeferred,
   type DayPlan,
   type PlainDate,
   type StatusInterval,
@@ -164,6 +166,30 @@ function taskRepository(data: InMemoryData): TaskRepository {
           }
         });
       }
+      if (filter.deferred !== undefined && filter.today) {
+        const today = filter.today as PlainDate;
+        items = items.filter((task) => isDeferred(task, today) === filter.deferred);
+      }
+      if (filter.deadline && filter.today) {
+        const today = filter.today as PlainDate;
+        const weekEnd = addDays(today, 7);
+        items = items.filter((task) => {
+          switch (filter.deadline) {
+            case "none":
+              return task.deadline === null;
+            case "overdue":
+              return task.deadline !== null && task.deadline < today;
+            case "week":
+              return (
+                task.deadline !== null &&
+                task.deadline >= today &&
+                task.deadline <= weekEnd
+              );
+            default:
+              return true;
+          }
+        });
+      }
 
       const direction = filter.order === "desc" ? -1 : 1;
       const key = (task: Task): string | number => {
@@ -211,7 +237,8 @@ function taskRepository(data: InMemoryData): TaskRepository {
             task.projectId !== query.projectId ||
             task.deletedAt !== null ||
             task.statusId === null ||
-            (!query.includeSubtasks && task.parentTaskId !== null)
+            (!query.includeSubtasks && task.parentTaskId !== null) ||
+            (!query.includeDeferred && query.today && isDeferred(task, query.today))
           ) {
             return false;
           }
@@ -254,7 +281,9 @@ function taskRepository(data: InMemoryData): TaskRepository {
             task.workspaceId === query.workspaceId &&
             task.deletedAt === null &&
             task.completedAt === null &&
-            ((task.dueDate !== null && task.dueDate <= query.date) ||
+            ((task.dueDate !== null &&
+              task.dueDate <= query.date &&
+              !isDeferred(task, query.date)) ||
               planned.has(task.id)),
         )
         .sort(byDueThenRank);
@@ -274,6 +303,7 @@ function taskRepository(data: InMemoryData): TaskRepository {
             task.completedAt === null &&
             task.dueDate !== null &&
             task.dueDate > query.from &&
+            !isDeferred(task, query.from) &&
             (query.to === null || task.dueDate <= query.to),
         )
         .sort(byDueThenRank);

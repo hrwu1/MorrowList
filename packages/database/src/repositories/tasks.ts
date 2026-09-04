@@ -11,7 +11,13 @@ import {
   type TaskFilter,
   type TaskRepository,
 } from "@morrowlist/application";
-import type { ChildProgress, Tag, Task } from "@morrowlist/domain";
+import {
+  addDays,
+  type ChildProgress,
+  type PlainDate,
+  type Tag,
+  type Task,
+} from "@morrowlist/domain";
 import {
   and,
   asc,
@@ -19,6 +25,7 @@ import {
   eq,
   exists,
   gt,
+  gte,
   inArray,
   isNotNull,
   isNull,
@@ -77,6 +84,10 @@ const PRIORITY_RANK = sql`
     else 0
   end
 `;
+
+/** Live on `date`: no defer date, or one that has arrived (GAP-16). */
+const notDeferredOn = (date: PlainDate) =>
+  sql`(${tasks.deferUntil} is null or ${tasks.deferUntil} <= ${date})`;
 
 export function createTaskRepository(db: Database): TaskRepository {
   const scopePredicate = (scope: RankScope) =>
@@ -155,6 +166,24 @@ export function createTaskRepository(db: Database): TaskRepository {
         if (filter.due === "today") conditions.push(eq(tasks.dueDate, today));
         if (filter.due === "future") conditions.push(gt(tasks.dueDate, today));
       }
+      if (filter.deferred !== undefined && filter.today) {
+        conditions.push(
+          filter.deferred
+            ? gt(tasks.deferUntil, filter.today)
+            : notDeferredOn(filter.today as PlainDate),
+        );
+      }
+      if (filter.deadline && filter.today) {
+        const today = filter.today as PlainDate;
+        if (filter.deadline === "none") conditions.push(isNull(tasks.deadline));
+        if (filter.deadline === "overdue") conditions.push(lt(tasks.deadline, today));
+        if (filter.deadline === "week") {
+          conditions.push(
+            gte(tasks.deadline, today),
+            lte(tasks.deadline, addDays(today, 7)),
+          );
+        }
+      }
 
       const descending = filter.order === "desc";
       const direction = descending ? desc : asc;
@@ -226,6 +255,9 @@ export function createTaskRepository(db: Database): TaskRepository {
             eq(tasks.projectId, query.projectId),
             isNull(tasks.deletedAt),
             query.includeSubtasks ? undefined : isNull(tasks.parentTaskId),
+            query.includeDeferred || !query.today
+              ? undefined
+              : notDeferredOn(query.today),
             eq(workflowStatuses.projectId, query.projectId),
             isNull(workflowStatuses.archivedAt),
           ),
@@ -259,7 +291,9 @@ export function createTaskRepository(db: Database): TaskRepository {
             isNull(tasks.deletedAt),
             isNull(tasks.completedAt),
             or(
-              lte(tasks.dueDate, query.date),
+              // A deferred task is out of Today until its defer date (GAP-16); a My Day
+              // selection still brings it in.
+              and(lte(tasks.dueDate, query.date), notDeferredOn(query.date)),
               exists(
                 db
                   .select({ one: sql`1` })
@@ -291,6 +325,7 @@ export function createTaskRepository(db: Database): TaskRepository {
         isNull(tasks.deletedAt),
         isNull(tasks.completedAt),
         gt(tasks.dueDate, query.from),
+        notDeferredOn(query.from),
       ];
       if (query.to !== null) conditions.push(lte(tasks.dueDate, query.to));
 

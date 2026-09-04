@@ -44,6 +44,11 @@ export function toTask(row: TaskRow): Task {
     // PostgreSQL returns `time` as HH:mm:ss; the domain models a wall-clock HH:mm.
     dueTime: (row.dueTime ? row.dueTime.slice(0, 5) : null) as Task["dueTime"],
     dueTimezone: row.dueTimezone,
+    deferUntil: row.deferUntil as Task["deferUntil"],
+    deadline: row.deadline as Task["deadline"],
+    deadlineTime: (row.deadlineTime
+      ? row.deadlineTime.slice(0, 5)
+      : null) as Task["deadlineTime"],
     parentTaskId: row.parentTaskId,
     recurrence: (row.recurrence as RecurrenceRule | null) ?? null,
     seriesId: row.seriesId,
@@ -78,6 +83,9 @@ export function toTaskRow(task: Task): TaskRow {
     dueDate: task.dueDate,
     dueTime: task.dueTime,
     dueTimezone: task.dueTimezone,
+    deferUntil: task.deferUntil,
+    deadline: task.deadline,
+    deadlineTime: task.deadlineTime,
     parentTaskId: task.parentTaskId,
     recurrence: task.recurrence,
     seriesId: task.seriesId,
