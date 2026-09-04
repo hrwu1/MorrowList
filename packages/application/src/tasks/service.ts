@@ -31,6 +31,7 @@ import {
   isBlocked,
   entersInProgress,
   isTerminal,
+  isUuid,
   materialChanges,
   moveTask as applyTaskMove,
   rankBetween,
@@ -1266,9 +1267,12 @@ export class TaskService {
     workspaceId: string,
     idOrKey: string,
   ): Promise<Task> {
-    const numeric = /^\d+$/.test(idOrKey)
-      ? Number(idOrKey)
-      : /-(\d+)$/.exec(idOrKey)?.[1];
+    // A UUID whose last group is all digits would otherwise read as a task key.
+    const numeric = isUuid(idOrKey)
+      ? undefined
+      : /^\d+$/.test(idOrKey)
+        ? Number(idOrKey)
+        : /-(\d+)$/.exec(idOrKey)?.[1];
     const task =
       numeric === undefined
         ? await tx.tasks.findById(workspaceId, idOrKey)

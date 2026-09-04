@@ -2174,3 +2174,21 @@ describe("defer and deadline dates (GAP-16)", () => {
     expect(await ids({ deadline: "none" })).toEqual([deferred.id]);
   });
 });
+
+describe("TaskService.get by id", () => {
+  it("treats a UUID whose last group is digits as an id, not a task key", async () => {
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Numeric tail",
+    });
+    const numericTail = `${task.id.slice(0, 24)}123456789012`;
+    unitOfWork.data.tasks.set(numericTail, {
+      ...unitOfWork.data.tasks.get(task.id)!,
+      id: numericTail,
+    });
+
+    await expect(
+      service.get(seeded.context, seeded.workspace.id, numericTail),
+    ).resolves.toMatchObject({ id: numericTail });
+  });
+});
