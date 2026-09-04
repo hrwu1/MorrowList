@@ -2,6 +2,7 @@ import {
   activityQuerySchema,
   createProjectRequestSchema,
   createStatusRequestSchema,
+  flowQuerySchema,
   listProjectsQuerySchema,
   listStatusesQuerySchema,
   projectBoardQuerySchema,
@@ -87,6 +88,19 @@ export function projectRoutes(deps: ApiDependencies) {
         body,
       );
       return c.json({ data: status }, 201);
+    })
+
+    .get("/projects/:projectId/flow", async (c) => {
+      const actor = c.get("actor");
+      const query = parseQuery(c.req.query(), flowQuerySchema);
+      return c.json({
+        data: await deps.flowService.project(
+          actor,
+          requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+          c.req.param("projectId"),
+          query,
+        ),
+      });
     })
 
     .get("/projects/:projectId", async (c) => {

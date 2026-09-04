@@ -11,6 +11,9 @@ import type {
   CreateTaskRequest,
   ErrorCode,
   ErrorResponse,
+  FlowQuery,
+  FlowResponse,
+  FlowSummaryDto,
   ListProjectsQuery,
   ListStatusesQuery,
   ListTasksQuery,
@@ -288,6 +291,20 @@ export class ApiClient {
       undefined,
       options,
     );
+  }
+
+  async getProjectFlow(
+    projectId: string,
+    query: Partial<FlowQuery> = {},
+    options: RequestOptions = {},
+  ): Promise<FlowSummaryDto> {
+    const response = await this.send<FlowResponse>(
+      "GET",
+      `/projects/${encodeURIComponent(projectId)}/flow${this.queryString(query, options)}`,
+      undefined,
+      options,
+    );
+    return response.data;
   }
 
   async listTasks(

@@ -27,6 +27,7 @@ export function toTaskDto(
   subtaskProgress: SubtaskProgress | null = null,
   tags: readonly Tag[] = [],
   edges: readonly RelationEdge[] = [],
+  flow?: { readonly inStatusSince: Date | null; readonly ageDays: number | null },
 ): TaskDto {
   const relations = edges.flatMap((edge): TaskRelationDto[] => {
     const other =
@@ -95,5 +96,11 @@ export function toTaskDto(
         ? { reason: task.blockedReason, since: task.blockedSince.toISOString() }
         : null,
     isBlocked: isBlocked(task, predecessors),
+    ...(flow
+      ? {
+          inStatusSince: flow.inStatusSince?.toISOString() ?? null,
+          ageDays: flow.ageDays,
+        }
+      : {}),
   };
 }

@@ -10,6 +10,8 @@ import {
   createStatusRequestSchema,
   createTaskRequestSchema,
   errorResponseSchema,
+  flowQuerySchema,
+  flowResponseSchema,
   listProjectsQuerySchema,
   listStatusesQuerySchema,
   listTasksQuerySchema,
@@ -64,6 +66,7 @@ const registry = {
   ProjectList: projectListResponseSchema,
   ProjectBoard: projectBoardResponseSchema,
   ActivityList: activityListResponseSchema,
+  ProjectFlow: flowResponseSchema,
   Tag: tagResponseSchema,
   TagList: tagListResponseSchema,
   CreateTagRequest: createTagRequestSchema,
@@ -451,6 +454,26 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
             "200": {
               description: "The board projection",
               ...jsonContent(ref("ProjectBoard")),
+            },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/projects/{projectId}/flow": {
+        get: {
+          summary: "Get a project's flow metrics",
+          description:
+            "Cycle time and lead time percentiles, weekly throughput, work in progress, the cumulative flow diagram and aging work in progress, computed from the status intervals every task change records. Read-only.",
+          parameters: [
+            projectIdParam,
+            workspaceIdParam,
+            ...queryParameters(flowQuerySchema),
+          ],
+          responses: {
+            "200": {
+              description: "The flow summary",
+              ...jsonContent(ref("ProjectFlow")),
             },
             "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
             ...commonErrors,

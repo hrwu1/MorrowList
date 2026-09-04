@@ -127,6 +127,13 @@ export const taskSchema = z.object({
   blocked: taskBlockedSchema.nullable(),
   /** Open and either flagged or waiting on an incomplete `blocks` predecessor. */
   isBlocked: z.boolean(),
+  /**
+   * Flow fields (GAP-17), present on board cards only. `inStatusSince` is when the task
+   * entered its current status; `ageDays` is its work item age — time since it was
+   * started — and is null while it is queued or done.
+   */
+  inStatusSince: z.iso.datetime().nullable().optional(),
+  ageDays: z.number().nonnegative().nullable().optional(),
 });
 
 export const titleSchema = z.string().trim().min(1).max(500);

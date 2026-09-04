@@ -1,4 +1,5 @@
 import {
+  FlowService,
   ProjectService,
   TaskService,
   bootstrapUser,
@@ -11,7 +12,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { backfillStatusIntervals } from "../backfill-flow.js";
 import type { DatabaseHandle } from "../client.js";
-import { taskStatusIntervals } from "../schema/index.js";
+import { taskStatusIntervals, tasks as tasks_ } from "../schema/index.js";
 import {
   setupTestDatabase,
   teardownTestDatabase,
@@ -308,5 +309,96 @@ describe("backfill", () => {
       tasks: 0,
       intervals: 0,
     });
+  });
+});
+
+describe("flow read budget", () => {
+  it("summarises a project with 5,000 completed tasks inside 300 ms", async () => {
+    const detail = await projects.create(context, { workspaceId, name: "Busy" });
+    const byCategory = (category: string) => {
+      const status = detail.statuses.find((s) => s.category === category);
+      if (!status) throw new Error(`no ${category}`);
+      return status;
+    };
+    const ready = byCategory("ready");
+    const inProgress = byCategory("in_progress");
+    const done = byCategory("done");
+    const projectId = detail.project.id;
+
+    // Seed rows directly: 5,000 completed tasks, each with four intervals spread over a
+    // year, plus 50 open ones, without paying for 20,000 commands through the service.
+    const base = START.getTime();
+    const taskRows = [];
+    const intervalRows = [];
+    for (let index = 0; index < 5_050; index++) {
+      const id = uuidv7();
+      const completed = index < 5_000;
+      const created = base + (index % 365) * 86_400_000 + index;
+      const startedAt = created + 2 * 86_400_000;
+      const doneAt = startedAt + ((index % 9) + 1) * 86_400_000;
+      taskRows.push({
+        id,
+        workspaceId,
+        taskNumber: index + 1,
+        projectId,
+        statusId: completed ? done.id : inProgress.id,
+        title: `Task ${index}`,
+        priority: "none" as const,
+        rank: `a${String(index).padStart(6, "0")}`,
+        completedAt: completed ? new Date(doneAt) : null,
+        version: 1,
+        createdByActorKind: "user" as const,
+        createdByActorId: context.actorId,
+        lastActorKind: "user" as const,
+        lastActorId: context.actorId,
+        createdAt: new Date(created),
+        updatedAt: new Date(created),
+      });
+      const stays = [
+        [ready.id, "ready", created, startedAt],
+        [inProgress.id, "in_progress", startedAt, completed ? doneAt : null],
+        ...(completed ? [[done.id, "done", doneAt, null]] : []),
+      ] as const;
+      for (const [statusId, category, enteredAt, leftAt] of stays) {
+        intervalRows.push({
+          id: uuidv7(),
+          taskId: id,
+          workspaceId,
+          projectId,
+          statusId,
+          category,
+          enteredAt: new Date(enteredAt),
+          leftAt: leftAt === null ? null : new Date(leftAt),
+        });
+      }
+    }
+    for (let offset = 0; offset < taskRows.length; offset += 500) {
+      await handle.db.insert(tasks_).values(taskRows.slice(offset, offset + 500));
+    }
+    for (let offset = 0; offset < intervalRows.length; offset += 500) {
+      await handle.db
+        .insert(taskStatusIntervals)
+        .values(intervalRows.slice(offset, offset + 500));
+    }
+
+    // Autovacuum analyses a table after this many inserts; the test does not wait for it.
+    await handle.db.execute(sql`analyze task_status_intervals`);
+
+    clock.tick(60 * 24 * 400);
+    const flow = new FlowService({ unitOfWork, clock });
+    const timings: number[] = [];
+    let summary = await flow.project(context, workspaceId, projectId, { range: "365" });
+    for (let run = 0; run < 5; run++) {
+      const started = performance.now();
+      summary = await flow.project(context, workspaceId, projectId, { range: "365" });
+      timings.push(performance.now() - started);
+    }
+
+    expect(summary.wip).toBe(50);
+    expect(summary.completed).toBeGreaterThan(4_000);
+    expect(summary.cycleTimeDays.samples).toBe(summary.completed);
+    expect(summary.aging).toHaveLength(50);
+    expect(summary.cumulativeFlow).toHaveLength(365);
+    expect(Math.max(...timings)).toBeLessThan(300);
   });
 });

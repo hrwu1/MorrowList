@@ -1,11 +1,30 @@
-import type { UpdateProjectRequest } from "@morrowlist/contracts";
+import type { ApiClient } from "@morrowlist/api-client";
+import type { ProjectDto, UpdateProjectRequest } from "@morrowlist/contracts";
 import { Command } from "commander";
 
-import { formatProjectTable, printJson } from "../formatters/output.js";
+import { formatFlowSummary, formatProjectTable, printJson } from "../formatters/output.js";
 
-import { fail, globalsOf, idempotency, withClient } from "./shared.js";
+import { fail, globalsOf, idempotency, usageFailure, withClient } from "./shared.js";
 
-/** `morrow project …` (spec 21.3): the project edit, archive, and restore surface. */
+/**
+ * `morrow project …` (spec 21.3, GAP-17): the project edit, archive, and restore surface,
+ * plus the flow metrics. `flow` addresses a project by id, slug or case-insensitive name,
+ * because a person types the name and a script has the id.
+ */
+
+async function findProject(client: ApiClient, ref: string): Promise<ProjectDto | null> {
+  const key = ref.trim().toLocaleLowerCase("en-US");
+  const { data } = await client.listProjects();
+  return (
+    data.find(
+      (project) =>
+        project.id === ref ||
+        project.slug === key ||
+        project.name.toLocaleLowerCase("en-US") === key,
+    ) ?? null
+  );
+}
+
 export function projectCommand(): Command {
   const project = new Command("project").description("Create and manage projects");
 
@@ -148,6 +167,30 @@ export function projectCommand(): Command {
         }
       });
   }
+
+  project
+    .command("flow")
+    .description(
+      "Cycle time, lead time, throughput, WIP and aging work for a project's board",
+    )
+    .argument("<project>", "project id, slug or name")
+    .option("--range <days>", "30, 90 or 365 days of history", "90")
+    .action(async (ref: string, options, command: Command) => {
+      const globals = globalsOf(command);
+      const json = Boolean(globals.json);
+      try {
+        const flow = await withClient(globals, async (client) => {
+          const found = await findProject(client, ref);
+          if (!found) usageFailure(`No project matching "${ref}".`, json);
+          return client.getProjectFlow(found.id, { range: options.range });
+        });
+
+        if (json) printJson({ ok: true, data: flow });
+        else process.stdout.write(`${formatFlowSummary(flow)}\n`);
+      } catch (error) {
+        fail(error, json);
+      }
+    });
 
   return project;
 }

@@ -20,6 +20,7 @@ import {
   type WorkflowStatus,
 } from "@morrowlist/domain";
 
+import { cardFlowFields } from "../flow/service.js";
 import {
   BOARD_TASK_LIMIT,
   type Project,
@@ -315,16 +316,16 @@ export class ProjectService {
         includeSubtasks: query.includeSubtasks ?? false,
       });
       const boardTaskIds = tasks.items.map((task) => task.id);
-      // Cards show the My Day indicator (spec 9.5), subtask progress, tag chips and
-      // the blocked indicator (spec 29.3); one query each covers the whole board.
-      const [plans, progress, tags, edges] = await Promise.all([
-        tx.dayPlans.listForTasks(
-          boardTaskIds,
-          toLocalDate(this.clock.now(), workspace.timezone),
-        ),
+      // Cards show the My Day indicator (spec 9.5), subtask progress, tag chips, the
+      // blocked indicator (spec 29.3) and the flow fields (GAP-17); one query each
+      // covers the whole board.
+      const now = this.clock.now();
+      const [plans, progress, tags, edges, flow] = await Promise.all([
+        tx.dayPlans.listForTasks(boardTaskIds, toLocalDate(now, workspace.timezone)),
         tx.tasks.childSummary(workspaceId, boardTaskIds),
         tx.tasks.tagsFor(workspaceId, boardTaskIds),
         tx.tasks.relationsFor(workspaceId, boardTaskIds),
+        cardFlowFields(tx, workspaceId, boardTaskIds, now),
       ]);
 
       return {
@@ -339,6 +340,7 @@ export class ProjectService {
               progress.get(task.id) ?? null,
               tags.get(task.id) ?? [],
               edges,
+              flow.get(task.id) ?? { inStatusSince: null, ageDays: null },
             ),
           ),
         },

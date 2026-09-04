@@ -5,6 +5,7 @@ import {
   EXIT,
   exitCodeFor,
   formatActivity,
+  formatFlowSummary,
   formatTagTable,
   formatStatusTable,
   formatTaskDetail,
@@ -342,5 +343,45 @@ describe("formatStatusTable", () => {
     expect(lines[0]).toBe("s1  Ready  (ready)  [default, wip 3]");
     expect(lines[1]).toBe("s2  Done  (done)  [done, archived]");
     expect(formatStatusTable([])).toBe("No statuses.");
+  });
+});
+
+describe("formatFlowSummary", () => {
+  it("prints the numbers, a weekly bar per week, and the aging list", () => {
+    const output = formatFlowSummary({
+      projectId: "01a04e0f-0000-7000-8000-000000000003",
+      range: "30",
+      from: "2026-08-01",
+      to: "2026-08-30",
+      timezone: "Europe/Berlin",
+      computedAt: "2026-08-30T09:00:00.000Z",
+      wip: 2,
+      completed: 3,
+      cycleTimeDays: { samples: 2, p50: 1.5, p85: 4, p95: 4 },
+      leadTimeDays: { samples: 3, p50: 2, p85: 6, p95: 6 },
+      throughput: [
+        { weekStart: "2026-07-27", count: 2 },
+        { weekStart: "2026-08-03", count: 0 },
+      ],
+      cumulativeFlow: [],
+      aging: [
+        {
+          taskId: "01a04e0f-0000-7000-8000-000000000001",
+          key: "ML-7",
+          title: "Old one",
+          statusId: "01a04e0f-0000-7000-8000-000000000004",
+          statusName: "In Progress",
+          category: "in_progress",
+          ageDays: 9,
+          band: "over_p95",
+        },
+      ],
+    });
+
+    expect(output).toContain("WIP now     2");
+    expect(output).toContain("cycle time  p50 1.5d  p85 4d  p95 4d  (2 started tasks)");
+    expect(output).toContain("2026-07-27  ## 2");
+    expect(output).toContain("2026-08-03  0");
+    expect(output).toContain("ML-7       9d  In progress  Old one  [over p95]");
   });
 });

@@ -1,5 +1,6 @@
 import {
   ActivityService,
+  FlowService,
   ProjectService,
   TagService,
   TaskService,
@@ -79,6 +80,7 @@ beforeEach(async () => {
       cursorSecret: "test-secret",
     }),
     activityService: new ActivityService({ unitOfWork, cursorSecret: "test-secret" }),
+    flowService: new FlowService({ unitOfWork, clock: fixedClock(NOW) }),
     viewService: new ViewService({ unitOfWork, clock: fixedClock(NOW) }),
     tagService: new TagService({ unitOfWork, clock: fixedClock(NOW) }),
     logger: silentLogger,

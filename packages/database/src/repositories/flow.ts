@@ -1,6 +1,7 @@
 import type { StatusIntervalRepository } from "@morrowlist/application";
 import type { StatusInterval } from "@morrowlist/domain";
-import { and, asc, eq, gte, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, eq, exists, gte, inArray, isNull, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 
 import type { Database } from "../client.js";
 import { taskStatusIntervals } from "../schema/index.js";
@@ -60,19 +61,10 @@ export function createStatusIntervalRepository(db: Database): StatusIntervalRepo
     },
 
     async listForProject(workspaceId, projectId, since) {
-      // Tasks touched in the range, by the project index; then their whole history.
-      const touched = db
-        .select({ taskId: taskStatusIntervals.taskId })
-        .from(taskStatusIntervals)
-        .where(
-          and(
-            eq(taskStatusIntervals.projectId, projectId),
-            or(
-              isNull(taskStatusIntervals.leftAt),
-              gte(taskStatusIntervals.leftAt, since),
-            ),
-          ),
-        );
+      // A task counts when any of its intervals is still open or was left inside the
+      // range; the correlated probe uses the (task_id, entered_at) index, and the whole
+      // history of each such task comes back so cycle and lead time can look back.
+      const touched = alias(taskStatusIntervals, "touched");
       const rows = await db
         .select()
         .from(taskStatusIntervals)
@@ -80,7 +72,17 @@ export function createStatusIntervalRepository(db: Database): StatusIntervalRepo
           and(
             eq(taskStatusIntervals.workspaceId, workspaceId),
             eq(taskStatusIntervals.projectId, projectId),
-            inArray(taskStatusIntervals.taskId, touched),
+            exists(
+              db
+                .select({ one: sql`1` })
+                .from(touched)
+                .where(
+                  and(
+                    eq(touched.taskId, taskStatusIntervals.taskId),
+                    or(isNull(touched.leftAt), gte(touched.leftAt, since)),
+                  ),
+                ),
+            ),
           ),
         )
         .orderBy(asc(taskStatusIntervals.taskId), asc(taskStatusIntervals.enteredAt));

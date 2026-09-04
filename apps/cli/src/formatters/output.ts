@@ -1,5 +1,6 @@
 import type {
   ActivityEntryDto,
+  FlowSummaryDto,
   TagListItemDto,
   ProjectDto,
   TaskDto,
@@ -274,4 +275,44 @@ export function formatTagTable(tags: readonly TagListItemDto[]): string {
       return `${name}  ${tag.colorToken.padEnd(7)}  ${count}${description}`;
     })
     .join("\n");
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  backlog: "Backlog",
+  ready: "Ready",
+  in_progress: "In progress",
+  blocked: "Blocked",
+  review: "Review",
+  done: "Done",
+};
+
+const days = (value: number | null) => (value === null ? "-" : `${value}d`);
+
+/** `morrow project flow`: the numbers first, then the weekly throughput and aging list. */
+export function formatFlowSummary(flow: FlowSummaryDto): string {
+  const lines = [
+    `Flow for the last ${flow.range} days (${flow.from} to ${flow.to}, ${flow.timezone})`,
+    `  WIP now     ${flow.wip}`,
+    `  completed   ${flow.completed}`,
+    `  cycle time  p50 ${days(flow.cycleTimeDays.p50)}  p85 ${days(flow.cycleTimeDays.p85)}  p95 ${days(flow.cycleTimeDays.p95)}  (${flow.cycleTimeDays.samples} started tasks)`,
+    `  lead time   p50 ${days(flow.leadTimeDays.p50)}  p85 ${days(flow.leadTimeDays.p85)}  p95 ${days(flow.leadTimeDays.p95)}  (${flow.leadTimeDays.samples} tasks)`,
+    "",
+    "Throughput by week",
+    ...flow.throughput.map(
+      (week) =>
+        `  ${week.weekStart}  ${"#".repeat(week.count)}${week.count ? " " : ""}${week.count}`,
+    ),
+  ];
+  if (flow.aging.length > 0) {
+    const keyWidth = Math.max(...flow.aging.map((item) => item.key.length));
+    lines.push(
+      "",
+      "Aging work in progress",
+      ...flow.aging.map(
+        (item) =>
+          `  ${item.key.padEnd(keyWidth)}  ${String(item.ageDays).padStart(6)}d  ${(CATEGORY_LABELS[item.category] ?? item.category).padEnd(11)}  ${item.title}${item.band && item.band !== "under_p50" ? `  [${item.band.replace("over_", "over ")}]` : ""}`,
+      ),
+    );
+  }
+  return lines.join("\n");
 }

@@ -22,6 +22,18 @@ describe("board OpenAPI surface", () => {
     expect(document.components.schemas).toHaveProperty("MoveTaskRequest");
   });
 
+  it("publishes the read-only flow metrics for a project", () => {
+    const document = buildOpenApiDocument() as {
+      paths: Record<string, Record<string, { parameters: { name: string }[] }>>;
+      components: { schemas: Record<string, unknown> };
+    };
+
+    const flow = document.paths["/projects/{projectId}/flow"]?.get;
+    expect(flow).toBeDefined();
+    expect(flow?.parameters.map((parameter) => parameter.name)).toContain("range");
+    expect(document.components.schemas).toHaveProperty("ProjectFlow");
+  });
+
   it("publishes the read-only activity history for tasks and projects", () => {
     const document = buildOpenApiDocument() as {
       paths: Record<string, Record<string, unknown>>;
