@@ -8,6 +8,7 @@ import {
   TaskService,
   ViewService,
   WorkflowService,
+  WorkspaceService,
   bootstrapUser,
 } from "@morrowlist/application";
 import { createAuth, createAuthPort, type AuthPort } from "@morrowlist/auth";
@@ -83,6 +84,7 @@ export function getContainer(): Container {
   const dependencies: ApiDependencies = {
     auth,
     unitOfWork,
+    workspaceService: new WorkspaceService({ unitOfWork }),
     projectService: new ProjectService({ unitOfWork }),
     workflowService: new WorkflowService({ unitOfWork }),
     taskService: new TaskService({ unitOfWork, cursorSecret }),

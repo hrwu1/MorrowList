@@ -3,6 +3,7 @@
 import { ApiClientError } from "@morrowlist/api-client";
 import type {
   ProjectBoardResponse,
+  TaskCommandResult,
   TaskDto,
   WorkflowStatusDto,
 } from "@morrowlist/contracts";
@@ -32,7 +33,8 @@ export interface MoveBoardTaskInput {
 
 /**
  * One optimistic move path for pointer drag, keyboard drag, and the Move menu.
- * The server still computes the authoritative rank and completion transition.
+ * The server still computes the authoritative rank and completion transition, and
+ * answers with any cross-project in-progress warning (GAP-20) for the caller to show.
  */
 export function useMoveBoardTask(projectId: string) {
   const queryClient = useQueryClient();
@@ -40,19 +42,21 @@ export function useMoveBoardTask(projectId: string) {
   const boardKey = projectKeys.projectBoards(projectId);
 
   return useMutation({
-    mutationFn: async (input: MoveBoardTaskInput) => {
+    mutationFn: async (input: MoveBoardTaskInput): Promise<TaskCommandResult> => {
       const neighbours = {
         beforeTaskId: input.placement.beforeTaskId,
         afterTaskId: input.placement.afterTaskId,
         expectedVersion: input.task.version,
       };
-      return input.task.statusId === input.destination.id
-        ? apiClient.reorderTask(input.task.id, neighbours)
-        : apiClient.moveTask(input.task.id, {
-            projectId: input.projectId,
-            statusId: input.destination.id,
-            ...neighbours,
-          });
+      if (input.task.statusId === input.destination.id) {
+        const task = await apiClient.reorderTask(input.task.id, neighbours);
+        return { task, warnings: [] };
+      }
+      return apiClient.moveTask(input.task.id, {
+        projectId: input.projectId,
+        statusId: input.destination.id,
+        ...neighbours,
+      });
     },
     onMutate: async (input) => {
       await Promise.all([
@@ -80,7 +84,7 @@ export function useMoveBoardTask(projectId: string) {
         queryClient.setQueryData(key, value);
       }
     },
-    onSuccess: (task, input) => {
+    onSuccess: (result, input) => {
       queryClient.setQueriesData<ProjectBoardResponse>(
         { queryKey: boardKey },
         (current) =>
@@ -89,7 +93,7 @@ export function useMoveBoardTask(projectId: string) {
                 taskId: input.task.id,
                 placement: input.placement,
                 destination: input.destination,
-                authoritativeTask: task,
+                authoritativeTask: result.task,
               })
             : current,
       );

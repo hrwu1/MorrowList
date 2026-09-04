@@ -296,7 +296,7 @@ export function taskCommand(): Command {
       const globals = globalsOf(command);
       const json = Boolean(globals.json);
       try {
-        const result = await withClient(globals, async (client) => {
+        const { task: result, warnings } = await withClient(globals, async (client) => {
           const current = await client.getTask(idOrKey);
           const expected = options.expectedVersion
             ? Number(options.expectedVersion)
@@ -304,8 +304,12 @@ export function taskCommand(): Command {
           return client.reopenTask(current.id, expected, idempotency());
         });
 
-        if (json) printJson({ ok: true, data: result });
-        else process.stdout.write(`${result.key}  reopened\n`);
+        if (json) printJson({ ok: true, data: result, warnings });
+        else {
+          process.stdout.write(`${result.key}  reopened\n`);
+          // Warnings go to stderr so `--json` and piped stdout stay clean (spec 21.5).
+          for (const warning of warnings) printError(`warning: ${warning.message}`);
+        }
       } catch (error) {
         fail(error, json);
       }

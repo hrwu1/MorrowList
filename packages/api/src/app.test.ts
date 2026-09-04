@@ -5,6 +5,7 @@ import {
   TaskService,
   ViewService,
   WorkflowService,
+  WorkspaceService,
   bootstrapUser,
 } from "@morrowlist/application";
 import type { AuthPort, AuthenticatedUser } from "@morrowlist/auth";
@@ -69,6 +70,7 @@ beforeEach(async () => {
   const deps: ApiDependencies = {
     auth,
     unitOfWork,
+    workspaceService: new WorkspaceService({ unitOfWork, clock: fixedClock(NOW) }),
     projectService: new ProjectService({ unitOfWork, clock: fixedClock(NOW) }),
     workflowService: new WorkflowService({ unitOfWork, clock: fixedClock(NOW) }),
     taskService: new TaskService({
@@ -163,7 +165,93 @@ describe("authentication", () => {
     });
     expect(body.data.workspaces).toHaveLength(1);
     expect(body.data.workspaces[0].role).toBe("owner");
+    expect(body.data.workspaces[0]).toMatchObject({
+      inProgressLimit: null,
+      inProgressCount: 0,
+    });
     expect(body.data.defaultWorkspaceId).toBe(body.data.workspaces[0].id);
+  });
+});
+
+describe("workspace settings and the in-progress limit", () => {
+  async function startTaskIn(projectName: string) {
+    const created = await (
+      await jsonRequest("/api/v1/projects", "POST", { name: projectName })
+    ).json();
+    const projectId = created.data.project.id as string;
+    const byCategory = (category: string) =>
+      created.data.statuses.find(
+        (status: { category: string }) => status.category === category,
+      ).id as string;
+    const task = await (
+      await jsonRequest("/api/v1/tasks", "POST", {
+        title: `${projectName} work`,
+        projectId,
+        statusId: byCategory("ready"),
+      })
+    ).json();
+    return (await jsonRequest(`/api/v1/tasks/${task.data.id}/move`, "POST", {
+      projectId,
+      statusId: byCategory("in_progress"),
+    })) as Response;
+  }
+
+  it("sets the limit, counts started work in /me, and warns without blocking", async () => {
+    const me = await (await request("/api/v1/me")).json();
+    const workspaceId = me.data.defaultWorkspaceId as string;
+
+    const updated = await jsonRequest(`/api/v1/workspaces/${workspaceId}`, "PATCH", {
+      inProgressLimit: 1,
+    });
+    expect(updated.status).toBe(200);
+    await expect(updated.json()).resolves.toMatchObject({
+      data: { id: workspaceId, inProgressLimit: 1, version: 2 },
+    });
+
+    const first = await (await startTaskIn("Alpha")).json();
+    expect(first.warnings).toEqual([]);
+    const second = await startTaskIn("Beta");
+    expect(second.status).toBe(200);
+    const body = await second.json();
+    expect(body.data.isCompleted).toBe(false);
+    expect(body.warnings).toHaveLength(1);
+    expect(body.warnings[0]).toMatchObject({
+      code: "IN_PROGRESS_LIMIT_EXCEEDED",
+      limit: 1,
+      count: 2,
+    });
+    expect(body.warnings[0].tasks.map((task: { title: string }) => task.title)).toEqual(
+      ["Alpha work", "Beta work"],
+    );
+
+    const after = await (await request("/api/v1/me")).json();
+    expect(after.data.workspaces[0]).toMatchObject({
+      inProgressLimit: 1,
+      inProgressCount: 2,
+    });
+  });
+
+  it("validates the limit and hides another workspace", async () => {
+    const me = await (await request("/api/v1/me")).json();
+    const workspaceId = me.data.defaultWorkspaceId as string;
+
+    expect(
+      (await jsonRequest(`/api/v1/workspaces/${workspaceId}`, "PATCH", {})).status,
+    ).toBe(422);
+    expect(
+      (
+        await jsonRequest(`/api/v1/workspaces/${workspaceId}`, "PATCH", {
+          inProgressLimit: 0,
+        })
+      ).status,
+    ).toBe(422);
+    expect(
+      (
+        await jsonRequest(`/api/v1/workspaces/${uuidv7()}`, "PATCH", {
+          inProgressLimit: 2,
+        })
+      ).status,
+    ).toBe(404);
   });
 });
 

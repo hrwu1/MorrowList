@@ -19,9 +19,9 @@ export function meRoutes(deps: ApiDependencies) {
       throw new ApiError("AUTH_REQUIRED", "Sign in to continue.");
     }
 
-    const workspaces = await deps.unitOfWork.execute((tx) =>
-      tx.workspaces.listForUser(userId),
-    );
+    // Each workspace carries its in-progress limit and count (GAP-20), so a shell can
+    // show "3 of 3 in progress" from this one call.
+    const workspaces = await deps.workspaceService.listForUser(actor);
     const defaultWorkspace = workspaces[0];
     if (!defaultWorkspace) {
       throw new ApiError("WORKSPACE_NOT_FOUND", "No workspace is available yet.");
@@ -34,16 +34,7 @@ export function meRoutes(deps: ApiDependencies) {
           email: user.email,
           name: user.name,
         },
-        workspaces: workspaces.map((workspace) => ({
-          id: workspace.id,
-          name: workspace.name,
-          slug: workspace.slug,
-          taskKeyPrefix: workspace.taskKeyPrefix,
-          timezone: workspace.timezone,
-          role: workspace.role,
-          createdAt: workspace.createdAt.toISOString(),
-          updatedAt: workspace.updatedAt.toISOString(),
-        })),
+        workspaces,
         defaultWorkspaceId: defaultWorkspace.id,
         capabilities: {
           actorKind: actor.actorKind === "api_key" ? "api_key" : "user",

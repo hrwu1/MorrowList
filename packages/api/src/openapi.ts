@@ -28,6 +28,7 @@ import {
   setTaskParentRequestSchema,
   tagListResponseSchema,
   tagResponseSchema,
+  taskCommandResponseSchema,
   taskListResponseSchema,
   taskResponseSchema,
   todayViewQuerySchema,
@@ -38,8 +39,10 @@ import {
   updateProjectRequestSchema,
   updateStatusRequestSchema,
   updateTaskRequestSchema,
+  updateWorkspaceRequestSchema,
   workflowStatusListResponseSchema,
   workflowStatusResponseSchema,
+  workspaceResponseSchema,
 } from "@morrowlist/contracts";
 import { z } from "zod";
 
@@ -54,6 +57,7 @@ import { API_BASE_PATH } from "./app.js";
 
 const registry = {
   Task: taskResponseSchema.shape.data,
+  TaskCommandResult: taskCommandResponseSchema,
   TaskList: taskListResponseSchema,
   ProjectDetail: projectResponseSchema,
   Project: z.object({ data: projectSchema }),
@@ -86,6 +90,8 @@ const registry = {
   UpcomingView: upcomingViewResponseSchema,
   SetTaskParentRequest: setTaskParentRequestSchema,
   MeResponse: meResponseSchema,
+  Workspace: workspaceResponseSchema,
+  UpdateWorkspaceRequest: updateWorkspaceRequestSchema,
   ErrorResponse: errorResponseSchema,
 } as const;
 
@@ -213,6 +219,35 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
           summary: "Current user, workspaces, and capabilities",
           responses: {
             "200": { description: "The caller", ...jsonContent(ref("MeResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/workspaces/{id}": {
+        patch: {
+          summary:
+            "Update a workspace's name, key prefix, timezone, or in-progress limit",
+          description:
+            "The in-progress limit counts open tasks in in-progress columns across every project. Exceeding it warns on move and reopen; it never blocks.",
+          parameters: [
+            {
+              name: "id",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+          ],
+          requestBody: {
+            required: true,
+            ...jsonContent(ref("UpdateWorkspaceRequest")),
+          },
+          responses: {
+            "200": {
+              description: "The updated workspace",
+              ...jsonContent(ref("Workspace")),
+            },
+            ...notFound,
+            ...conflict,
             ...commonErrors,
           },
         },
@@ -720,11 +755,14 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
         post: {
           summary: "Move a task to another project status or the Inbox",
           description:
-            "Neighbour IDs describe the intended position; the server computes the authoritative rank.",
+            "Neighbour IDs describe the intended position; the server computes the authoritative rank. Entering an in-progress column past the workspace limit adds a warning; the move still succeeds.",
           parameters: [taskIdParam, workspaceIdParam],
           requestBody: { required: true, ...jsonContent(ref("MoveTaskRequest")) },
           responses: {
-            "200": { description: "The moved task", ...jsonContent(ref("Task")) },
+            "200": {
+              description: "The moved task and any limit warnings",
+              ...jsonContent(ref("TaskCommandResult")),
+            },
             "409": {
               description: "Version conflict",
               ...jsonContent(ref("ErrorResponse")),
@@ -759,10 +797,15 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
       "/tasks/{id}/reopen": {
         post: {
           summary: "Reopen a completed task",
+          description:
+            "Returns the task to its last active status. Landing in an in-progress column past the workspace limit adds a warning; the reopen still succeeds.",
           parameters: [taskIdParam, workspaceIdParam],
           requestBody: { required: false, ...jsonContent(ref("ReopenTaskRequest")) },
           responses: {
-            "200": { description: "The reopened task", ...jsonContent(ref("Task")) },
+            "200": {
+              description: "The reopened task and any limit warnings",
+              ...jsonContent(ref("TaskCommandResult")),
+            },
             ...commonErrors,
           },
         },

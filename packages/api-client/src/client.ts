@@ -28,6 +28,8 @@ import type {
   SetTaskParentRequest,
   TagDto,
   TagListResponse,
+  TaskCommandResponse,
+  TaskCommandResult,
   TaskDto,
   TaskListResponse,
   TodayViewQuery,
@@ -38,9 +40,12 @@ import type {
   UpdateProjectRequest,
   UpdateStatusRequest,
   UpdateTaskRequest,
+  UpdateWorkspaceRequest,
   WorkflowStatusDto,
   WorkflowStatusListResponse,
   WorkflowStatusResponse,
+  WorkspaceDto,
+  WorkspaceResponse,
 } from "@morrowlist/contracts";
 
 /**
@@ -92,6 +97,21 @@ export class ApiClient {
   async me(options: RequestOptions = {}): Promise<MeResponse["data"]> {
     const body = await this.send<MeResponse>("GET", "/me", undefined, options);
     return body.data;
+  }
+
+  /** Workspace settings, including the cross-project in-progress limit (GAP-20). */
+  async updateWorkspace(
+    workspaceId: string,
+    body: UpdateWorkspaceRequest,
+    options: RequestOptions = {},
+  ): Promise<WorkspaceDto> {
+    const response = await this.send<WorkspaceResponse>(
+      "PATCH",
+      `/workspaces/${encodeURIComponent(workspaceId)}`,
+      body,
+      options,
+    );
+    return response.data;
   }
 
   async listProjects(
@@ -333,18 +353,19 @@ export class ApiClient {
     return response.data;
   }
 
+  /** Moves can start work; the result carries any in-progress limit warning (GAP-20). */
   async moveTask(
     id: string,
     body: MoveTaskRequest,
     options: RequestOptions = {},
-  ): Promise<TaskDto> {
-    const response = await this.send<{ data: TaskDto }>(
+  ): Promise<TaskCommandResult> {
+    const response = await this.send<TaskCommandResponse>(
       "POST",
       `/tasks/${encodeURIComponent(id)}/move${this.queryString({}, options)}`,
       body,
       options,
     );
-    return response.data;
+    return { task: response.data, warnings: response.warnings ?? [] };
   }
 
   async reorderTask(
@@ -380,14 +401,14 @@ export class ApiClient {
     id: string,
     expectedVersion?: number,
     options: RequestOptions = {},
-  ): Promise<TaskDto> {
-    const response = await this.send<{ data: TaskDto }>(
+  ): Promise<TaskCommandResult> {
+    const response = await this.send<TaskCommandResponse>(
       "POST",
       `/tasks/${encodeURIComponent(id)}/reopen${this.queryString({}, options)}`,
       expectedVersion === undefined ? {} : { expectedVersion },
       options,
     );
-    return response.data;
+    return { task: response.data, warnings: response.warnings ?? [] };
   }
 
   async setTaskParent(

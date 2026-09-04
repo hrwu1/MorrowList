@@ -8,6 +8,7 @@ import type {
   ReorderTaskRequest,
   SetTaskBlockedRequest,
   SetTaskParentRequest,
+  TaskCommandResult,
   TaskDto,
   UpdateTaskRequest,
   WipWarningDto,
@@ -89,15 +90,6 @@ export interface TaskServiceOptions {
 
 export interface WorkspaceScopedRequest {
   readonly workspaceId: string;
-}
-
-/**
- * A command that can start work answers with the task and any warning about the
- * workspace's cross-project limit (GAP-20). A warning never fails the command.
- */
-export interface TaskCommandResult {
-  readonly task: TaskDto;
-  readonly warnings: readonly WipWarningDto[];
 }
 
 export class TaskService {

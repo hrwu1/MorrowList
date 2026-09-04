@@ -7,6 +7,7 @@ import { statusCommand } from "./commands/status.js";
 import { tagCommand } from "./commands/tag.js";
 import { taskCommand } from "./commands/task.js";
 import { todayCommand } from "./commands/today.js";
+import { workspaceCommand } from "./commands/workspace.js";
 import { EXIT, printError } from "./formatters/output.js";
 
 /**
@@ -37,6 +38,7 @@ program.addCommand(taskCommand());
 program.addCommand(todayCommand());
 program.addCommand(tagCommand());
 program.addCommand(relationCommand());
+program.addCommand(workspaceCommand());
 
 try {
   await program.parseAsync(process.argv);

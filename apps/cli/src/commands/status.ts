@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import type { StatusCategory, UpdateStatusRequest } from "@morrowlist/contracts";
 import { Command } from "commander";
 
@@ -80,12 +82,16 @@ export function statusCommand(): Command {
     .option("--clear-wip", "remove the WIP limit")
     .option("--default", "make this the default column for new tasks")
     .option("--policy <markdown>", "column policy")
+    .option("--policy-file <path>", "read the column policy (Markdown) from a file")
     .option("--clear-policy", "remove the column policy")
     .option("--expected-version <n>", "fail unless the column is still at this version")
     .action(async (id: string, options, command: Command) => {
       const globals = globalsOf(command);
       const json = Boolean(globals.json);
       try {
+        const policy: string | undefined = options.policyFile
+          ? await readFile(options.policyFile, "utf8")
+          : options.policy;
         const body: UpdateStatusRequest = {
           ...(options.name ? { name: options.name } : {}),
           ...(options.category ? { category: options.category as StatusCategory } : {}),
@@ -98,8 +104,8 @@ export function statusCommand(): Command {
           ...(options.default ? { isDefault: true } : {}),
           ...(options.clearPolicy
             ? { policyMd: null }
-            : options.policy
-              ? { policyMd: options.policy }
+            : policy !== undefined
+              ? { policyMd: policy }
               : {}),
           ...(options.expectedVersion
             ? { expectedVersion: Number(options.expectedVersion) }

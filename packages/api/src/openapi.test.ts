@@ -62,4 +62,22 @@ describe("board OpenAPI surface", () => {
     expect(document.components.schemas).toHaveProperty("TagList");
     expect(document.components.schemas).toHaveProperty("CreateTagRequest");
   });
+
+  it("publishes the workspace limit and the warnings on move and reopen", () => {
+    const document = buildOpenApiDocument() as {
+      paths: Record<string, Record<string, { responses: Record<string, unknown> }>>;
+      components: { schemas: Record<string, unknown> };
+    };
+
+    expect(document.paths["/workspaces/{id}"]).toHaveProperty("patch");
+    expect(document.components.schemas).toHaveProperty("UpdateWorkspaceRequest");
+    expect(document.components.schemas).toHaveProperty("TaskCommandResult");
+    expect(document.paths["/tasks/{id}/move"]?.post?.responses["200"]).toMatchObject({
+      content: {
+        "application/json": {
+          schema: { $ref: "#/components/schemas/TaskCommandResult" },
+        },
+      },
+    });
+  });
 });

@@ -32,6 +32,8 @@ export type ExitCode = (typeof EXIT)[keyof typeof EXIT];
 export interface JsonEnvelope<T> {
   readonly ok: boolean;
   readonly data?: T;
+  /** Non-fatal notices such as the in-progress limit being exceeded (GAP-20). */
+  readonly warnings?: readonly { readonly code: string; readonly message: string }[];
   readonly error?: {
     readonly code: string;
     readonly message: string;

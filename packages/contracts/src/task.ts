@@ -282,6 +282,11 @@ export const taskListResponseSchema = paginated(taskSchema);
 export type TaskDto = z.infer<typeof taskSchema>;
 export type WipWarningDto = z.infer<typeof wipWarningSchema>;
 export type TaskCommandResponse = z.infer<typeof taskCommandResponseSchema>;
+/** The unwrapped form of `TaskCommandResponse`: the task with its limit warnings. */
+export interface TaskCommandResult {
+  readonly task: TaskDto;
+  readonly warnings: readonly WipWarningDto[];
+}
 export type SubtaskProgress = z.infer<typeof subtaskProgressSchema>;
 export type RelationType = z.infer<typeof relationTypeSchema>;
 export type RelatedTaskDto = z.infer<typeof relatedTaskSchema>;

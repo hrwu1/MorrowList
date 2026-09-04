@@ -86,7 +86,8 @@ describe("activity requests", () => {
 describe("task movement requests", () => {
   it("moves with destination and server-ranking neighbours", async () => {
     const task = { id: TASK_ID, statusId: STATUS_ID };
-    const { client, requests } = recordingClient({ data: task });
+    const warning = { code: "IN_PROGRESS_LIMIT_EXCEEDED", limit: 1, count: 2 };
+    const { client, requests } = recordingClient({ data: task, warnings: [warning] });
 
     await expect(
       client.moveTask(
@@ -100,7 +101,7 @@ describe("task movement requests", () => {
         },
         { idempotencyKey: "move-1" },
       ),
-    ).resolves.toEqual(task);
+    ).resolves.toEqual({ task, warnings: [warning] });
 
     expect(requests[0]?.url).toContain(`/tasks/${TASK_ID}/move?workspaceId=`);
     expect(requests[0]?.headers.get("idempotency-key")).toBe("move-1");
@@ -249,5 +250,22 @@ describe("tag requests", () => {
     await expect(client.deleteTag(TAG_ID)).resolves.toBeUndefined();
     expect(requests[0]?.method).toBe("DELETE");
     expect(requests[0]?.url).toBe(`https://example.test/api/v1/tags/${TAG_ID}`);
+  });
+});
+
+describe("workspace requests", () => {
+  it("updates the in-progress limit and unwraps the workspace", async () => {
+    const workspace = { id: PROJECT_ID, inProgressLimit: 3 };
+    const { client, requests } = recordingClient({ data: workspace });
+
+    await expect(
+      client.updateWorkspace(PROJECT_ID, { inProgressLimit: 3 }),
+    ).resolves.toEqual(workspace);
+
+    expect(requests[0]?.method).toBe("PATCH");
+    expect(requests[0]?.url).toBe(
+      `https://example.test/api/v1/workspaces/${PROJECT_ID}`,
+    );
+    await expect(requests[0]?.json()).resolves.toEqual({ inProgressLimit: 3 });
   });
 });

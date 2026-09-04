@@ -272,10 +272,11 @@ export function useMoveTaskToProject() {
   return useMutation({
     mutationFn: async ({ task, projectId }: MoveTaskToProjectInput) => {
       if (projectId === null) {
-        return apiClient.moveTask(task.id, {
+        const result = await apiClient.moveTask(task.id, {
           projectId: null,
           expectedVersion: task.version,
         });
+        return result.task;
       }
 
       const detail = await queryClient.fetchQuery({
@@ -287,11 +288,12 @@ export function useMoveTaskToProject() {
         throw new Error("This project has no active workflow status.");
       }
 
-      return apiClient.moveTask(task.id, {
+      const result = await apiClient.moveTask(task.id, {
         projectId,
         statusId: destination.id,
         expectedVersion: task.version,
       });
+      return result.task;
     },
     onSuccess: (moved) => patchTaskEverywhere(queryClient, moved),
     onSettled: () => invalidateTaskProjections(queryClient),
@@ -350,7 +352,7 @@ export function useCompleteTask() {
 
 export function useReopenTask() {
   return useTaskAction(
-    (task) => apiClient.reopenTask(task.id, task.version),
+    (task) => apiClient.reopenTask(task.id, task.version).then((result) => result.task),
     (task) => ({
       ...task,
       isCompleted: false,

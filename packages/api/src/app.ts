@@ -12,6 +12,7 @@ import { statusRoutes } from "./routes/statuses.js";
 import { tagRoutes } from "./routes/tags.js";
 import { taskRoutes } from "./routes/tasks.js";
 import { viewRoutes } from "./routes/views.js";
+import { workspaceRoutes } from "./routes/workspace.js";
 
 /**
  * The `/api/v1` application (FND-006). Mounted inside Next.js today; the same Hono app can
@@ -46,6 +47,7 @@ export function createApiApp(deps: ApiDependencies) {
   app.use("/tags", authenticate(deps.auth, listWorkspaceIds));
   app.use("/tags/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/statuses/*", authenticate(deps.auth, listWorkspaceIds));
+  app.use("/workspaces/*", authenticate(deps.auth, listWorkspaceIds));
 
   app.route("/", meRoutes(deps));
   app.route("/", projectRoutes(deps));
@@ -53,6 +55,7 @@ export function createApiApp(deps: ApiDependencies) {
   app.route("/", tagRoutes(deps));
   app.route("/", taskRoutes(deps));
   app.route("/", viewRoutes(deps));
+  app.route("/", workspaceRoutes(deps));
 
   app.notFound((c) => {
     const { status, body } = toErrorBody(
