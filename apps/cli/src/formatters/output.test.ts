@@ -241,6 +241,29 @@ describe("formatTaskDetail", () => {
     expect(formatTaskTable([task({ isBlocked: true })])).toContain("[blocked]");
   });
 
+  it("prints the repeat rule in words and the series id", () => {
+    const detail = formatTaskDetail(
+      task({
+        recurrence: {
+          freq: "weekly",
+          interval: 2,
+          mode: "after_completion",
+          weekdays: ["mon", "thu"],
+          monthDay: null,
+          nthWeekday: null,
+          until: null,
+          count: 3,
+        },
+        seriesId: "0198f0a0-0000-7000-8000-000000000009",
+      }),
+    );
+    expect(detail).toContain(
+      "repeat      Every 2 weeks on Mon, Thu after completion, 3 occurrences left",
+    );
+    expect(detail).toContain("series      0198f0a0-0000-7000-8000-000000000009");
+    expect(formatTaskDetail(task())).not.toContain("repeat");
+  });
+
   it("omits the subtask lines for a childless task", () => {
     expect(formatTaskDetail(task())).not.toContain("subtasks");
   });

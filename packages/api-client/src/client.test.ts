@@ -156,6 +156,20 @@ describe("My Day and view requests", () => {
   });
 });
 
+describe("recurrence requests", () => {
+  it("posts the expected version to the skip endpoint", async () => {
+    const { client, requests } = recordingClient({ data: { id: TASK_ID } });
+
+    await expect(client.skipOccurrence(TASK_ID, 3)).resolves.toEqual({ id: TASK_ID });
+
+    expect(requests[0]?.method).toBe("POST");
+    expect(requests[0]?.url).toBe(
+      `https://example.test/api/v1/tasks/${TASK_ID}/skip?workspaceId=0198f0a0-0000-7000-8000-000000000003`,
+    );
+    await expect(requests[0]?.json()).resolves.toEqual({ expectedVersion: 3 });
+  });
+});
+
 describe("subtask requests", () => {
   it("sets a parent and detaches it with the expected version", async () => {
     const task = { id: TASK_ID, parentTaskId: PROJECT_ID };

@@ -316,6 +316,51 @@ describe("task endpoints", () => {
     expect(reopened.data.isCompleted).toBe(false);
   });
 
+  it("creates a repeating task, spawns the next occurrence on completion, and skips", async () => {
+    const created = await (
+      await jsonRequest("/api/v1/tasks", "POST", {
+        title: "Water plants",
+        dueDate: "2026-08-29",
+        recurrence: { freq: "weekly", weekdays: ["sat"] },
+      })
+    ).json();
+    expect(created.data.recurrence).toMatchObject({
+      freq: "weekly",
+      weekdays: ["sat"],
+    });
+    expect(created.data.seriesId).toBe(created.data.id);
+
+    const skipped = await (
+      await jsonRequest(`/api/v1/tasks/${created.data.id}/skip`, "POST", {
+        expectedVersion: 1,
+      })
+    ).json();
+    expect(skipped.data).toMatchObject({
+      id: created.data.id,
+      dueDate: "2026-09-05",
+      version: 2,
+    });
+
+    await jsonRequest(`/api/v1/tasks/${created.data.id}/complete`, "POST");
+    const series = await (
+      await request(`/api/v1/tasks?seriesId=${created.data.id}&sort=dueDate`)
+    ).json();
+    expect(
+      series.data.map((t: { key: string; dueDate: string }) => [t.key, t.dueDate]),
+    ).toEqual([
+      ["ML-1", "2026-09-05"],
+      ["ML-2", "2026-09-12"],
+    ]);
+
+    // Completed: nothing to skip. Both rejections are validation failures.
+    const invalid = await jsonRequest(`/api/v1/tasks/${created.data.id}/skip`, "POST");
+    expect(invalid.status).toBe(422);
+    const badRule = await jsonRequest(`/api/v1/tasks/${created.data.id}`, "PATCH", {
+      recurrence: { freq: "monthly" },
+    });
+    expect(badRule.status).toBe(422);
+  });
+
   it("soft deletes and restores a task", async () => {
     const created = await (
       await jsonRequest("/api/v1/tasks", "POST", {

@@ -16,6 +16,7 @@
   "dependencies": {
     "@morrowlist/api-client": "workspace:*",
     "@morrowlist/contracts": "workspace:*",
+    "@morrowlist/domain": "workspace:*",
     "commander": "14.0.0"
   },
   "devDependencies": {

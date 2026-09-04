@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import { ApiClient, ApiClientError } from "@morrowlist/api-client";
+import type { RecurrenceRuleDto } from "@morrowlist/contracts";
+import { parseRecurrencePhrase, weekdayOf, type PlainDate } from "@morrowlist/domain";
 import type { Command } from "commander";
 
 import { readConfig, resolveProfile, type ResolveOptions } from "../config/profile.js";
@@ -67,6 +69,31 @@ export function fail(error: unknown, json: boolean): never {
     printError(`error: ${message}`);
   }
   process.exit(EXIT.network);
+}
+
+/**
+ * `--every <phrase>` to a recurrence rule (GAP-12). A bare `week` or `month` falls on
+ * the due date's weekday or day of month, or today's when there is no due date.
+ */
+export function recurrenceFromPhrase(
+  phrase: string,
+  dueDate: string | null | undefined,
+  afterCompletion: boolean,
+  json: boolean,
+): RecurrenceRuleDto {
+  const anchor = (dueDate ?? new Date().toISOString().slice(0, 10)) as PlainDate;
+  const rule = parseRecurrencePhrase(phrase, {
+    defaultWeekday: weekdayOf(anchor),
+    defaultMonthDay: Number(anchor.slice(8, 10)),
+    mode: afterCompletion ? "after_completion" : "schedule",
+  });
+  if (!rule) {
+    usageFailure(
+      `Cannot read "--every ${phrase}". Try "day", "2 weeks on mon,thu", "weekdays", "month on 31", "month on last fri", "year", "week until 2026-12-31", or "day for 10 times".`,
+      json,
+    );
+  }
+  return { ...rule, weekdays: rule.weekdays ? [...rule.weekdays] : null };
 }
 
 /** A usage-level failure the API was never asked about, such as an unknown tag name. */

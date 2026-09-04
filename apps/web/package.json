@@ -22,6 +22,7 @@
     "@morrowlist/auth": "workspace:*",
     "@morrowlist/config": "workspace:*",
     "@morrowlist/contracts": "workspace:*",
+    "@morrowlist/domain": "workspace:*",
     "@morrowlist/database": "workspace:*",
     "@morrowlist/observability": "workspace:*",
     "@morrowlist/ui": "workspace:*",

@@ -10,6 +10,7 @@ import {
   reopenTaskRequestSchema,
   setTaskBlockedRequestSchema,
   setTaskParentRequestSchema,
+  skipOccurrenceRequestSchema,
   updateTaskRequestSchema,
 } from "@morrowlist/contracts";
 import { Hono } from "hono";
@@ -127,6 +128,18 @@ export function taskRoutes(deps: ApiDependencies) {
         body.expectedVersion,
       );
       return c.json({ data: result.task, warnings: result.warnings });
+    })
+
+    .post("/tasks/:id/skip", async (c) => {
+      const actor = c.get("actor");
+      const body = await parseOptionalBody(c, skipOccurrenceRequestSchema);
+      const task = await deps.taskService.skipOccurrence(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("id"),
+        body.expectedVersion,
+      );
+      return c.json({ data: task });
     })
 
     .post("/tasks/:id/parent", async (c) => {

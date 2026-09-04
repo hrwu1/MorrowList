@@ -7,6 +7,7 @@ import type {
   TodayViewDto,
   WorkflowStatusDto,
 } from "@morrowlist/contracts";
+import { describeRecurrence } from "@morrowlist/domain";
 
 /**
  * Output envelope and exit codes (spec 21.5, 21.6).
@@ -215,6 +216,10 @@ export function formatTaskDetail(
           }`,
         ]
       : []),
+    ...(task.recurrence
+      ? [`  repeat      ${describeRecurrence(task.recurrence)}`]
+      : []),
+    ...(task.seriesId ? [`  series      ${task.seriesId}`] : []),
     ...(task.parentTaskId ? [`  parent      ${task.parentTaskId}`] : []),
     ...(task.subtaskProgress
       ? [

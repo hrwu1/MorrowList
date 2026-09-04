@@ -810,6 +810,26 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
           },
         },
       },
+      "/tasks/{id}/skip": {
+        post: {
+          summary: "Skip the current occurrence of a repeating task",
+          description:
+            "The task itself moves on to its next occurrence; nothing is created. A task without a recurrence rule, a completed one, or the last occurrence of a bounded series is rejected with VALIDATION_FAILED.",
+          parameters: [taskIdParam, workspaceIdParam],
+          requestBody: { required: false, ...jsonContent(ref("CompleteTaskRequest")) },
+          responses: {
+            "200": {
+              description: "The task on its next occurrence",
+              ...jsonContent(ref("Task")),
+            },
+            "409": {
+              description: "Version conflict",
+              ...jsonContent(ref("ErrorResponse")),
+            },
+            ...commonErrors,
+          },
+        },
+      },
       "/tasks/{id}/parent": {
         post: {
           summary: "Make a task a subtask of another",

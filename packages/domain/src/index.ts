@@ -130,6 +130,7 @@ export {
   type RecurrencePhraseOptions,
   type RecurrenceRule,
   type RecurrenceRuleInput,
+  type RecurrenceRuleView,
   type Weekday,
 } from "./task/recurrence.js";
 export {

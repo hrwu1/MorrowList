@@ -10,7 +10,13 @@ import {
   printJson,
 } from "../formatters/output.js";
 
-import { fail, globalsOf, idempotency, withClient } from "./shared.js";
+import {
+  fail,
+  globalsOf,
+  idempotency,
+  recurrenceFromPhrase,
+  withClient,
+} from "./shared.js";
 import { findTag, resolveTags } from "./tag.js";
 
 /**
@@ -44,10 +50,26 @@ export function taskCommand(): Command {
       [] as string[],
     )
     .option("--create-tags", "create any --tag that does not exist yet")
+    .option(
+      "--every <phrase>",
+      'repeat, e.g. "day", "2 weeks on mon,thu", "month on 31", "year"; a bare "week" or "month" uses the due date',
+    )
+    .option(
+      "--after-completion",
+      "count the next occurrence from the completion date rather than the due date",
+    )
     .action(async (titleParts: string[], options, command) => {
       const globals = globalsOf(command);
       const json = Boolean(globals.json);
       try {
+        const recurrence = options.every
+          ? recurrenceFromPhrase(
+              options.every,
+              options.due,
+              Boolean(options.afterCompletion),
+              json,
+            )
+          : null;
         const created = await withClient(globals, async (client) => {
           // Tags are resolved before the task exists so an unknown name fails cleanly.
           const tags = await resolveTags(
@@ -67,6 +89,7 @@ export function taskCommand(): Command {
             ...(options.parent
               ? { parentTaskId: (await client.getTask(options.parent)).id }
               : {}),
+            ...(recurrence ? { recurrence } : {}),
           };
           let task = await client.createTask(body, idempotency());
           for (const tag of tags) {
@@ -185,6 +208,12 @@ export function taskCommand(): Command {
     .option("--clear-due", "remove the due date")
     .option("--parent <idOrKey>", "make it a subtask of this task")
     .option("--no-parent", "detach it from its parent")
+    .option(
+      "--every <phrase>",
+      'repeat, e.g. "day", "2 weeks on mon,thu", "month on 31"',
+    )
+    .option("--after-completion", "count from the completion date; used with --every")
+    .option("--no-repeat", "stop repeating; this occurrence stays as it is")
     .option("--expected-version <n>", "fail unless the task is still at this version")
     .action(async (idOrKey: string, options, command: Command) => {
       const globals = globalsOf(command);
@@ -192,6 +221,17 @@ export function taskCommand(): Command {
       try {
         const updated = await withClient(globals, async (client) => {
           const current = await client.getTask(idOrKey);
+          const recurrence =
+            options.repeat === false
+              ? null
+              : options.every
+                ? recurrenceFromPhrase(
+                    options.every,
+                    options.due ?? current.dueDate,
+                    Boolean(options.afterCompletion),
+                    json,
+                  )
+                : undefined;
           const expectedVersion = options.expectedVersion
             ? Number(options.expectedVersion)
             : undefined;
@@ -231,6 +271,7 @@ export function taskCommand(): Command {
               : options.due
                 ? { dueDate: options.due }
                 : {}),
+            ...(recurrence !== undefined ? { recurrence } : {}),
           };
           if (Object.keys(fields).length === 0) return client.getTask(current.id);
           return client.updateTask(
@@ -367,6 +408,30 @@ export function taskCommand(): Command {
 
         if (json) printJson({ ok: true, data: result });
         else process.stdout.write(`${result.key}  unblocked\n`);
+      } catch (error) {
+        fail(error, json);
+      }
+    });
+
+  task
+    .command("skip")
+    .description("Skip the current occurrence of a repeating task")
+    .argument("<idOrKey>")
+    .option("--expected-version <n>", "fail unless the task is still at this version")
+    .action(async (idOrKey: string, options, command: Command) => {
+      const globals = globalsOf(command);
+      const json = Boolean(globals.json);
+      try {
+        const result = await withClient(globals, async (client) => {
+          const current = await client.getTask(idOrKey);
+          const expected = options.expectedVersion
+            ? Number(options.expectedVersion)
+            : current.version;
+          return client.skipOccurrence(current.id, expected, idempotency());
+        });
+
+        if (json) printJson({ ok: true, data: result });
+        else process.stdout.write(`${result.key}  next due ${result.dueDate}\n`);
       } catch (error) {
         fail(error, json);
       }

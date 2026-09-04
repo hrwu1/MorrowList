@@ -411,6 +411,21 @@ export class ApiClient {
     return { task: response.data, warnings: response.warnings ?? [] };
   }
 
+  /** Move a repeating task on to its next occurrence without completing it (GAP-12). */
+  async skipOccurrence(
+    id: string,
+    expectedVersion?: number,
+    options: RequestOptions = {},
+  ): Promise<TaskDto> {
+    const response = await this.send<{ data: TaskDto }>(
+      "POST",
+      `/tasks/${encodeURIComponent(id)}/skip${this.queryString({}, options)}`,
+      expectedVersion === undefined ? {} : { expectedVersion },
+      options,
+    );
+    return response.data;
+  }
+
   async setTaskParent(
     id: string,
     body: SetTaskParentRequest,

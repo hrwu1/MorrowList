@@ -376,8 +376,13 @@ function ordinal(day: number): string {
   }
 }
 
+/** A rule as a client sees it: the wire shape carries `until` as a plain string. */
+export type RecurrenceRuleView = Omit<RecurrenceRule, "until"> & {
+  readonly until: string | null;
+};
+
 /** A short human label, e.g. "Every 2 weeks on Mon, Thu after completion, until 2026-12-31". */
-export function describeRecurrence(rule: RecurrenceRule): string {
+export function describeRecurrence(rule: RecurrenceRuleView): string {
   const unit = { daily: "day", weekly: "week", monthly: "month", yearly: "year" }[
     rule.freq
   ];

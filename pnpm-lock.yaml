@@ -50,6 +50,9 @@ importers:
       '@morrowlist/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@morrowlist/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       commander:
         specifier: 14.0.0
         version: 14.0.0
@@ -99,6 +102,9 @@ importers:
       '@morrowlist/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@morrowlist/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@morrowlist/observability':
         specifier: workspace:*
         version: link:../../packages/observability
