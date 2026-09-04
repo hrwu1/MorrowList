@@ -30,6 +30,8 @@ import {
   useArchiveStatus,
   useUpdateStatus,
 } from "@/features/projects/hooks/use-workflow";
+import { useProjectFlow } from "@/features/flow/hooks/use-flow";
+import { readBoardAge, usuallyDoneLabel } from "@/features/flow/lib/flow-view";
 import { QuickAdd } from "@/features/tasks/components/quick-add";
 import { TaskPanel } from "@/features/tasks/components/task-panel";
 import { WipWarning } from "@/features/workspace/components/wip-warning";
@@ -51,7 +53,10 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   const sort = readBoardSort(new URLSearchParams(searchParams.toString()));
   const stageView = readBoardStageView(new URLSearchParams(searchParams.toString()));
   const showSubtasks = readBoardSubtasks(new URLSearchParams(searchParams.toString()));
+  const showAge = readBoardAge(new URLSearchParams(searchParams.toString()));
   const board = useProjectBoard(projectId, showSubtasks);
+  const flow = useProjectFlow(projectId);
+  const doneHint = usuallyDoneLabel(flow.data?.cycleTimeDays.p85 ?? null);
   const moveTask = useMoveBoardTask(projectId);
   const selectedTaskKey = searchParams.get("task");
   const [mobileStatusId, setMobileStatusId] = useState<string | null>(null);
@@ -112,6 +117,14 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
     const params = new URLSearchParams(searchParams.toString());
     if (next === "focus") params.delete("show");
     else params.set("show", next);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
+  function changeAge(show: boolean) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (show) params.delete("age");
+    else params.set("age", "off");
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
@@ -270,6 +283,8 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
           <p className="board-page__summary">
             {tasks.length} {tasks.length === 1 ? "task" : "tasks"} across{" "}
             {statuses.length} stages
+            {" · "}
+            <Link href={`/projects/${project.id}/flow`}>Flow</Link>
           </p>
         </div>
         <div className="board-page__actions">
@@ -323,6 +338,12 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
               >
                 {showSubtasks ? "Subtasks shown" : "Subtasks hidden"}
               </span>
+              <span
+                className="view-disclosure__chip"
+                data-active={!showAge || undefined}
+              >
+                {showAge ? "Card age shown" : "Card age hidden"}
+              </span>
             </span>
           </summary>
           <div className="view-disclosure__panel board-toolbar__view-panel">
@@ -362,6 +383,17 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
               >
                 <option value="hide">Hidden, progress on the parent</option>
                 <option value="show">Shown as cards</option>
+              </Select>
+            </label>
+            <label className="filters__control">
+              <span className="ml-field__label">Card age</span>
+              <Select
+                value={showAge ? "show" : "hide"}
+                aria-label="Card age shown"
+                onChange={(event) => changeAge(event.target.value === "show")}
+              >
+                <option value="show">Days in column, fading after 7 and 14</option>
+                <option value="hide">Hidden</option>
               </Select>
             </label>
             <p className="board-toolbar__hint" id="board-drag-hint">
@@ -460,6 +492,8 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
                   reorderDisabled={sort !== "manual"}
                   moveDisabled={moveTask.isPending}
                   collapsed={collapsedColumns.collapsed.includes(status.id)}
+                  showAge={showAge}
+                  hint={status.category === "in_progress" ? doneHint : null}
                   hrefForTask={hrefForTask}
                   onMove={moveFromMenu}
                   onToggleCollapse={collapsedColumns.toggle}

@@ -43,6 +43,9 @@ export interface KanbanColumnProps {
   readonly reorderDisabled: boolean;
   readonly moveDisabled: boolean;
   readonly collapsed: boolean;
+  readonly showAge: boolean;
+  /** "Usually done in N days", from the project's 85th percentile cycle time (GAP-17). */
+  readonly hint: string | null;
   readonly hrefForTask: (taskKey: string) => string;
   readonly onMove: (task: TaskDto, statusId: string) => void;
   readonly onToggleCollapse: (statusId: string) => void;
@@ -59,6 +62,8 @@ export function KanbanColumn({
   reorderDisabled,
   moveDisabled,
   collapsed,
+  showAge,
+  hint,
   hrefForTask,
   onMove,
   onToggleCollapse,
@@ -172,6 +177,7 @@ export function KanbanColumn({
               {overLimit ? " · over limit" : atLimit ? " · at limit" : ""}
             </span>
           ) : null}
+          {hint ? <span className="kanban-column__forecast">{hint}</span> : null}
           {status.policyMd && policyOpen ? (
             <div
               id={`board-policy-${status.id}`}
@@ -208,6 +214,7 @@ export function KanbanColumn({
                   dragDisabled={dragDisabled}
                   reorderDisabled={reorderDisabled}
                   moveDisabled={moveDisabled}
+                  showAge={showAge}
                   onMove={onMove}
                 />
               ))

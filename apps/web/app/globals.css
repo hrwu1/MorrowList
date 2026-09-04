@@ -2472,6 +2472,12 @@
     color: var(--danger);
     font-weight: 600;
   }
+  .kanban-column__forecast {
+    display: block;
+    margin: 0.14rem 0 0 0.93rem;
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+  }
   .kanban-column__tasks {
     display: flex;
     min-height: 25rem;
@@ -2515,6 +2521,36 @@
   }
   .board-card[data-dragging] {
     opacity: 0.35;
+  }
+  /* Card age (GAP-17): the oldest cards fade so fresh work stands out. */
+  .board-card[data-age="aging"] {
+    background: color-mix(in oklab, var(--surface-raised) 60%, var(--surface-sunken));
+  }
+  .board-card[data-age="aging"] .board-card__title {
+    color: var(--text-secondary);
+  }
+  .board-card[data-age="stale"] {
+    border-style: dashed;
+    background: var(--surface-sunken);
+  }
+  .board-card[data-age="stale"] .board-card__title {
+    color: var(--text-muted);
+  }
+  .board-card__age {
+    padding: 0 0.35rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .board-card__age[data-age="aging"] {
+    border-color: var(--warning);
+    color: var(--warning);
+  }
+  .board-card__age[data-age="stale"] {
+    border-color: var(--danger);
+    color: var(--danger);
+    font-weight: 600;
   }
   .board-card--overlay {
     width: 15rem;
@@ -3002,5 +3038,184 @@
     .board-toolbar__hint {
       font-size: 0.7rem;
     }
+  }
+
+  /* Flow view (GAP-17): stat tiles and inline SVG charts on the status colour tokens. */
+  .flow-page {
+    max-width: var(--content-max);
+  }
+  .flow-page__status {
+    display: grid;
+    min-height: 12rem;
+    place-items: center;
+  }
+  .flow-page .board-page__eyebrow a {
+    color: inherit;
+  }
+  .flow-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.75rem;
+    margin: 0;
+  }
+  .flow-stat {
+    padding: 0.8rem 0.9rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface-raised);
+  }
+  .flow-stat dt {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  .flow-stat dd {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    margin: 0.3rem 0 0;
+  }
+  .flow-stat strong {
+    font-size: 1.5rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .flow-stat span {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+  .flow-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.9rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface-raised);
+  }
+  .flow-chart h2 {
+    font-size: 1rem;
+  }
+  .flow-chart__svg {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+  .flow-chart__empty {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+  .flow-chart__axis {
+    fill: var(--text-muted);
+    font-size: 11px;
+  }
+  .flow-chart__value {
+    fill: var(--text-secondary);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  .flow-bar {
+    fill: var(--success);
+    opacity: 0.85;
+  }
+  .flow-area {
+    stroke: var(--surface-raised);
+    stroke-width: 1;
+    opacity: 0.8;
+  }
+  .flow-area[data-category="backlog"],
+  .flow-legend li[data-category="backlog"] .flow-legend__swatch {
+    fill: var(--text-muted);
+    background: var(--text-muted);
+  }
+  .flow-area[data-category="ready"],
+  .flow-legend li[data-category="ready"] .flow-legend__swatch {
+    fill: var(--accent);
+    background: var(--accent);
+  }
+  .flow-area[data-category="in_progress"],
+  .flow-legend li[data-category="in_progress"] .flow-legend__swatch {
+    fill: var(--warning);
+    background: var(--warning);
+  }
+  .flow-area[data-category="blocked"],
+  .flow-legend li[data-category="blocked"] .flow-legend__swatch {
+    fill: var(--danger);
+    background: var(--danger);
+  }
+  .flow-area[data-category="review"],
+  .flow-legend li[data-category="review"] .flow-legend__swatch {
+    fill: var(--accent-text);
+    background: var(--accent-text);
+  }
+  .flow-area[data-category="done"],
+  .flow-legend li[data-category="done"] .flow-legend__swatch {
+    fill: var(--success);
+    background: var(--success);
+  }
+  .flow-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+  }
+  .flow-legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .flow-legend__swatch {
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 2px;
+  }
+  .flow-reference {
+    stroke: var(--border-strong);
+    stroke-dasharray: 4 4;
+  }
+  .flow-dot {
+    fill: var(--accent);
+    stroke: var(--surface-raised);
+    stroke-width: 1.5;
+  }
+  .flow-dot[data-band="over_p85"] {
+    fill: var(--warning);
+  }
+  .flow-dot[data-band="over_p95"] {
+    fill: var(--danger);
+  }
+  .flow-aging {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.875rem;
+  }
+  .flow-aging li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.6rem;
+  }
+  .flow-aging li[data-band="over_p95"] .flow-aging__age {
+    color: var(--danger);
+  }
+  .flow-aging li[data-band="over_p85"] .flow-aging__age {
+    color: var(--warning);
+  }
+  .flow-aging__title {
+    flex: 1 1 12rem;
+  }
+  .flow-aging__age {
+    color: var(--text-muted);
+    font-size: 0.8rem;
   }
 }

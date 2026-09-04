@@ -20,6 +20,7 @@ import {
 } from "@tanstack/react-query";
 
 import { activityKeys } from "../../activity/hooks/use-activity";
+import { flowKeys } from "../../flow/hooks/use-flow";
 import { projectKeys } from "../../projects/hooks/use-projects";
 import { localToday, patchTaskInToday } from "../../today/lib/today-view";
 import { patchTaskInUpcoming } from "../../upcoming/lib/upcoming-view";
@@ -203,6 +204,7 @@ function invalidateTaskProjections(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: projectKeys.boards() });
   // Every mutation records history, so any open activity list is now behind.
   void queryClient.invalidateQueries({ queryKey: activityKeys.all });
+  void queryClient.invalidateQueries({ queryKey: flowKeys.all });
   void queryClient.invalidateQueries({ queryKey: todayKeys.all });
   void queryClient.invalidateQueries({ queryKey: upcomingKeys.all });
   // The shell's in-progress counter follows every move, complete, and reopen (GAP-20).

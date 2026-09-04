@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { CSSProperties, KeyboardEventHandler } from "react";
 
 import { BlockedBadge } from "@/features/relations/components/blocked-badge";
+import { ageBand, daysInStatus } from "@/features/flow/lib/flow-view";
 import { TagChips } from "@/features/tags/components/tag-chip";
 import {
   DueBadge,
@@ -25,6 +26,8 @@ export interface KanbanCardProps {
   readonly dragDisabled: boolean;
   readonly reorderDisabled: boolean;
   readonly moveDisabled: boolean;
+  /** Show how long the card has sat in its column and fade the oldest (GAP-17). */
+  readonly showAge: boolean;
   readonly onMove: (task: TaskDto, statusId: string) => void;
 }
 
@@ -36,6 +39,7 @@ export function KanbanCard({
   dragDisabled,
   reorderDisabled,
   moveDisabled,
+  showAge,
   onMove,
 }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -47,6 +51,10 @@ export function KanbanCard({
   const addToDay = useAddToDay();
   const removeFromDay = useRemoveFromDay();
   const inMyDay = task.dayPlans.length > 0;
+  // Age is read from the browser clock so it stays current while the board is open.
+  const days =
+    showAge && !task.isCompleted ? daysInStatus(task.inStatusSince, Date.now()) : null;
+  const band = ageBand(days);
   const style: CSSProperties = {
     transform: transform
       ? `translate3d(${transform.x}px, ${transform.y}px, 0) scaleX(${transform.scaleX}) scaleY(${transform.scaleY})`
@@ -62,6 +70,7 @@ export function KanbanCard({
       data-blocked={task.isBlocked || undefined}
       data-dragging={isDragging || undefined}
       data-done={task.isCompleted || undefined}
+      data-age={band ?? undefined}
       aria-current={selected ? "true" : undefined}
       // The whole card is the pointer drag source; the handle is the keyboard one. The
       // Move menu opens on press, so it never starts a drag.
@@ -146,6 +155,16 @@ export function KanbanCard({
         <MyDayBadge dayPlans={task.dayPlans} />
         <BlockedBadge task={task} />
         <SubtaskProgressBadge progress={task.subtaskProgress} />
+        {days !== null && days >= 1 ? (
+          <span
+            className="board-card__age"
+            data-age={band ?? undefined}
+            title={`In this column for ${days} ${days === 1 ? "day" : "days"}`}
+            aria-label={`In this column for ${days} ${days === 1 ? "day" : "days"}`}
+          >
+            {days}d
+          </span>
+        ) : null}
       </div>
 
       {task.tags.length > 0 ? (

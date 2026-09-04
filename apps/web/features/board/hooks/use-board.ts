@@ -13,6 +13,7 @@ import { projectKeys } from "../../projects/hooks/use-projects";
 import { moveTaskInBoard, type BoardPlacement } from "../lib/board-view";
 
 import { activityKeys } from "@/features/activity/hooks/use-activity";
+import { flowKeys } from "@/features/flow/hooks/use-flow";
 import { taskKeys } from "@/features/tasks/hooks/use-tasks";
 import { workspaceKeys } from "@/features/workspace/hooks/use-workspace";
 import { apiClient } from "@/lib/api-client";
@@ -104,6 +105,7 @@ export function useMoveBoardTask(projectId: string) {
       void queryClient.invalidateQueries({ queryKey: taskKeys.all });
       void queryClient.invalidateQueries({ queryKey: activityKeys.all });
       void queryClient.invalidateQueries({ queryKey: workspaceKeys.me() });
+      void queryClient.invalidateQueries({ queryKey: flowKeys.all });
     },
   });
 }
