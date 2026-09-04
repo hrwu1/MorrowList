@@ -16,6 +16,7 @@ it costs, so a future change is a deliberate reversal rather than an accident.
 | [ADR-008](008-online-first-pwa.md)                   | Online-first PWA                   | Accepted |
 | [ADR-009](009-manual-ordering-is-authoritative.md)   | Manual ordering is authoritative   | Accepted |
 | [ADR-010](010-personal-first-workspace-model.md)     | Personal-first workspace model     | Accepted |
+| [ADR-011](011-blocked-is-a-relation-or-a-flag.md)    | Blocked is a relation or a flag    | Accepted |
 
 ## Adding a record
 

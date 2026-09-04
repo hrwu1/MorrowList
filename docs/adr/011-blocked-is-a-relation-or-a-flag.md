@@ -1,6 +1,6 @@
-# ADR-NNN — Blocked is a relation or a flag; the Blocked column is a view
+# ADR-011 — Blocked is a relation or a flag; the Blocked column is a view
 
-**Status:** Proposed (numbered at merge; GAP-06)
+**Status:** Accepted
 
 **Date:** 2026-09-03
 
