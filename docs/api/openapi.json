@@ -7937,6 +7937,181 @@
                             }
                           ]
                         },
+                        "recurrence": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "freq": {
+                                  "type": "string",
+                                  "enum": [
+                                    "daily",
+                                    "weekly",
+                                    "monthly",
+                                    "yearly"
+                                  ]
+                                },
+                                "interval": {
+                                  "default": 1,
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 365
+                                },
+                                "mode": {
+                                  "default": "schedule",
+                                  "type": "string",
+                                  "enum": [
+                                    "schedule",
+                                    "after_completion"
+                                  ]
+                                },
+                                "weekdays": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "minItems": 1,
+                                      "maxItems": 7,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "enum": [
+                                          "mon",
+                                          "tue",
+                                          "wed",
+                                          "thu",
+                                          "fri",
+                                          "sat",
+                                          "sun"
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "monthDay": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 31
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "nthWeekday": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "nth": {
+                                          "anyOf": [
+                                            {
+                                              "type": "number",
+                                              "const": 1
+                                            },
+                                            {
+                                              "type": "number",
+                                              "const": 2
+                                            },
+                                            {
+                                              "type": "number",
+                                              "const": 3
+                                            },
+                                            {
+                                              "type": "number",
+                                              "const": 4
+                                            },
+                                            {
+                                              "type": "number",
+                                              "const": -1
+                                            }
+                                          ]
+                                        },
+                                        "weekday": {
+                                          "type": "string",
+                                          "enum": [
+                                            "mon",
+                                            "tue",
+                                            "wed",
+                                            "thu",
+                                            "fri",
+                                            "sat",
+                                            "sun"
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "nth",
+                                        "weekday"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "until": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "count": {
+                                  "default": null,
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 1,
+                                      "maximum": 1000
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "freq",
+                                "interval",
+                                "mode",
+                                "weekdays",
+                                "monthDay",
+                                "nthWeekday",
+                                "until",
+                                "count"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "seriesId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "rank": {
                           "type": "string"
                         },
@@ -8146,6 +8321,127 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "relations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "blocks",
+                                  "related_to"
+                                ]
+                              },
+                              "sourceTaskId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "targetTaskId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                              },
+                              "task": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                  },
+                                  "key": {
+                                    "type": "string"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "isCompleted": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "key",
+                                  "title",
+                                  "isCompleted"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "type",
+                              "sourceTaskId",
+                              "targetTaskId",
+                              "task",
+                              "createdAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "blocked": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "reason": {
+                                  "type": "string"
+                                },
+                                "since": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                                }
+                              },
+                              "required": [
+                                "reason",
+                                "since"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "isBlocked": {
+                          "type": "boolean"
+                        },
+                        "inStatusSince": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "ageDays": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -8162,6 +8458,8 @@
                         "dueTime",
                         "dueTimezone",
                         "parentTaskId",
+                        "recurrence",
+                        "seriesId",
                         "rank",
                         "isCompleted",
                         "completedAt",
@@ -8173,7 +8471,10 @@
                         "updatedAt",
                         "deletedAt",
                         "dayPlans",
-                        "subtaskProgress"
+                        "subtaskProgress",
+                        "relations",
+                        "blocked",
+                        "isBlocked"
                       ],
                       "additionalProperties": false
                     },

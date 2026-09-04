@@ -63,7 +63,6 @@ import { openInterval, syncIntervals } from "../flow/intervals.js";
 import type {
   Page,
   RankScope,
-  RelationEdge,
   TransactionContext,
   UnitOfWork,
   Workspace,
@@ -78,7 +77,7 @@ import {
 import { decodeCursor, encodeCursor } from "../shared/cursor.js";
 import { recordEvent } from "../shared/event-recorder.js";
 
-import { toTaskDto } from "./mappers.js";
+import { loadTaskDtos } from "./mappers.js";
 
 /**
  * Task use cases (spec 19.2). Each method is one user-visible intention: it authorises,
@@ -1192,28 +1191,7 @@ export class TaskService {
     workspace: Workspace,
     tasks: readonly Task[],
   ): Promise<TaskDto[]> {
-    const ids = tasks.map((task) => task.id);
-    const [plans, progress, tags, edges]: [
-      ReadonlyMap<string, readonly string[]>,
-      ReadonlyMap<string, { completed: number; total: number }>,
-      ReadonlyMap<string, readonly Tag[]>,
-      readonly RelationEdge[],
-    ] = await Promise.all([
-      tx.dayPlans.listForTasks(ids, this.workspaceToday(workspace.timezone)),
-      tx.tasks.childSummary(workspace.id, ids),
-      tx.tasks.tagsFor(workspace.id, ids),
-      tx.tasks.relationsFor(workspace.id, ids),
-    ]);
-    return tasks.map((task) =>
-      toTaskDto(
-        task,
-        workspace.taskKeyPrefix,
-        plans.get(task.id) ?? [],
-        progress.get(task.id) ?? null,
-        tags.get(task.id) ?? [],
-        edges,
-      ),
-    );
+    return loadTaskDtos(tx, workspace, tasks, this.workspaceToday(workspace.timezone));
   }
 
   private async tagsOf(tx: TransactionContext, task: Task): Promise<readonly Tag[]> {

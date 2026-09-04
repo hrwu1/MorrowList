@@ -29,7 +29,6 @@ import {
   reorderTaskRequestSchema,
   setTaskBlockedRequestSchema,
   reorderSavedViewRequestSchema,
-  reorderTaskRequestSchema,
   savedViewListResponseSchema,
   savedViewResponseSchema,
   searchQuerySchema,

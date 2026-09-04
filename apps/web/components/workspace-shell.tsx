@@ -42,8 +42,8 @@ import { useTodayView } from "@/features/today/hooks/use-today";
 import { countTodayTasks } from "@/features/today/lib/today-view";
 import { useUpcomingView } from "@/features/upcoming/hooks/use-upcoming";
 import { countUpcomingTasks } from "@/features/upcoming/lib/upcoming-view";
-import { WipCounter } from "@/features/workspace/components/wip-counter";
 import { SavedViewNav } from "@/features/views/components/saved-view-nav";
+import { WipCounter } from "@/features/workspace/components/wip-counter";
 import { authClient } from "@/lib/auth-client";
 
 export interface WorkspaceUser {

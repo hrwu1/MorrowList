@@ -5,12 +5,43 @@ import {
   isCompleted,
   isDeleted,
   taskKey,
+  type PlainDate,
   type Tag,
   type Task,
 } from "@morrowlist/domain";
 
-import type { RelationEdge } from "../ports/index.js";
+import type { RelationEdge, TransactionContext, Workspace } from "../ports/index.js";
 import { toTagDto } from "../tags/mappers.js";
+
+/**
+ * Every projection a task DTO carries, read for a whole page at once: day plans,
+ * subtask progress, tags, and the relations touching the page. Shared by every list
+ * that returns `TaskDto`s (task lists, search) so no projection can drift.
+ */
+export async function loadTaskDtos(
+  tx: TransactionContext,
+  workspace: Workspace,
+  tasks: readonly Task[],
+  today: PlainDate,
+): Promise<TaskDto[]> {
+  const ids = tasks.map((task) => task.id);
+  const [plans, progress, tags, edges] = await Promise.all([
+    tx.dayPlans.listForTasks(ids, today),
+    tx.tasks.childSummary(workspace.id, ids),
+    tx.tasks.tagsFor(workspace.id, ids),
+    tx.tasks.relationsFor(workspace.id, ids),
+  ]);
+  return tasks.map((task) =>
+    toTaskDto(
+      task,
+      workspace.taskKeyPrefix,
+      plans.get(task.id) ?? [],
+      progress.get(task.id) ?? null,
+      tags.get(task.id) ?? [],
+      edges,
+    ),
+  );
+}
 
 /**
  * Domain-to-contract mapping (spec 17.3 step 8). Keeping this in one place means a

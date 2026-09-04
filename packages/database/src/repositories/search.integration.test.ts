@@ -1,5 +1,4 @@
 import {
-  ProjectService,
   SavedViewService,
   TagService,
   TaskService,
@@ -38,7 +37,6 @@ let workspaceId: string;
 let userId: string;
 let tasks: TaskService;
 let tagService: TagService;
-let projects: ProjectService;
 /** The statement Drizzle last sent, so a test can EXPLAIN exactly what shipped. */
 let lastQuery: { sql: string; params: unknown[] } = { sql: "", params: [] };
 let repository: ReturnType<typeof createTaskRepository>;
@@ -80,7 +78,6 @@ beforeEach(async () => {
     cursorSecret: "search-integration-cursor-secret",
   });
   tagService = new TagService({ unitOfWork, clock: fixedClock(NOW) });
-  projects = new ProjectService({ unitOfWork, clock: fixedClock(NOW) });
   const logged = drizzle(handle.pool, {
     schema,
     logger: {
@@ -148,7 +145,7 @@ async function seedReferenceScale(): Promise<void> {
   );
 }
 
-describe("migration 0004", () => {
+describe("migration 0010", () => {
   it("keeps the search vector in step with the title and description", async () => {
     const task = await tasks.create(context, {
       workspaceId,
@@ -292,38 +289,43 @@ describe("task search", () => {
     expect([first.hasMore, second.hasMore, third.hasMore]).toEqual([true, true, false]);
   });
 
-  it("filters blocked work by status category in both list and search", async () => {
-    const { project, statuses } = await projects.create(context, {
-      workspaceId,
-      name: "Research",
-    });
-    const blocked = statuses.find((status) => status.category === "blocked");
-    const ready = statuses.find((status) => status.category === "ready");
-    const stuck = await tasks.create(context, {
+  it("filters blocked work, flagged or waiting on a blocker, in both list and search", async () => {
+    // Blocked is the explicit flag or an open `blocks` predecessor (spec 8.4, ADR-011).
+    const flagged = await tasks.create(context, {
       workspaceId,
       title: "Stuck experiment",
-      projectId: project.id,
-      statusId: blocked?.id,
     });
-    await tasks.create(context, {
+    await tasks.setBlocked(context, workspaceId, flagged.id, {
+      reason: "Waiting on the lab",
+    });
+    const gate = await tasks.create(context, { workspaceId, title: "Gate" });
+    const waiting = await tasks.create(context, {
       workspaceId,
-      title: "Moving experiment",
-      projectId: project.id,
-      statusId: ready?.id,
+      title: "Waiting experiment",
     });
+    await tasks.addRelation(context, workspaceId, gate.id, {
+      type: "blocks",
+      targetTaskId: waiting.id,
+    });
+    await tasks.create(context, { workspaceId, title: "Moving experiment" });
 
     const listed = await tasks.list(context, {
       workspaceId,
       limit: 50,
       includeSubtasks: true,
       isBlocked: true,
-      sort: "rank",
+      sort: "createdAt",
       order: "asc",
     } as never);
-    expect(listed.data.map((task) => task.id)).toEqual([stuck.id]);
+    expect(listed.data.map((task) => task.id)).toEqual([flagged.id, waiting.id]);
 
-    const searched = await search("experiment", { isBlocked: false });
-    expect(searched.items.map((task) => task.title)).toEqual(["Moving experiment"]);
+    const blocked = await search("experiment", { isBlocked: true });
+    expect(blocked.items.map((task) => task.title).sort()).toEqual([
+      "Stuck experiment",
+      "Waiting experiment",
+    ]);
+    const open = await search("experiment", { isBlocked: false });
+    expect(open.items.map((task) => task.title)).toEqual(["Moving experiment"]);
   });
 
   it("returns every task that passes the filters when there are no terms", async () => {

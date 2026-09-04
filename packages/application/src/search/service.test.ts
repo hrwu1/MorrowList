@@ -8,7 +8,6 @@ import {
   createInMemoryUnitOfWork,
   emptyData,
   seedWorkspace,
-  statusByCategory,
   type InMemoryUnitOfWork,
   type SeededWorkspace,
 } from "../testing/index.js";
@@ -191,12 +190,14 @@ describe("SearchService.search", () => {
       title: "Child step",
       parentTaskId: parent.id,
     });
-    const blocked = statusByCategory(seeded.statuses, "blocked");
-    await tasks.create(seeded.context, {
+    // Blocked is the flag or an open `blocks` predecessor (spec 8.4, ADR-011), not a
+    // status category.
+    const stuckTask = await tasks.create(seeded.context, {
       workspaceId: seeded.workspace.id,
       title: "Plan stuck",
-      projectId: seeded.project.id,
-      statusId: blocked.id,
+    });
+    await tasks.setBlocked(seeded.context, seeded.workspace.id, stuckTask.id, {
+      reason: "Waiting on the vendor",
     });
 
     const { data } = await query("plan");
@@ -207,5 +208,10 @@ describe("SearchService.search", () => {
     expect(stuck.data.tasks.map((candidate) => candidate.task.title)).toEqual([
       "Plan stuck",
     ]);
+    expect(stuck.data.tasks[0]?.task).toMatchObject({
+      isBlocked: true,
+      blocked: { reason: "Waiting on the vendor" },
+      relations: [],
+    });
   });
 });

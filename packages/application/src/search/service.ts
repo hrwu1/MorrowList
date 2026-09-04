@@ -32,7 +32,7 @@ import {
   type ActorContext,
 } from "../shared/actor-context.js";
 import { decodeCursor, encodeCursor } from "../shared/cursor.js";
-import { toTaskDto } from "../tasks/mappers.js";
+import { loadTaskDtos } from "../tasks/mappers.js";
 
 export interface SearchServiceOptions {
   readonly unitOfWork: UnitOfWork;
@@ -117,24 +117,15 @@ export class SearchService {
         ? [keyed, ...page.items.filter((task) => task.id !== keyed.id)]
         : [...page.items];
 
-      const ids = items.map((task) => task.id);
-      const [plans, progress, tags, projects] = await Promise.all([
-        tx.dayPlans.listForTasks(ids, today),
-        tx.tasks.childSummary(workspace.id, ids),
-        tx.tasks.tagsFor(workspace.id, ids),
+      const [dtos, projects] = await Promise.all([
+        loadTaskDtos(tx, workspace, items, today),
         after || terms.length === 0
           ? Promise.resolve([])
           : tx.projects.listByWorkspace(workspace.id),
       ]);
 
-      const tasks: SearchTaskResultDto[] = items.map((task) => ({
-        task: toTaskDto(
-          task,
-          workspace.taskKeyPrefix,
-          plans.get(task.id) ?? [],
-          progress.get(task.id) ?? null,
-          tags.get(task.id) ?? [],
-        ),
+      const tasks: SearchTaskResultDto[] = items.map((task, index) => ({
+        task: dtos[index]!,
         matches: {
           title: matchRanges(task.title, terms),
           description: matchRanges(task.descriptionMd, terms),

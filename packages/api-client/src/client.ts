@@ -30,7 +30,6 @@ import type {
   ReorderTaskRequest,
   SetTaskBlockedRequest,
   ReorderSavedViewRequest,
-  ReorderTaskRequest,
   SavedViewDto,
   SavedViewListResponse,
   SearchQuery,

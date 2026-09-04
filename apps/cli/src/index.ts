@@ -3,13 +3,13 @@ import { Command } from "commander";
 import { authCommand } from "./commands/auth.js";
 import { projectCommand } from "./commands/project.js";
 import { relationCommand } from "./commands/relation.js";
+import { searchCommand } from "./commands/search.js";
 import { statusCommand } from "./commands/status.js";
 import { tagCommand } from "./commands/tag.js";
 import { taskCommand } from "./commands/task.js";
 import { todayCommand } from "./commands/today.js";
-import { workspaceCommand } from "./commands/workspace.js";
-import { searchCommand } from "./commands/search.js";
 import { viewCommand } from "./commands/view.js";
+import { workspaceCommand } from "./commands/workspace.js";
 import { EXIT, printError } from "./formatters/output.js";
 
 /**

@@ -23,8 +23,6 @@ export interface TaskFilter {
   /** True selects Inbox tasks only: those with no project (spec 9.1). */
   readonly inboxOnly?: boolean | undefined;
   readonly isCompleted?: boolean | undefined;
-  /** Blocked means the task's status is in the `blocked` category (spec 9.5, 9.8). */
-  readonly isBlocked?: boolean | undefined;
   /**
    * Blocked state as the domain defines it (spec 8.4): open and either flagged or
    * waiting on a live, incomplete `blocks` predecessor.
