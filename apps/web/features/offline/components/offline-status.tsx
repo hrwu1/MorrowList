@@ -19,8 +19,11 @@ export function OfflineStatus() {
         <div className="offline-banner" role="status" data-testid="offline-banner">
           <span className="offline-banner__dot" aria-hidden="true" />
           <span>
-            <strong>You're offline.</strong> Recently opened views still work; changes
-            are paused until you're back online.
+            <strong>You're offline.</strong>{" "}
+            <span className="offline-banner__detail">
+              Recently opened views still work; changes are paused until you're back
+              online.
+            </span>
           </span>
         </div>
       )}

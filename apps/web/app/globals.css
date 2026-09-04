@@ -3133,6 +3133,13 @@
     }
   }
 
+  /* On a phone the notice stays a small pill so it covers as little as possible. */
+  @media (max-width: 45rem) {
+    .offline-banner__detail {
+      display: none;
+    }
+  }
+
   /* Touch targets (spec 14, 25): 44px on a phone or wherever the pointer is coarse. */
   @media (max-width: 45rem), (pointer: coarse) {
     .ml-button,
