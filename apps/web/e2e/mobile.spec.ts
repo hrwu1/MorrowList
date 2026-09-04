@@ -66,6 +66,9 @@ function overflowsHorizontally(page: Page) {
 test("every view fits the phone width and the main controls are thumb-sized", async ({
   page,
 }) => {
+  // This one walks every view in the app rather than a single screen, so it needs more
+  // than the per-test budget the rest of the suite lives within.
+  test.slow();
   await signUp(page);
   await capture(page, "Fits on a phone");
   const projectId = await createProject(page, "A project with a rather long name");

@@ -18,6 +18,7 @@ process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS = "1";
  * in the Inbox — depends on both. That database is its own, not the development one:
  * every test signs up, so sharing would silently fill day-to-day data with junk.
  */
+const production = Boolean(process.env.CI);
 const PORT = Number(process.env.E2E_PORT ?? 3210);
 const baseURL = `http://127.0.0.1:${PORT}`;
 const databaseUrl = e2eDatabaseUrl();
@@ -42,7 +43,12 @@ export default defineConfig({
     // once the browsers are provisioned there.
   ],
   webServer: {
-    command: `pnpm dev --port ${PORT}`,
+    // `next dev` compiles each route on its first request. On CI's small runners that
+    // costs seconds per route, so a first visit loses the race with the assertion
+    // timeout and a test that walks many routes never fits its budget. CI builds before
+    // it runs the suite, so drive the production server there; local runs keep the dev
+    // server, whose rebuilds are what make iterating on a test bearable.
+    command: production ? `pnpm start --port ${PORT}` : `pnpm dev --port ${PORT}`,
     url: `${baseURL}/api/v1/health`,
     // Never reuse a server already listening on this port: it may have been started
     // against DATABASE_URL, which would put the suite's rows back in development data.
