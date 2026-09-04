@@ -57,6 +57,8 @@ export default defineConfig({
       AUTH_TRUSTED_ORIGINS: [process.env.AUTH_TRUSTED_ORIGINS, baseURL]
         .filter(Boolean)
         .join(","),
+      // The reminder worker polls fast here so a reminder due in a minute is seen in time.
+      WORKER_POLL_SECONDS: "2",
     },
   },
 });

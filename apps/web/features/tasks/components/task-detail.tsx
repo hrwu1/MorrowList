@@ -40,7 +40,13 @@ import { allSubtasksDone, hasOpenSubtasks } from "../lib/task-projections";
 import { Markdown } from "./markdown";
 import { RecurrenceEditor } from "./recurrence-editor";
 import { SubtaskList } from "./subtask-list";
-import { DueBadge, DueDateInput, DueTimeInput, PrioritySelect } from "./task-fields";
+import {
+  DueBadge,
+  DueDateInput,
+  DueTimeInput,
+  PrioritySelect,
+  ReminderSelect,
+} from "./task-fields";
 
 import { ActivityList } from "@/features/activity/components/activity-list";
 import { useProjects } from "@/features/projects/hooks/use-projects";
@@ -113,6 +119,7 @@ interface Draft {
   deferUntil: string | null;
   deadline: string | null;
   deadlineTime: string | null;
+  reminderOffsetMinutes: number | null;
 }
 
 function toDraft(task: TaskDto): Draft {
@@ -126,6 +133,7 @@ function toDraft(task: TaskDto): Draft {
     deferUntil: task.deferUntil,
     deadline: task.deadline,
     deadlineTime: task.deadlineTime,
+    reminderOffsetMinutes: task.reminderOffsetMinutes,
   };
 }
 
@@ -660,6 +668,27 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
             ))}
           </ul>
         </Alert>
+      ) : null}
+
+      {draft.dueTime ? (
+        <Field
+          label="Reminder"
+          htmlFor={fieldId("reminder")}
+          hint={
+            task.reminderOffsetMinutes === null && draft.dueTime && !task.dueTime
+              ? "A new due time gets your default reminder once it is saved."
+              : undefined
+          }
+        >
+          <ReminderSelect
+            id={fieldId("reminder")}
+            value={draft.reminderOffsetMinutes}
+            disabled={!editable || task.dueTime === null}
+            onChange={(reminderOffsetMinutes) =>
+              edit({ reminderOffsetMinutes }, { reminderOffsetMinutes }, true)
+            }
+          />
+        </Field>
       ) : null}
 
       <TagPicker task={task} disabled={!editable} />

@@ -11,6 +11,8 @@ import { describeRecurrence } from "../lib/recurrence";
 import { deadlineTone, isDeferred } from "../lib/task-dates";
 import { PRIORITIES } from "../lib/task-view";
 
+import { REMINDER_OPTIONS } from "@/features/notifications/lib/notification-view";
+
 /**
  * The controls that edit a task's priority and due date, shared by quick-add, the row
  * actions, and the detail panel so the same field behaves the same everywhere.
@@ -96,6 +98,39 @@ export function DueTimeInput({
         onChange(event.target.value === "" ? null : event.target.value)
       }
     />
+  );
+}
+
+export interface ReminderSelectProps {
+  readonly id: string;
+  /** Minutes before the due time; null is no reminder. */
+  readonly value: number | null;
+  readonly onChange: (value: number | null) => void;
+  readonly disabled?: boolean | undefined;
+}
+
+/** When to be reminded before the due time (GAP-13). Only meaningful with a due time set. */
+export function ReminderSelect({ id, value, onChange, disabled }: ReminderSelectProps) {
+  const known = REMINDER_OPTIONS.some((option) => option.value === value);
+  return (
+    <Select
+      id={id}
+      value={value === null ? "" : String(value)}
+      disabled={disabled}
+      onChange={(event) =>
+        onChange(event.target.value === "" ? null : Number(event.target.value))
+      }
+    >
+      {REMINDER_OPTIONS.map((option) => (
+        <option
+          key={option.value ?? "none"}
+          value={option.value === null ? "" : option.value}
+        >
+          {option.label}
+        </option>
+      ))}
+      {known ? null : <option value={String(value)}>{value} minutes before</option>}
+    </Select>
   );
 }
 

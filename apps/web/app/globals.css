@@ -3686,3 +3686,99 @@
     font-size: 0.75rem;
   }
 }
+
+@layer components {
+  /* Notifications (GAP-13) */
+  .notifications,
+  .notification-settings {
+    width: 100%;
+    max-width: var(--content-max);
+    margin: 0 auto;
+  }
+  .notifications__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .notifications__filter,
+  .notification-settings__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+  }
+  .notifications__list {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .notification {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface-raised);
+  }
+  .notification[data-unread] {
+    border-color: var(--accent);
+  }
+  .notification__body {
+    display: grid;
+    flex: 1 1 18rem;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+  .notification__title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-weight: 600;
+  }
+  .notification__dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .notification__text {
+    margin: 0;
+    color: var(--text-secondary);
+    white-space: pre-line;
+  }
+  .notification__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .notification__error {
+    flex: 1 1 100%;
+  }
+  .notification-settings__form {
+    padding: 1rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface-raised);
+  }
+  .notification-settings__group {
+    display: grid;
+    gap: 0.6rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .notification-settings__group > legend {
+    padding: 0;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+  }
+}

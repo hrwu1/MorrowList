@@ -28,6 +28,8 @@ import {
   type SVGProps,
 } from "react";
 
+import { useUnreadCount } from "@/features/notifications/hooks/use-notifications";
+import { unreadBadge } from "@/features/notifications/lib/notification-view";
 import {
   clearCacheScope,
   useSyncCacheScope,
@@ -85,6 +87,7 @@ export function WorkspaceShell({
   });
   const today = useTodayView();
   const upcoming = useUpcomingView("14");
+  const unread = useUnreadCount();
   const [inboxOpen, setInboxOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const restoreFocusTo = useRef<HTMLElement | null>(null);
@@ -174,6 +177,13 @@ export function WorkspaceShell({
           ? "!"
           : "·",
     },
+    {
+      href: "/notifications",
+      label: "Notifications",
+      icon: "bell" as const,
+      // The bell shows only unread; an empty badge is quieter than a zero.
+      count: unread.data !== undefined ? unreadBadge(unread.data) : "",
+    },
   ];
 
   return (
@@ -256,9 +266,11 @@ export function WorkspaceShell({
               >
                 <Icon name={link.icon} />
                 <span>{link.label}</span>
-                <span className="workspace-nav__count" aria-hidden="true">
-                  {link.count}
-                </span>
+                {link.count ? (
+                  <span className="workspace-nav__count" aria-hidden="true">
+                    {link.count}
+                  </span>
+                ) : null}
               </Link>
             ))}
 
@@ -316,6 +328,14 @@ export function WorkspaceShell({
             >
               <Icon name="settings" />
               <span>Workspace settings</span>
+            </Link>
+            <Link
+              className="workspace-nav__link workspace-nav__link--quiet"
+              href="/settings/notifications"
+              aria-current={pathname === "/settings/notifications" ? "page" : undefined}
+            >
+              <Icon name="bell" />
+              <span>Notification settings</span>
             </Link>
 
             <details className="workspace-account" key={`account-${pathname}`}>
@@ -856,9 +876,11 @@ function MobileHeader({
               >
                 <Icon name={link.icon} />
                 <span>{link.label}</span>
-                <span className="workspace-nav__count" aria-hidden="true">
-                  {link.count}
-                </span>
+                {link.count ? (
+                  <span className="workspace-nav__count" aria-hidden="true">
+                    {link.count}
+                  </span>
+                ) : null}
               </Link>
             ))}
             <ProjectSection
@@ -903,6 +925,15 @@ function MobileHeader({
             >
               <Icon name="tag" />
               Manage tags
+            </Link>
+            <Link
+              className="workspace-nav__link workspace-nav__link--quiet"
+              href="/settings/notifications"
+              aria-current={pathname === "/settings/notifications" ? "page" : undefined}
+              onClick={closeMenu}
+            >
+              <Icon name="bell" />
+              Notification settings
             </Link>
           </nav>
           <button
@@ -1155,6 +1186,7 @@ function sentenceCase(value: string): string {
 
 type IconName =
   | "arrow-up-right"
+  | "bell"
   | "calendar"
   | "check"
   | "chevron-up"
@@ -1175,6 +1207,12 @@ function Icon({
 }: SVGProps<SVGSVGElement> & { readonly name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
     "arrow-up-right": <path d="M7 17 17 7M8 7h9v9" />,
+    bell: (
+      <>
+        <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z" />
+        <path d="M10 20a2 2 0 0 0 4 0" />
+      </>
+    ),
     calendar: (
       <>
         <rect x="4" y="5" width="16" height="15" rx="2" />
