@@ -117,3 +117,12 @@ export function addDays(date: PlainDate, days: number): PlainDate {
   const shifted = new Date(Date.UTC(year, month - 1, day + days));
   return shifted.toISOString().slice(0, 10) as PlainDate;
 }
+
+/** Whole calendar days from `from` to `to`; negative when `to` is the earlier date. */
+export function daysBetween(from: PlainDate, to: PlainDate): number {
+  const utc = (date: PlainDate) => {
+    const [year, month, day] = date.split("-").map(Number) as [number, number, number];
+    return Date.UTC(year, month - 1, day);
+  };
+  return Math.round((utc(to) - utc(from)) / 86_400_000);
+}

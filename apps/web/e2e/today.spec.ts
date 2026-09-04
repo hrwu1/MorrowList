@@ -63,7 +63,9 @@ test("adds a task to My Day, sees it in Today, and completes it inline", async (
 
   await page.getByRole("button", { name: "Edit Chosen for today" }).click();
   await page.getByRole("button", { name: "Add Chosen for today to My Day" }).click();
-  await expect(row(page, "Chosen for today").getByText("My Day")).toBeVisible();
+  await expect(
+    row(page, "Chosen for today").getByText("My Day", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Remove Chosen for today from My Day" }),
   ).toBeVisible();

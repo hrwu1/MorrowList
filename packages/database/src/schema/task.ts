@@ -41,7 +41,7 @@ export const tasks = pgTable(
     dueDate: date("due_date"),
     dueTime: time("due_time"),
     dueTimezone: varchar("due_timezone", { length: 100 }),
-    // Start/defer and deadline dates (GAP-16, migration 0005). Date-only like due_date;
+    // Start/defer and deadline dates (GAP-16, migration 0009). Date-only like due_date;
     // the deadline time is wall-clock in the workspace timezone.
     deferUntil: date("defer_until"),
     deadline: date("deadline"),

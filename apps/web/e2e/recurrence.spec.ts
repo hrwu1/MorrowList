@@ -54,7 +54,7 @@ test("a weekly task spawns its next occurrence on completion, can be skipped, an
 
   // A due date and a weekly preset anchored at it.
   const detail = panel(page);
-  await detail.getByLabel("Due date").fill(today);
+  await detail.getByLabel("Planned", { exact: true }).fill(today);
   await detail.getByLabel("Repeat", { exact: true }).selectOption("weekly");
   await expect(detail.getByText(/^Every week on \w{3}\. Completing/)).toBeVisible();
   await expect(

@@ -31,5 +31,8 @@ is expected but not enforced; the API reports `dateWarnings` so a client can war
   three dates when they land.
 - `deadlineTime` has no timezone column of its own; it is read in the workspace timezone.
   A later decision may add one if per-task zones become necessary.
+- On a repeating task (ADR-012) the defer date and deadline move to the next occurrence
+  by the same number of days as the due date, on spawn and on skip; without a due date a
+  spawned occurrence starts without them and a skipped task keeps its own.
 
 ---

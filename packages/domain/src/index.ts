@@ -155,6 +155,7 @@ export {
   PRIORITIES,
   TITLE_MAX_LENGTH,
   addDays,
+  daysBetween,
   isPriority,
   localDateFormatter,
   normalizeDescription,

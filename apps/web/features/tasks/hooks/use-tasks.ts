@@ -21,7 +21,6 @@ import {
 
 import { activityKeys } from "../../activity/hooks/use-activity";
 import { flowKeys } from "../../flow/hooks/use-flow";
-import { projectKeys } from "../../projects/hooks/use-projects";
 import { projectKeys, type BoardViewOptions } from "../../projects/hooks/use-projects";
 import { localToday, patchTaskInToday } from "../../today/lib/today-view";
 import { patchTaskInUpcoming } from "../../upcoming/lib/upcoming-view";

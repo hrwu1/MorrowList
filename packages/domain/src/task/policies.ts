@@ -23,6 +23,8 @@ import {
 import { normalizeBlockedReason } from "./relation.js";
 import { isCompleted, isDeleted, type Task } from "./task.js";
 import {
+  addDays,
+  daysBetween,
   normalizeDescription,
   normalizeTitle,
   type PlainDate,
@@ -193,6 +195,25 @@ export function updateTaskFields(
  * task does not repeat or the series ends here. The application layer allocates the id
  * and number, resolves the project's default status, and copies the tags.
  */
+/**
+ * The defer date and deadline are a window around the due date (GAP-16): "defer until
+ * three days before, deadline two days after". When an occurrence moves to its next due
+ * date, the window moves with it by the same number of days. Without a due date there is
+ * no window to move, so the result is null and the caller decides what that means.
+ */
+function shiftedDateWindow(
+  task: Task,
+  dueDate: PlainDate,
+): Pick<Task, "deferUntil" | "deadline" | "deadlineTime"> | null {
+  if (task.dueDate === null) return null;
+  const days = daysBetween(task.dueDate, dueDate);
+  return {
+    deferUntil: task.deferUntil === null ? null : addDays(task.deferUntil, days),
+    deadline: task.deadline === null ? null : addDays(task.deadline, days),
+    deadlineTime: task.deadline === null ? null : task.deadlineTime,
+  };
+}
+
 export function spawnNextOccurrence(
   task: Task,
   completedOn: PlainDate,
@@ -206,6 +227,12 @@ export function spawnNextOccurrence(
   | null {
   const next = nextOccurrenceAfter(task, completedOn);
   if (!next) return null;
+  // A new occurrence starts without the dates when nothing anchors them.
+  const window = shiftedDateWindow(task, next.dueDate) ?? {
+    deferUntil: null,
+    deadline: null,
+    deadlineTime: null,
+  };
   return {
     workspaceId: task.workspaceId,
     title: task.title,
@@ -216,6 +243,7 @@ export function spawnNextOccurrence(
     dueDate: next.dueDate,
     dueTime: task.dueTime,
     dueTimezone: task.dueTimezone,
+    ...window,
     recurrence: next.recurrence,
     seriesId: task.seriesId ?? task.id,
   };
@@ -248,8 +276,14 @@ export function skipOccurrence(
       { taskId: task.id },
     );
   }
+  // The same task keeps its own dates when it had no due date to move them with.
   return touch(
-    { ...task, dueDate: next.dueDate, recurrence: next.recurrence },
+    {
+      ...task,
+      ...(shiftedDateWindow(task, next.dueDate) ?? {}),
+      dueDate: next.dueDate,
+      recurrence: next.recurrence,
+    },
     task,
     context,
   );

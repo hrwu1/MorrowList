@@ -25,7 +25,7 @@ recurrence.
 3. **The next occurrence is created on completion, in the same transaction.** Completing
    a task with a rule inserts the next occurrence (same title, description, priority,
    project in its default stage, parent, tags, due time and timezone; due date from the
-   rule), records `task.created` with `seriesId` and `spawnedFrom` on it, and records
+   rule; defer date and deadline moved with the due date, see the date rules), records `task.created` with `seriesId` and `spawnedFrom` on it, and records
    `task.completed` on the old one. The rule moves to the new task; the completed one
    keeps only its `series_id`.
 4. **A series is the id of its first occurrence.** `tasks.series_id` is set when a rule is
@@ -52,6 +52,11 @@ recurrence.
 - `count` is the number of occurrences left including the current one. The spawned copy
   carries `count - 1`; `count: 1`, or a next date after `until`, ends the series: the
   last completion creates nothing and drops the rule.
+- The defer date and deadline (GAP-16) are a window around the due date, so they move to
+  the next occurrence by the same number of days as the due date, on spawn and on skip;
+  the deadline time travels with the deadline. A task without a due date has no window
+  to move: a spawned occurrence starts without those dates, and a skipped task keeps its
+  own.
 
 ## Consequences
 

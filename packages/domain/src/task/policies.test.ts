@@ -754,6 +754,9 @@ describe("recurrence", () => {
       dueDate: "2026-09-10",
       dueTime: "09:00",
       dueTimezone: "Europe/Berlin",
+      deferUntil: null,
+      deadline: null,
+      deadlineTime: null,
       recurrence: { ...task.recurrence, count: 1 },
       seriesId: "series-1",
     });
@@ -887,5 +890,57 @@ describe("defer and deadline dates (GAP-16)", () => {
     expect(isPastDeadline(task, toPlainDate("2026-09-05"))).toBe(false);
     expect(isPastDeadline(task, toPlainDate("2026-09-06"))).toBe(true);
     expect(isDeferred(inboxTask(), toPlainDate("2026-09-09"))).toBe(false);
+  });
+
+  it("moves the defer date and deadline with the due date on spawn and skip, and drops them without one", () => {
+    const weekly = { freq: "weekly" as const, weekdays: ["thu" as const] };
+    const windowed = createTask(
+      {
+        ...baseInput,
+        deferUntil: toPlainDate("2026-08-31"),
+        dueDate: toPlainDate("2026-09-03"),
+        deadline: toPlainDate("2026-09-05"),
+        deadlineTime: toPlainTime("17:00"),
+        recurrence: weekly,
+      },
+      testContext(),
+    );
+
+    // Spawned on the due date: the next Thursday, with the window shifted by a week.
+    expect(spawnNextOccurrence(windowed, toPlainDate("2026-09-03"))).toMatchObject({
+      dueDate: "2026-09-10",
+      deferUntil: "2026-09-07",
+      deadline: "2026-09-12",
+      deadlineTime: "17:00",
+    });
+    // Skipping moves the same task the same way.
+    expect(
+      skipOccurrence(windowed, toPlainDate("2026-09-03"), testContext()),
+    ).toMatchObject({
+      dueDate: "2026-09-10",
+      deferUntil: "2026-09-07",
+      deadline: "2026-09-12",
+      deadlineTime: "17:00",
+    });
+
+    // Without a due date nothing anchors the window: a new occurrence starts without
+    // it, while a skipped task keeps its own dates.
+    const unanchored = createTask(
+      {
+        ...baseInput,
+        deferUntil: toPlainDate("2026-08-31"),
+        deadline: toPlainDate("2026-09-05"),
+        recurrence: weekly,
+      },
+      testContext(),
+    );
+    expect(spawnNextOccurrence(unanchored, toPlainDate("2026-09-03"))).toMatchObject({
+      deferUntil: null,
+      deadline: null,
+      deadlineTime: null,
+    });
+    expect(
+      skipOccurrence(unanchored, toPlainDate("2026-09-03"), testContext()),
+    ).toMatchObject({ deferUntil: "2026-08-31", deadline: "2026-09-05" });
   });
 });

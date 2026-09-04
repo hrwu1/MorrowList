@@ -529,7 +529,7 @@ describe("defer and deadline dates (GAP-16)", () => {
     return page.items.map((task) => task.id);
   }
 
-  it("applies migration 0005: columns, the deadline-time check, and partial indexes", async () => {
+  it("applies migration 0009: columns, the deadline-time check, and partial indexes", async () => {
     const columns = await handle.pool.query<{ column_name: string; data_type: string }>(
       `select column_name, data_type from information_schema.columns
        where table_name = 'tasks' and column_name in ('defer_until', 'deadline', 'deadline_time')
