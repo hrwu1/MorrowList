@@ -21,12 +21,14 @@ import {
   assertExpectedVersion,
   assertNoBlocksCycle,
   assertParentIsAssignable,
+  boardPlacement,
   canonicalizeRelation,
   clearBlocked as applyClearBlocked,
   completeTask,
   createTask,
   deleteTask,
   flagBlocked,
+  intervalTransition,
   isBlocked,
   entersInProgress,
   isTerminal,
@@ -47,6 +49,7 @@ import {
   updateTaskFields,
   uuidv7,
   wipWarning,
+  type BoardPlacement,
   type Clock,
   type CreateTaskInput,
   type DayPlanSource,
@@ -1010,6 +1013,7 @@ export class TaskService {
         );
       }
 
+      await this.syncIntervals(tx, previous, next);
       await recordEvent(tx, context, this.clock, {
         workspaceId,
         aggregateType: "task",
@@ -1103,6 +1107,9 @@ export class TaskService {
     for (const tag of origin?.tags ?? []) {
       await tx.tasks.addTag(task.id, tag.id, this.clock.now());
     }
+    // A task on a board starts its first stay now, a spawned occurrence included.
+    const placement = boardPlacement(task);
+    if (placement) await this.openInterval(tx, task, placement, fields.project?.status);
     const key = taskKey(workspace.taskKeyPrefix, task.taskNumber);
     await recordEvent(tx, context, this.clock, {
       workspaceId: task.workspaceId,
@@ -1124,6 +1131,43 @@ export class TaskService {
       },
     });
     return task;
+  }
+
+  /**
+   * Keep the flow read model current (GAP-17): leaving a board position closes the open
+   * interval and arriving at one opens the next, in the same transaction as the change.
+   */
+  private async syncIntervals(
+    tx: TransactionContext,
+    previous: Task,
+    next: Task,
+  ): Promise<void> {
+    const transition = intervalTransition(previous, next);
+    if (transition.closes) await tx.statusIntervals.close(next.id, next.updatedAt);
+    if (transition.opens) await this.openInterval(tx, next, transition.opens);
+  }
+
+  private async openInterval(
+    tx: TransactionContext,
+    task: Task,
+    placement: BoardPlacement,
+    status?: WorkflowStatus,
+  ): Promise<void> {
+    const resolved = status ?? (await tx.statuses.findById(placement.statusId));
+    if (!resolved) {
+      throw new DomainError("STATUS_NOT_FOUND", "Status not found.", {
+        statusId: placement.statusId,
+      });
+    }
+    await tx.statusIntervals.open({
+      id: uuidv7(),
+      taskId: task.id,
+      workspaceId: task.workspaceId,
+      projectId: placement.projectId,
+      statusId: resolved.id,
+      category: resolved.category,
+      enteredAt: task.updatedAt,
+    });
   }
 
   private async insertDayPlan(

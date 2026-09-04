@@ -6,6 +6,7 @@ export {
   type DatabaseHandle,
 } from "./client.js";
 export { migrate, type MigrateOptions, type MigrateResult } from "./migrate.js";
+export { backfillStatusIntervals, type BackfillResult } from "./backfill-flow.js";
 export { buildTransactionContext, createUnitOfWork } from "./unit-of-work.js";
 export { createDayPlanRepository } from "./repositories/day-plans.js";
 export {
@@ -17,6 +18,7 @@ export {
   createWorkflowStatusRepository,
 } from "./repositories/projects.js";
 export { createTagRepository } from "./repositories/tags.js";
+export { createStatusIntervalRepository } from "./repositories/flow.js";
 export {
   createTaskCounterRepository,
   createTaskRepository,

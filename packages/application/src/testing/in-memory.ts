@@ -4,6 +4,7 @@ import {
   inProgressTasks,
   type DayPlan,
   type PlainDate,
+  type StatusInterval,
   type Tag,
   type Task,
   type TaskRelation,
@@ -24,6 +25,8 @@ import type {
   ProjectRepository,
   RankScope,
   RelationEdge,
+  StatusIntervalInput,
+  StatusIntervalRepository,
   TagRepository,
   TaskCounterRepository,
   TaskFilter,
@@ -56,11 +59,15 @@ export interface InMemoryData {
   tags: Map<string, Tag>;
   taskTags: { taskId: string; tagId: string; createdAt: Date }[];
   relations: Map<string, TaskRelation>;
+  intervals: InMemoryInterval[];
   workspaces: Map<string, Workspace>;
   memberships: WorkspaceMembership[];
   activity: ActivityEvent[];
   outbox: OutboxEventInput[];
 }
+
+/** A stored interval: the input plus the moment it was left. */
+export type InMemoryInterval = StatusIntervalInput & { readonly leftAt: Date | null };
 
 export function emptyData(): InMemoryData {
   return {
@@ -72,6 +79,7 @@ export function emptyData(): InMemoryData {
     tags: new Map(),
     taskTags: [],
     relations: new Map(),
+    intervals: [],
     workspaces: new Map(),
     memberships: [],
     activity: [],
@@ -567,6 +575,66 @@ function tagRepository(data: InMemoryData): TagRepository {
   };
 }
 
+function statusIntervalRepository(data: InMemoryData): StatusIntervalRepository {
+  const toInterval = (row: InMemoryInterval): StatusInterval => ({
+    taskId: row.taskId,
+    statusId: row.statusId,
+    category: row.category,
+    enteredAt: row.enteredAt,
+    leftAt: row.leftAt,
+  });
+  const byTime = (left: InMemoryInterval, right: InMemoryInterval) =>
+    left.taskId !== right.taskId
+      ? left.taskId < right.taskId
+        ? -1
+        : 1
+      : left.enteredAt.getTime() - right.enteredAt.getTime();
+
+  return {
+    async open(interval) {
+      if (
+        data.intervals.some((r) => r.taskId === interval.taskId && r.leftAt === null)
+      ) {
+        // Mirrors the partial unique index on (task_id) where left_at is null.
+        throw new Error(`task ${interval.taskId} already has an open interval`);
+      }
+      data.intervals.push({ ...interval, leftAt: null });
+    },
+    async close(taskId, leftAt) {
+      data.intervals = data.intervals.map((row) =>
+        row.taskId === taskId && row.leftAt === null ? { ...row, leftAt } : row,
+      );
+    },
+    async listForTasks(workspaceId, taskIds) {
+      const wanted = new Set(taskIds);
+      return data.intervals
+        .filter((row) => row.workspaceId === workspaceId && wanted.has(row.taskId))
+        .sort(byTime)
+        .map(toInterval);
+    },
+    async listForProject(workspaceId, projectId, since) {
+      const touched = new Set(
+        data.intervals
+          .filter(
+            (row) =>
+              row.projectId === projectId &&
+              (row.leftAt === null || row.leftAt.getTime() >= since.getTime()),
+          )
+          .map((row) => row.taskId),
+      );
+      return data.intervals
+        .filter(
+          (row) =>
+            row.workspaceId === workspaceId &&
+            row.projectId === projectId &&
+            touched.has(row.taskId),
+        )
+        .sort(byTime)
+        .map(toInterval);
+    },
+  };
+}
+
 function counterRepository(data: InMemoryData): TaskCounterRepository {
   return {
     async ensure(workspaceId) {
@@ -777,6 +845,7 @@ export function createInMemoryUnitOfWork(
     tags: new Map(source.tags),
     taskTags: [...source.taskTags],
     relations: new Map(source.relations),
+    intervals: [...source.intervals],
     workspaces: new Map(source.workspaces),
     memberships: [...source.memberships],
     activity: [...source.activity],
@@ -792,6 +861,7 @@ export function createInMemoryUnitOfWork(
     target.tags = source.tags;
     target.taskTags = source.taskTags;
     target.relations = source.relations;
+    target.intervals = source.intervals;
     target.workspaces = source.workspaces;
     target.memberships = source.memberships;
     target.activity = source.activity;
@@ -815,6 +885,7 @@ export function createInMemoryUnitOfWork(
         projects: projectRepository(working),
         statuses: statusRepository(working),
         tags: tagRepository(working),
+        statusIntervals: statusIntervalRepository(working),
         workspaces: workspaceRepository(working),
         activity: activityRepository(working),
         outbox: outboxRepository(working),

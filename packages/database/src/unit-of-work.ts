@@ -6,6 +6,7 @@ import {
   createActivityRepository,
   createOutboxRepository,
 } from "./repositories/events.js";
+import { createStatusIntervalRepository } from "./repositories/flow.js";
 import {
   createProjectRepository,
   createWorkflowStatusRepository,
@@ -32,6 +33,7 @@ export function buildTransactionContext(db: Database): TransactionContext {
     projects: createProjectRepository(db),
     statuses: createWorkflowStatusRepository(db),
     tags: createTagRepository(db),
+    statusIntervals: createStatusIntervalRepository(db),
     workspaces: createWorkspaceRepository(db),
     activity: createActivityRepository(db),
     outbox: createOutboxRepository(db),

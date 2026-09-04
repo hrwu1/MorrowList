@@ -1955,3 +1955,112 @@ describe("TaskService recurrence", () => {
     ).rejects.toMatchObject({ code: "TASK_VERSION_CONFLICT" });
   });
 });
+
+describe("status intervals (flow read model)", () => {
+  const intervalsOf = (taskId: string) =>
+    unitOfWork.data.intervals
+      .filter((row) => row.taskId === taskId)
+      .map((row) => ({
+        category: row.category,
+        projectId: row.projectId,
+        open: row.leftAt === null,
+      }));
+
+  it("opens on creation into a project and not for an Inbox task", async () => {
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const onBoard = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "On the board",
+      projectId: seeded.project.id,
+      statusId: ready.id,
+    });
+    const inbox = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Captured",
+    });
+
+    expect(intervalsOf(onBoard.id)).toEqual([
+      { category: "ready", projectId: seeded.project.id, open: true },
+    ]);
+    expect(intervalsOf(inbox.id)).toEqual([]);
+  });
+
+  it("closes and opens across move, complete, reopen, trash, restore and Inbox", async () => {
+    const workspaceId = seeded.workspace.id;
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const inProgress = statusByCategory(seeded.statuses, "in_progress");
+    const task = await service.create(seeded.context, {
+      workspaceId,
+      title: "Travels",
+      projectId: seeded.project.id,
+      statusId: ready.id,
+    });
+
+    await service.move(seeded.context, workspaceId, task.id, {
+      projectId: seeded.project.id,
+      statusId: inProgress.id,
+    });
+    await service.complete(seeded.context, workspaceId, task.id);
+    await service.reopen(seeded.context, workspaceId, task.id);
+    await service.delete(seeded.context, workspaceId, task.id);
+    expect(intervalsOf(task.id).every((row) => !row.open)).toBe(true);
+
+    await service.restore(seeded.context, workspaceId, task.id);
+    await service.move(seeded.context, workspaceId, task.id, { projectId: null });
+
+    expect(intervalsOf(task.id).map((row) => row.category)).toEqual([
+      "ready",
+      "in_progress",
+      "done",
+      // Reopening returns the task to its last active status.
+      "in_progress",
+      "in_progress",
+    ]);
+    expect(intervalsOf(task.id).some((row) => row.open)).toBe(false);
+    for (const row of unitOfWork.data.intervals) {
+      if (row.leftAt)
+        expect(row.leftAt.getTime()).toBeGreaterThanOrEqual(row.enteredAt.getTime());
+    }
+  });
+
+  it("leaves the open interval alone when a change keeps the task in place", async () => {
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Stays",
+      projectId: seeded.project.id,
+      statusId: ready.id,
+    });
+    await service.update(seeded.context, seeded.workspace.id, task.id, {
+      title: "Stays put",
+    });
+    await service.reorder(seeded.context, seeded.workspace.id, task.id, {});
+
+    expect(intervalsOf(task.id)).toEqual([
+      { category: "ready", projectId: seeded.project.id, open: true },
+    ]);
+  });
+
+  it("rolls the interval back with the task change when the commit fails", async () => {
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const inProgress = statusByCategory(seeded.statuses, "in_progress");
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Doomed move",
+      projectId: seeded.project.id,
+      statusId: ready.id,
+    });
+    unitOfWork.failNextCommit();
+
+    await expect(
+      service.move(seeded.context, seeded.workspace.id, task.id, {
+        projectId: seeded.project.id,
+        statusId: inProgress.id,
+      }),
+    ).rejects.toThrow("simulated commit failure");
+
+    expect(intervalsOf(task.id)).toEqual([
+      { category: "ready", projectId: seeded.project.id, open: true },
+    ]);
+  });
+});

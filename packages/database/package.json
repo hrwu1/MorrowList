@@ -27,6 +27,7 @@
     "db:generate": "pnpm build && drizzle-kit generate",
     "db:migrate": "tsx src/migrate-cli.ts",
     "db:seed": "tsx src/seed-cli.ts",
+    "db:backfill-flow": "tsx src/backfill-flow-cli.ts",
     "lint": "echo \"linted from repository root\""
   },
   "dependencies": {

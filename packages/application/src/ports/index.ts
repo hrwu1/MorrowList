@@ -22,6 +22,7 @@ export type {
   WorkflowStatusRepository,
 } from "./projects.js";
 export type { TagRepository } from "./tags.js";
+export type { StatusIntervalInput, StatusIntervalRepository } from "./flow.js";
 export type {
   Workspace,
   WorkspaceMembership,
