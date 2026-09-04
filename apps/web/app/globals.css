@@ -3255,21 +3255,27 @@
 
 @layer components {
   /* Search: the sidebar entry, the dialog, and the result list (spec 9.8). */
-  .workspace-search {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
+  .workspace-topline {
+    display: flex;
     align-items: center;
-    gap: 0.65rem;
-    width: 100%;
-    min-height: 2.35rem;
-    margin-bottom: 0.6rem;
-    padding: 0 0.7rem;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0 0.45rem 1.1rem;
+  }
+  .workspace-topline .workspace-brand {
+    margin: 0;
+  }
+  .workspace-search {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 2.25rem;
+    padding: 0 0.55rem;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     background: var(--surface-raised);
     color: var(--text-secondary);
     font: inherit;
-    text-align: left;
     cursor: pointer;
   }
   .workspace-search:hover {

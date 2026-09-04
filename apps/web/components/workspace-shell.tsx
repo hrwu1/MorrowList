@@ -171,7 +171,21 @@ export function WorkspaceShell({
     >
       <div className="app-shell">
         <aside className="workspace-sidebar" aria-label="Workspace">
-          <Brand />
+          <div className="workspace-topline">
+            <Brand />
+            {/* Beside the brand rather than in the nav, so the sidebar's drop targets
+                keep their positions for keyboard drags. */}
+            <button
+              type="button"
+              className="workspace-search"
+              aria-label="Search tasks and projects"
+              title="Search (/)"
+              onClick={openSearch}
+            >
+              <Icon name="search" />
+              <kbd aria-hidden="true">/</kbd>
+            </button>
+          </div>
 
           <button
             type="button"
@@ -182,17 +196,6 @@ export function WorkspaceShell({
             <Icon name="plus" />
             <span>New task</span>
             <kbd aria-hidden="true">N</kbd>
-          </button>
-
-          <button
-            type="button"
-            className="workspace-search"
-            aria-label="Search tasks and projects"
-            onClick={openSearch}
-          >
-            <Icon name="search" />
-            <span>Search</span>
-            <kbd aria-hidden="true">/</kbd>
           </button>
 
           <nav className="workspace-nav" aria-label="Primary">

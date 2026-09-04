@@ -19,7 +19,9 @@ async function signUp(page: Page) {
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();
   // The first Inbox render on a cold dev server compiles the shell; allow for it.
-  await expect(page.getByRole("heading", { level: 1, name: "Inbox" })).toBeVisible({
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Inbox", exact: true }),
+  ).toBeVisible({
     timeout: 20_000,
   });
 }
@@ -189,7 +191,9 @@ test("a filter set saves as a personal view that survives a reload and reorders"
 
   // A second view, then reorder from the sidebar and reload.
   await page.getByRole("link", { name: "Open full Inbox" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Inbox" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Inbox", exact: true }),
+  ).toBeVisible();
   await openFilters(page);
   await page
     .getByRole("form", { name: "Save as view" })
@@ -247,6 +251,8 @@ test("a filter set saves as a personal view that survives a reload and reorders"
 
   await page.getByRole("button", { name: "Delete view Whole inbox" }).click();
   await page.getByRole("button", { name: "Confirm deleting view Whole inbox" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Inbox" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Inbox", exact: true }),
+  ).toBeVisible();
   await expect(views.getByRole("link")).toHaveText(["Everything"]);
 });
