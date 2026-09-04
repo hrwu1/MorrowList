@@ -3169,9 +3169,13 @@
       align-items: center;
       min-height: 2.75rem;
     }
-    .workspace-project-link {
+    .workspace-project-link,
+    .workspace-search,
+    .search-dialog__input,
+    .search-result a {
       min-height: 2.75rem;
     }
+    .workspace-view__reorder button,
     .board-card__my-day,
     .board-card__drag,
     .kanban-column__menu > summary {

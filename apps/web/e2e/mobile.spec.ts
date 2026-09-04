@@ -44,6 +44,19 @@ async function createProject(page: Page, name: string): Promise<string> {
   }, name);
 }
 
+async function createSavedView(page: Page, name: string): Promise<string> {
+  return page.evaluate(async (viewName) => {
+    const response = await fetch("/api/v1/views/saved", {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: viewName, filters: { inbox: true } }),
+    });
+    const body = await response.json();
+    return body.data.id as string;
+  }, name);
+}
+
 function overflowsHorizontally(page: Page) {
   return page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -56,6 +69,7 @@ test("every view fits the phone width and the main controls are thumb-sized", as
   await signUp(page);
   await capture(page, "Fits on a phone");
   const projectId = await createProject(page, "A project with a rather long name");
+  const viewId = await createSavedView(page, "A saved view with a rather long name");
 
   const views = [
     "/today",
@@ -63,8 +77,12 @@ test("every view fits the phone width and the main controls are thumb-sized", as
     "/inbox",
     `/projects/${projectId}/board`,
     `/projects/${projectId}/settings`,
+    `/projects/${projectId}/flow`,
     "/projects",
     "/settings/tags",
+    "/settings/workspace",
+    "/search?q=phone",
+    `/views/${viewId}`,
     "/completed",
     "/trash",
   ];
@@ -88,6 +106,20 @@ test("every view fits the phone width and the main controls are thumb-sized", as
     expect(box!.height, "target height").toBeGreaterThanOrEqual(MIN_TARGET);
     expect(box!.width, "target width").toBeGreaterThanOrEqual(MIN_TARGET);
   }
+
+  // The search dialog's field and results are thumb-sized too.
+  await page.locator("body").press("/");
+  const dialog = page.getByRole("dialog", { name: "Search" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("combobox").fill("phone");
+  const result = dialog.getByRole("link", { name: /Fits on a phone/ });
+  await expect(result).toBeVisible();
+  for (const control of [dialog.getByRole("combobox"), result]) {
+    const box = (await control.boundingBox())!;
+    expect(box.height, "search target height").toBeGreaterThanOrEqual(MIN_TARGET);
+  }
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
 
   // The completion circle stays small on screen but answers to a thumb-sized area.
   const check = page.getByRole("button", { name: "Complete Fits on a phone" });

@@ -56,6 +56,9 @@ describe("cache policy", () => {
     expect(policy("/api/auth/sign-in/email")).toBe("none");
     expect(policy("/api/v1/me")).toBe("none");
     expect(policy("/api/v1/workspace")).toBe("none");
+    expect(policy("/api/v1/workspaces/w1")).toBe("none");
+    // Search results are transient and never make up a view of their own.
+    expect(policy("/api/v1/search?q=plan")).toBe("none");
     expect(policy("/api/v1/health")).toBe("none");
     expect(policy("/sign-in", "navigate")).toBe("none");
     expect(policy("/sign-up", "navigate")).toBe("none");
@@ -64,12 +67,20 @@ describe("cache policy", () => {
   it("partitions read projections and page navigations", () => {
     expect(policy("/api/v1/views/today")).toBe("partition");
     expect(policy("/api/v1/views/upcoming?days=14")).toBe("partition");
+    // Saved views are owner-scoped, which the user-and-workspace partition already is.
+    expect(policy("/api/v1/views/saved")).toBe("partition");
     expect(policy("/api/v1/tasks?inbox=true")).toBe("partition");
     expect(policy("/api/v1/tasks/ML-1")).toBe("partition");
     expect(policy("/api/v1/projects/p1/board")).toBe("partition");
+    expect(policy("/api/v1/projects/p1/flow")).toBe("partition");
+    expect(policy("/api/v1/projects/p1/activity")).toBe("partition");
+    expect(policy("/api/v1/projects/p1/statuses")).toBe("partition");
+    expect(policy("/api/v1/tasks/ML-1/activity")).toBe("partition");
     expect(policy("/api/v1/tags")).toBe("partition");
     expect(policy("/inbox", "navigate")).toBe("partition");
     expect(policy("/projects/p1/board", "navigate")).toBe("partition");
+    expect(policy("/projects/p1/flow", "navigate")).toBe("partition");
+    expect(policy("/views/v1", "navigate")).toBe("partition");
   });
 
   it("keeps static assets and the precached shell in the shared cache", () => {
