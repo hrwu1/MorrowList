@@ -2,6 +2,8 @@ import {
   ActivityService,
   FlowService,
   ProjectService,
+  SavedViewService,
+  SearchService,
   TagService,
   TaskService,
   ViewService,
@@ -83,6 +85,12 @@ beforeEach(async () => {
     flowService: new FlowService({ unitOfWork, clock: fixedClock(NOW) }),
     viewService: new ViewService({ unitOfWork, clock: fixedClock(NOW) }),
     tagService: new TagService({ unitOfWork, clock: fixedClock(NOW) }),
+    searchService: new SearchService({
+      unitOfWork,
+      clock: fixedClock(NOW),
+      cursorSecret: "test-secret",
+    }),
+    savedViewService: new SavedViewService({ unitOfWork, clock: fixedClock(NOW) }),
     logger: silentLogger,
     checkHealth: async () =>
       healthy
@@ -1315,5 +1323,116 @@ describe("defer and deadline dates (GAP-16)", () => {
       "Later",
       "Now",
     ]);
+  });
+});
+
+describe("search endpoint", () => {
+  it("finds tasks by description word with match offsets and lists project hits", async () => {
+    await jsonRequest("/api/v1/projects", "POST", { name: "Budget planning" });
+    await jsonRequest("/api/v1/tasks", "POST", {
+      title: "Slides",
+      descriptionMd: "Budget review deck",
+    });
+    await jsonRequest("/api/v1/tasks", "POST", { title: "Unrelated" });
+
+    const response = await request("/api/v1/search?q=budget");
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.tasks).toHaveLength(1);
+    expect(body.data.tasks[0].task.title).toBe("Slides");
+    expect(body.data.tasks[0].matches.description).toEqual([{ start: 0, end: 6 }]);
+    expect(body.data.projects[0].project.name).toBe("Budget planning");
+    expect(body.page).toEqual({ nextCursor: null, hasMore: false });
+  });
+
+  it("resolves a task key first and honours operators", async () => {
+    await jsonRequest("/api/v1/tasks", "POST", { title: "First", priority: "high" });
+    await jsonRequest("/api/v1/tasks", "POST", { title: "Second" });
+
+    const byKey = await (await request("/api/v1/search?q=ML-2")).json();
+    expect(
+      byKey.data.tasks.map((hit: { task: { key: string } }) => hit.task.key),
+    ).toEqual(["ML-2"]);
+
+    const byOperator = await (await request("/api/v1/search?q=priority%3Ahigh")).json();
+    expect(
+      byOperator.data.tasks.map((hit: { task: { title: string } }) => hit.task.title),
+    ).toEqual(["First"]);
+  });
+
+  it("rejects an empty query and an unknown operator value with the envelope", async () => {
+    expect((await request("/api/v1/search?q=")).status).toBe(422);
+
+    const response = await request("/api/v1/search?q=due%3Asomeday");
+    expect(response.status).toBe(422);
+    const body = await response.json();
+    expect(body.error.code).toBe("VALIDATION_FAILED");
+    expect(body.error.details.operator).toBe("due");
+  });
+});
+
+describe("saved view endpoints", () => {
+  it("saves, lists, renames, reorders, and deletes personal views", async () => {
+    const created = await jsonRequest("/api/v1/views/saved", "POST", {
+      name: "Overdue",
+      filters: { due: "overdue" },
+    });
+    expect(created.status).toBe(201);
+    const first = (await created.json()).data;
+    expect(first).toMatchObject({
+      name: "Overdue",
+      layout: "list",
+      filters: { due: "overdue" },
+    });
+
+    const second = (
+      await (
+        await jsonRequest("/api/v1/views/saved", "POST", {
+          name: "Blocked",
+          layout: "board",
+        })
+      ).json()
+    ).data;
+
+    const duplicate = await jsonRequest("/api/v1/views/saved", "POST", {
+      name: "overdue",
+    });
+    expect(duplicate.status).toBe(409);
+
+    const renamed = await jsonRequest(`/api/v1/views/saved/${first.id}`, "PATCH", {
+      name: "Overdue work",
+    });
+    expect((await renamed.json()).data.name).toBe("Overdue work");
+
+    const reordered = await jsonRequest(
+      `/api/v1/views/saved/${second.id}/reorder`,
+      "POST",
+      {
+        afterViewId: first.id,
+      },
+    );
+    expect(reordered.status).toBe(200);
+
+    const listed = await (await request("/api/v1/views/saved")).json();
+    expect(listed.data.map((view: { name: string }) => view.name)).toEqual([
+      "Blocked",
+      "Overdue work",
+    ]);
+
+    expect(
+      (await request(`/api/v1/views/saved/${first.id}`, { method: "DELETE" })).status,
+    ).toBe(204);
+    expect(
+      (await request(`/api/v1/views/saved/${first.id}`, { method: "DELETE" })).status,
+    ).toBe(404);
+  });
+
+  it("rejects unknown filter fields", async () => {
+    const response = await jsonRequest("/api/v1/views/saved", "POST", {
+      name: "Bad",
+      filters: { q: "text" },
+    });
+    expect(response.status).toBe(422);
   });
 });

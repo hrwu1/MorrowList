@@ -5,6 +5,8 @@ import {
   ActivityService,
   FlowService,
   ProjectService,
+  SavedViewService,
+  SearchService,
   TagService,
   TaskService,
   ViewService,
@@ -93,6 +95,8 @@ export function getContainer(): Container {
     flowService: new FlowService({ unitOfWork }),
     viewService: new ViewService({ unitOfWork }),
     tagService: new TagService({ unitOfWork }),
+    searchService: new SearchService({ unitOfWork, cursorSecret }),
+    savedViewService: new SavedViewService({ unitOfWork }),
     logger,
     checkHealth: () => checkDatabaseHealth(database),
   };

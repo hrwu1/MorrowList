@@ -23,6 +23,7 @@
     "@morrowlist/config": "workspace:*",
     "@morrowlist/contracts": "workspace:*",
     "@morrowlist/database": "workspace:*",
+    "@morrowlist/domain": "workspace:*",
     "@morrowlist/observability": "workspace:*",
     "@morrowlist/ui": "workspace:*",
     "@tanstack/react-query": "5.85.5",

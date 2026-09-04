@@ -15,9 +15,11 @@ import {
   globalsOf,
   idempotency,
   recurrenceFromPhrase,
+  usageFailure,
   withClient,
 } from "./shared.js";
 import { findTag, resolveTags } from "./tag.js";
+import { WHERE_HELP, resolveWhere } from "./where.js";
 
 /**
  * `morrow task …` (CLI-002, CLI-003).
@@ -126,6 +128,7 @@ export function taskCommand(): Command {
     .option("--deadline <filter>", "overdue | week | none")
     .option("--tag <name>", "restrict to tasks carrying a tag")
     .option("--blocked", "blocked tasks only: flagged, or waiting on an open blocker")
+    .option("--where <query>", `filters in the search grammar; ${WHERE_HELP}`)
     .option("--limit <n>", "page size, 1-200", "50")
     .action(async (options, command: Command) => {
       const globals = globalsOf(command);
@@ -133,9 +136,15 @@ export function taskCommand(): Command {
       try {
         const page = await withClient(globals, async (client) => {
           const tag = options.tag ? await findTag(client, options.tag) : null;
-          if (options.tag && !tag) {
+          const where = options.where
+            ? await resolveWhere(client, options.where)
+            : { query: {}, noSuchTag: false, error: null };
+          if (where.error) usageFailure(where.error, json);
+          if ((options.tag && !tag) || where.noSuchTag) {
             return { data: [], page: { nextCursor: null, hasMore: false } };
           }
+          // Flags first, then --where: an operator overrides the flag it duplicates,
+          // the same precedence the search endpoint applies.
           return client.listTasks({
             ...(options.inbox ? { inbox: true } : {}),
             isCompleted: Boolean(options.completed),
@@ -146,6 +155,7 @@ export function taskCommand(): Command {
             ...(options.deadline ? { deadline: options.deadline } : {}),
             ...(tag ? { tagId: tag.id } : {}),
             ...(options.blocked ? { isBlocked: true } : {}),
+            ...where.query,
             limit: Number(options.limit),
           } as never);
         });

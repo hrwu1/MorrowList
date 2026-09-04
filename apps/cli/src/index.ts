@@ -8,6 +8,8 @@ import { tagCommand } from "./commands/tag.js";
 import { taskCommand } from "./commands/task.js";
 import { todayCommand } from "./commands/today.js";
 import { workspaceCommand } from "./commands/workspace.js";
+import { searchCommand } from "./commands/search.js";
+import { viewCommand } from "./commands/view.js";
 import { EXIT, printError } from "./formatters/output.js";
 
 /**
@@ -39,6 +41,8 @@ program.addCommand(todayCommand());
 program.addCommand(tagCommand());
 program.addCommand(relationCommand());
 program.addCommand(workspaceCommand());
+program.addCommand(searchCommand());
+program.addCommand(viewCommand());
 
 try {
   await program.parseAsync(process.argv);

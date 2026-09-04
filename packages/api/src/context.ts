@@ -3,6 +3,8 @@ import type {
   ActorContext,
   FlowService,
   ProjectService,
+  SavedViewService,
+  SearchService,
   TagService,
   TaskService,
   UnitOfWork,
@@ -28,6 +30,8 @@ export interface ApiDependencies {
   readonly flowService: FlowService;
   readonly viewService: ViewService;
   readonly tagService: TagService;
+  readonly searchService: SearchService;
+  readonly savedViewService: SavedViewService;
   readonly logger: Logger;
   readonly metrics?: Metrics;
   /** Readiness probe backing `GET /ready` (spec FND-006). */

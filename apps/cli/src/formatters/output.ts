@@ -2,6 +2,8 @@ import type {
   ActivityEntryDto,
   FlowSummaryDto,
   DateWarning,
+  SavedViewDto,
+  SearchResponse,
   TagListItemDto,
   ProjectDto,
   TaskDto,
@@ -270,6 +272,37 @@ export function formatTaskDetail(
     );
   }
   return lines.join("\n");
+}
+
+/** Search hits: projects for navigation first, then tasks with the matched text marked. */
+export function formatSearchResults(page: SearchResponse): string {
+  const blocks: string[] = [];
+  if (page.data.projects.length > 0) {
+    blocks.push(
+      `Projects\n${page.data.projects
+        .map((hit) => `  ${hit.project.name}  (${hit.project.id})`)
+        .join("\n")}`,
+    );
+  }
+  if (page.data.tasks.length > 0) {
+    blocks.push(formatTaskTable(page.data.tasks.map((hit) => hit.task)));
+  }
+  return blocks.length === 0 ? "No matches." : blocks.join("\n\n");
+}
+
+/** Saved views in sidebar order with their layout and filters. */
+export function formatSavedViewTable(views: readonly SavedViewDto[]): string {
+  if (views.length === 0) return "No saved views.";
+
+  const nameWidth = Math.max(...views.map((view) => view.name.length));
+  return views
+    .map((view) => {
+      const filters = Object.entries(view.filters)
+        .map(([key, value]) => `${key}=${String(value)}`)
+        .join(" ");
+      return `${view.name.padEnd(nameWidth)}  ${view.layout.padEnd(5)}  ${filters || "(all open tasks)"}`;
+    })
+    .join("\n");
 }
 
 /** Tags with their colour and how many live tasks carry each. */

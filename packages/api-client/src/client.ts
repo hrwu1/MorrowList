@@ -6,6 +6,7 @@ import type {
   ArchiveStatusRequest,
   CompleteTaskRequest,
   CreateProjectRequest,
+  CreateSavedViewRequest,
   CreateTagRequest,
   CreateStatusRequest,
   CreateTaskRequest,
@@ -28,6 +29,12 @@ import type {
   ReorderStatusRequest,
   ReorderTaskRequest,
   SetTaskBlockedRequest,
+  ReorderSavedViewRequest,
+  ReorderTaskRequest,
+  SavedViewDto,
+  SavedViewListResponse,
+  SearchQuery,
+  SearchResponse,
   SetTaskParentRequest,
   TagDto,
   TagListResponse,
@@ -39,6 +46,7 @@ import type {
   TodayViewResponse,
   UpcomingViewQuery,
   UpcomingViewResponse,
+  UpdateSavedViewRequest,
   UpdateTagRequest,
   UpdateProjectRequest,
   UpdateStatusRequest,
@@ -596,6 +604,78 @@ export class ApiClient {
     return this.send<UpcomingViewResponse>(
       "GET",
       `/views/upcoming${this.queryString(query, options)}`,
+      undefined,
+      options,
+    );
+  }
+
+  /** Full-text search with the operator grammar; a page of task hits plus project hits. */
+  async search(
+    query: Partial<SearchQuery> & { q: string },
+    options: RequestOptions = {},
+  ): Promise<SearchResponse> {
+    return this.send<SearchResponse>(
+      "GET",
+      `/search${this.queryString(query, options)}`,
+      undefined,
+      options,
+    );
+  }
+
+  async listSavedViews(options: RequestOptions = {}): Promise<SavedViewListResponse> {
+    return this.send<SavedViewListResponse>(
+      "GET",
+      `/views/saved${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+  }
+
+  async createSavedView(
+    body: CreateSavedViewRequest,
+    options: RequestOptions = {},
+  ): Promise<SavedViewDto> {
+    const response = await this.send<{ data: SavedViewDto }>(
+      "POST",
+      `/views/saved${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async updateSavedView(
+    id: string,
+    body: UpdateSavedViewRequest,
+    options: RequestOptions = {},
+  ): Promise<SavedViewDto> {
+    const response = await this.send<{ data: SavedViewDto }>(
+      "PATCH",
+      `/views/saved/${encodeURIComponent(id)}${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async reorderSavedView(
+    id: string,
+    body: ReorderSavedViewRequest,
+    options: RequestOptions = {},
+  ): Promise<SavedViewDto> {
+    const response = await this.send<{ data: SavedViewDto }>(
+      "POST",
+      `/views/saved/${encodeURIComponent(id)}/reorder${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async deleteSavedView(id: string, options: RequestOptions = {}): Promise<void> {
+    await this.send<void>(
+      "DELETE",
+      `/views/saved/${encodeURIComponent(id)}${this.queryString({}, options)}`,
       undefined,
       options,
     );

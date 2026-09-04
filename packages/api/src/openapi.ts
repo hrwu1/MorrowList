@@ -8,6 +8,7 @@ import {
   createProjectRequestSchema,
   createTagRequestSchema,
   createStatusRequestSchema,
+  createSavedViewRequestSchema,
   createTaskRequestSchema,
   errorResponseSchema,
   flowQuerySchema,
@@ -27,6 +28,12 @@ import {
   reopenTaskRequestSchema,
   reorderTaskRequestSchema,
   setTaskBlockedRequestSchema,
+  reorderSavedViewRequestSchema,
+  reorderTaskRequestSchema,
+  savedViewListResponseSchema,
+  savedViewResponseSchema,
+  searchQuerySchema,
+  searchResponseSchema,
   setTaskParentRequestSchema,
   tagListResponseSchema,
   tagResponseSchema,
@@ -37,6 +44,7 @@ import {
   todayViewResponseSchema,
   upcomingViewQuerySchema,
   upcomingViewResponseSchema,
+  updateSavedViewRequestSchema,
   updateTagRequestSchema,
   updateProjectRequestSchema,
   updateStatusRequestSchema,
@@ -92,6 +100,12 @@ const registry = {
   TodayView: todayViewResponseSchema,
   UpcomingView: upcomingViewResponseSchema,
   SetTaskParentRequest: setTaskParentRequestSchema,
+  SearchResponse: searchResponseSchema,
+  SavedView: savedViewResponseSchema,
+  SavedViewList: savedViewListResponseSchema,
+  CreateSavedViewRequest: createSavedViewRequestSchema,
+  UpdateSavedViewRequest: updateSavedViewRequestSchema,
+  ReorderSavedViewRequest: reorderSavedViewRequestSchema,
   MeResponse: meResponseSchema,
   Workspace: workspaceResponseSchema,
   UpdateWorkspaceRequest: updateWorkspaceRequestSchema,
@@ -954,6 +968,102 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
           parameters: [workspaceIdParam, ...queryParameters(todayViewQuerySchema)],
           responses: {
             "200": { description: "The Today view", ...jsonContent(ref("TodayView")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/search": {
+        get: {
+          summary: "Search tasks and projects",
+          description:
+            "Free text is prefix-matched against titles, descriptions and tag names; a task key such as ML-12 is resolved first. `q` also accepts the operators due:, priority:, tag:, is:open|done|blocked and in:inbox, which override the same explicit filter. Match positions are returned as character offsets, never markup. Project name hits are listed for navigation on the first page.",
+          parameters: [workspaceIdParam, ...queryParameters(searchQuerySchema)],
+          responses: {
+            "200": {
+              description: "A page of task hits plus project hits",
+              ...jsonContent(ref("SearchResponse")),
+            },
+            ...commonErrors,
+          },
+        },
+      },
+      "/views/saved": {
+        get: {
+          summary: "List the caller's saved views",
+          description:
+            "Saved views are personal: only the owner sees them, in sidebar order.",
+          parameters: [workspaceIdParam],
+          responses: {
+            "200": {
+              description: "The caller's saved views",
+              ...jsonContent(ref("SavedViewList")),
+            },
+            ...commonErrors,
+          },
+        },
+        post: {
+          summary: "Save the current filters as a personal view",
+          description:
+            "Names are unique per owner, case-insensitively. The new view is placed last in the sidebar.",
+          parameters: [workspaceIdParam],
+          requestBody: {
+            required: true,
+            ...jsonContent(ref("CreateSavedViewRequest")),
+          },
+          responses: {
+            "201": { description: "The saved view", ...jsonContent(ref("SavedView")) },
+            "409": {
+              description: "A view with this name already exists",
+              ...jsonContent(ref("ErrorResponse")),
+            },
+            ...commonErrors,
+          },
+        },
+      },
+      "/views/saved/{id}": {
+        patch: {
+          summary: "Rename, refilter, or relayout a saved view",
+          parameters: [taskIdParam, workspaceIdParam],
+          requestBody: {
+            required: true,
+            ...jsonContent(ref("UpdateSavedViewRequest")),
+          },
+          responses: {
+            "200": {
+              description: "The updated view",
+              ...jsonContent(ref("SavedView")),
+            },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            "409": {
+              description: "A view with this name already exists",
+              ...jsonContent(ref("ErrorResponse")),
+            },
+            ...commonErrors,
+          },
+        },
+        delete: {
+          summary: "Delete a saved view",
+          parameters: [taskIdParam, workspaceIdParam],
+          responses: {
+            "204": { description: "The view was deleted" },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/views/saved/{id}/reorder": {
+        post: {
+          summary: "Move a saved view in the sidebar",
+          description:
+            "Neighbour IDs describe the intended position among the caller's own views; the server computes the rank.",
+          parameters: [taskIdParam, workspaceIdParam],
+          requestBody: {
+            required: true,
+            ...jsonContent(ref("ReorderSavedViewRequest")),
+          },
+          responses: {
+            "200": { description: "The moved view", ...jsonContent(ref("SavedView")) },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
             ...commonErrors,
           },
         },

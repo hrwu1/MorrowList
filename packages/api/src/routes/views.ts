@@ -1,12 +1,18 @@
-import { todayViewQuerySchema, upcomingViewQuerySchema } from "@morrowlist/contracts";
+import {
+  createSavedViewRequestSchema,
+  reorderSavedViewRequestSchema,
+  todayViewQuerySchema,
+  upcomingViewQuerySchema,
+  updateSavedViewRequestSchema,
+} from "@morrowlist/contracts";
 import { Hono } from "hono";
 
 import type { ApiDependencies, ApiEnv } from "../context.js";
-import { parseQuery } from "../middleware/validate.js";
+import { parseJsonBody, parseQuery } from "../middleware/validate.js";
 
 import { requireWorkspace } from "./workspace.js";
 
-/** Built-in view projections (spec 20.3 `/views/*`). One query, one use case each. */
+/** Built-in view projections and personal saved views (spec 20.3 `/views/*`). */
 export function viewRoutes(deps: ApiDependencies) {
   return new Hono<ApiEnv>()
     .get("/views/today", async (c) => {
@@ -29,5 +35,60 @@ export function viewRoutes(deps: ApiDependencies) {
           workspaceId: requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
         }),
       );
+    })
+
+    .get("/views/saved", async (c) => {
+      const actor = c.get("actor");
+      return c.json(
+        await deps.savedViewService.list(
+          actor,
+          requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        ),
+      );
+    })
+
+    .post("/views/saved", async (c) => {
+      const actor = c.get("actor");
+      const body = await parseJsonBody(c, createSavedViewRequestSchema);
+      const view = await deps.savedViewService.create(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        body,
+      );
+      return c.json({ data: view }, 201);
+    })
+
+    .patch("/views/saved/:id", async (c) => {
+      const actor = c.get("actor");
+      const body = await parseJsonBody(c, updateSavedViewRequestSchema);
+      const view = await deps.savedViewService.update(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("id"),
+        body,
+      );
+      return c.json({ data: view });
+    })
+
+    .delete("/views/saved/:id", async (c) => {
+      const actor = c.get("actor");
+      await deps.savedViewService.delete(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("id"),
+      );
+      return c.body(null, 204);
+    })
+
+    .post("/views/saved/:id/reorder", async (c) => {
+      const actor = c.get("actor");
+      const body = await parseJsonBody(c, reorderSavedViewRequestSchema);
+      const view = await deps.savedViewService.reorder(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("id"),
+        body,
+      );
+      return c.json({ data: view });
     });
 }

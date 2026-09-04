@@ -283,3 +283,45 @@ describe("workspace requests", () => {
     await expect(requests[0]?.json()).resolves.toEqual({ inProgressLimit: 3 });
   });
 });
+
+describe("search and saved view requests", () => {
+  it("sends the search query with its filters and workspace", async () => {
+    const response = {
+      data: { tasks: [], projects: [] },
+      page: { nextCursor: null, hasMore: false },
+    };
+    const { client, requests } = recordingClient(response);
+
+    await expect(client.search({ q: "budget due:overdue", limit: 8 })).resolves.toEqual(
+      response,
+    );
+
+    expect(requests[0]?.method).toBe("GET");
+    expect(requests[0]?.url).toBe(
+      "https://example.test/api/v1/search?workspaceId=0198f0a0-0000-7000-8000-000000000003&q=budget+due%3Aoverdue&limit=8",
+    );
+  });
+
+  it("unwraps a created saved view and reorders by neighbour", async () => {
+    const view = { id: TASK_ID, name: "Overdue" };
+    const { client, requests } = recordingClient({ data: view });
+
+    await expect(
+      client.createSavedView({
+        name: "Overdue",
+        filters: { due: "overdue" },
+        layout: "list",
+      }),
+    ).resolves.toEqual(view);
+    await client.reorderSavedView(TASK_ID, { afterViewId: PROJECT_ID });
+
+    expect(requests[0]?.method).toBe("POST");
+    expect(requests[0]?.url).toBe(
+      "https://example.test/api/v1/views/saved?workspaceId=0198f0a0-0000-7000-8000-000000000003",
+    );
+    expect(requests[1]?.url).toBe(
+      `https://example.test/api/v1/views/saved/${TASK_ID}/reorder?workspaceId=0198f0a0-0000-7000-8000-000000000003`,
+    );
+    await expect(requests[1]?.json()).resolves.toEqual({ afterViewId: PROJECT_ID });
+  });
+});
