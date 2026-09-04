@@ -2904,7 +2904,8 @@
     .workspace-mobile-header {
       position: sticky;
       top: 0;
-      z-index: 30;
+      /* Above the task sheet (40): its menu must stay reachable while a task is open. */
+      z-index: 50;
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto auto;
       align-items: center;
@@ -2949,7 +2950,7 @@
       position: fixed;
       top: 3.55rem;
       right: 0.65rem;
-      z-index: 35;
+      z-index: 45;
       display: flex;
       width: min(22rem, calc(100vw - 1.3rem));
       max-height: calc(100dvh - 4.2rem);
