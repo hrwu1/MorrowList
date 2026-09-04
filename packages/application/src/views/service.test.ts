@@ -238,3 +238,49 @@ describe("ViewService.upcoming", () => {
     ]);
   });
 });
+
+describe("deferred tasks in the views (GAP-16)", () => {
+  it("hides a deferred task from Today and Upcoming until its date, except through My Day", async () => {
+    const deferredOverdue = await create("Deferred overdue", {
+      dueDate: "2026-09-01",
+      deferUntil: "2026-09-10",
+    });
+    const deferredUpcoming = await create("Deferred upcoming", {
+      dueDate: "2026-09-05",
+      deferUntil: "2026-09-04",
+    });
+    const returned = await create("Returned", {
+      dueDate: "2026-09-03",
+      deferUntil: "2026-09-03",
+    });
+    const chosen = await create("Chosen anyway", {
+      dueDate: "2026-09-01",
+      deferUntil: "2026-09-10",
+      addToDay: "2026-09-03",
+    });
+
+    const today = await views.today(seeded.context, {
+      workspaceId: seeded.workspace.id,
+    });
+    const upcoming = await views.upcoming(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      horizon: "14",
+    });
+
+    expect(ids(today.data.sections[0])).toEqual([]);
+    expect(ids(today.data.sections[1])).toEqual([returned.id]);
+    expect(ids(today.data.sections[2])).toEqual([chosen.id]);
+    expect(today.data.sections[2]?.tasks[0]?.reasons).toEqual(["my_day"]);
+    expect(upcoming.data.groups).toEqual([]);
+    expect([deferredOverdue.id, deferredUpcoming.id]).not.toContain(returned.id);
+
+    const later = await views.upcoming(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      from: "2026-09-04",
+      horizon: "14",
+    });
+    expect(later.data.groups.map((g) => g.tasks.map((t) => t.id))).toEqual([
+      [deferredUpcoming.id],
+    ]);
+  });
+});

@@ -48,7 +48,11 @@ export function projectRoutes(deps: ApiDependencies) {
           actor,
           requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
           c.req.param("projectId"),
-          { limit: query.limit, includeSubtasks: query.includeSubtasks },
+          {
+            limit: query.limit,
+            includeSubtasks: query.includeSubtasks,
+            includeDeferred: query.includeDeferred,
+          },
         ),
       );
     })

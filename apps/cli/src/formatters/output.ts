@@ -1,6 +1,7 @@
 import type {
   ActivityEntryDto,
   FlowSummaryDto,
+  DateWarning,
   TagListItemDto,
   ProjectDto,
   TaskDto,
@@ -103,10 +104,12 @@ export function formatTaskTable(tasks: readonly TaskDto[]): string {
       const key = task.key.padEnd(keyWidth);
       const mark = PRIORITY_MARK[task.priority] ?? "  ";
       const due = task.dueDate ? `  (due ${task.dueDate})` : "";
+      const deadline = task.deadline ? `  (deadline ${task.deadline})` : "";
+      const deferred = task.deferUntil ? `  (deferred until ${task.deferUntil})` : "";
       const blocked = task.isBlocked ? "  [blocked]" : "";
       const tags =
         task.tags.length > 0 ? `  #${task.tags.map((t) => t.name).join(" #")}` : "";
-      return `[${done}] ${key}  ${mark}${task.title}${due}${blocked}${tags}`;
+      return `[${done}] ${key}  ${mark}${task.title}${due}${deadline}${deferred}${blocked}${tags}`;
     })
     .join("\n");
 }
@@ -207,6 +210,11 @@ export function formatTaskDetail(
     `  priority    ${task.priority}`,
     `  project     ${task.projectId ?? "Inbox"}`,
     `  due         ${task.dueDate ?? "none"}${task.dueTime ? ` ${task.dueTime}` : ""}`,
+    `  deadline    ${task.deadline ?? "none"}${task.deadlineTime ? ` ${task.deadlineTime}` : ""}`,
+    `  deferred    ${task.deferUntil ? `until ${task.deferUntil}` : "no"}`,
+    ...(task.dateWarnings.length > 0
+      ? [`  warning     ${task.dateWarnings.map(describeDateWarning).join("; ")}`]
+      : []),
     `  my day      ${task.dayPlans.length > 0 ? task.dayPlans.join(", ") : "no"}`,
     ...(task.isBlocked || task.blocked
       ? [
@@ -315,4 +323,15 @@ export function formatFlowSummary(flow: FlowSummaryDto): string {
     );
   }
   return lines.join("\n");
+}
+
+const DATE_WARNING_TEXT: Record<DateWarning, string> = {
+  defer_after_due: "deferred past its due date",
+  due_after_deadline: "due after its deadline",
+  defer_after_deadline: "deferred past its deadline",
+};
+
+/** The soft date-order warnings the API attaches (GAP-16), spelled out. */
+export function describeDateWarning(warning: DateWarning): string {
+  return DATE_WARNING_TEXT[warning] ?? warning;
 }

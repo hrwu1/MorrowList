@@ -87,6 +87,12 @@ export const taskBlockedSchema = z.object({
   since: z.iso.datetime(),
 });
 
+export const dateWarningSchema = z.enum([
+  "defer_after_due",
+  "due_after_deadline",
+  "defer_after_deadline",
+]);
+
 export const taskSchema = z.object({
   id: uuidSchema,
   key: z.string(),
@@ -100,6 +106,17 @@ export const taskSchema = z.object({
   dueDate: plainDateSchema.nullable(),
   dueTime: plainTimeSchema.nullable(),
   dueTimezone: timezoneSchema.nullable(),
+  /** Hidden from Today, Upcoming, the Inbox and the board until this day (GAP-16). */
+  deferUntil: plainDateSchema.nullable(),
+  /** The hard limit, distinct from the planned `dueDate` (GAP-16). */
+  deadline: plainDateSchema.nullable(),
+  /** Wall-clock time of the deadline in the workspace timezone; requires `deadline`. */
+  deadlineTime: plainTimeSchema.nullable(),
+  /**
+   * The expected order is deferUntil ≤ dueDate ≤ deadline. Breaking it is allowed; these
+   * codes say which pair is out of order so a client can warn (GAP-16).
+   */
+  dateWarnings: z.array(dateWarningSchema),
   parentTaskId: uuidSchema.nullable(),
   recurrence: recurrenceRuleSchema.nullable(),
   /** Shared by every occurrence of a repeating task; the first occurrence's id. */
@@ -152,6 +169,9 @@ export const createTaskRequestSchema = z
     dueDate: plainDateSchema.nullish(),
     dueTime: plainTimeSchema.nullish(),
     dueTimezone: timezoneSchema.nullish(),
+    deferUntil: plainDateSchema.nullish(),
+    deadline: plainDateSchema.nullish(),
+    deadlineTime: plainTimeSchema.nullish(),
     parentTaskId: uuidSchema.nullish(),
     recurrence: recurrenceRuleSchema.nullish(),
     /** Add the new task to a My Day date in the same command (spec 20.4). */
@@ -160,6 +180,10 @@ export const createTaskRequestSchema = z
   .refine((body) => !(body.dueTime && !body.dueDate), {
     message: "dueTime requires dueDate",
     path: ["dueTime"],
+  })
+  .refine((body) => !(body.deadlineTime && !body.deadline), {
+    message: "deadlineTime requires deadline",
+    path: ["deadlineTime"],
   })
   .refine((body) => !(body.statusId && !body.projectId), {
     message: "statusId requires projectId",
@@ -181,6 +205,9 @@ export const updateTaskRequestSchema = z
     dueTimezone: timezoneSchema.nullable().optional(),
     /** A rule applies to this and future occurrences; null stops the series here. */
     recurrence: recurrenceRuleSchema.nullable().optional(),
+    deferUntil: plainDateSchema.nullable().optional(),
+    deadline: plainDateSchema.nullable().optional(),
+    deadlineTime: plainTimeSchema.nullable().optional(),
     expectedVersion: z.number().int().positive().optional(),
   })
   .refine((body) => Object.keys(body).some((key) => key !== "expectedVersion"), {
@@ -277,6 +304,7 @@ export const setTaskParentRequestSchema = z.object({
 });
 
 export const dueFilterSchema = z.enum(["overdue", "today", "future", "none"]);
+export const deadlineFilterSchema = z.enum(["overdue", "week", "none"]);
 
 /** Task list query fields (spec 20.5). */
 export const listTasksQuerySchema = paginationQuerySchema.extend({
@@ -290,6 +318,13 @@ export const listTasksQuerySchema = paginationQuerySchema.extend({
   isCompleted: z.stringbool().optional(),
   isBlocked: z.stringbool().optional(),
   due: dueFilterSchema.optional(),
+  /**
+   * Deferral is judged against the workspace's current date (GAP-16): `true` selects
+   * tasks whose defer date is still ahead, `false` excludes them, omitted lists both.
+   */
+  deferred: z.stringbool().optional(),
+  /** `week` is a deadline from today through the next seven days inclusive. */
+  deadline: deadlineFilterSchema.optional(),
   includeSubtasks: z.stringbool().default(true),
   /** Inbox tasks only: no project (spec 9.1). */
   inbox: z.stringbool().optional(),
@@ -344,6 +379,8 @@ export interface TaskCommandResult {
 }
 export type RecurrenceRuleDto = z.infer<typeof recurrenceRuleSchema>;
 export type RecurrenceRuleRequest = z.input<typeof recurrenceRuleSchema>;
+export type DateWarning = z.infer<typeof dateWarningSchema>;
+export type DeadlineFilter = z.infer<typeof deadlineFilterSchema>;
 export type SubtaskProgress = z.infer<typeof subtaskProgressSchema>;
 export type RelationType = z.infer<typeof relationTypeSchema>;
 export type RelatedTaskDto = z.infer<typeof relatedTaskSchema>;

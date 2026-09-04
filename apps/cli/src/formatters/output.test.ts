@@ -27,6 +27,10 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     dueDate: null,
     dueTime: null,
     dueTimezone: null,
+    deferUntil: null,
+    deadline: null,
+    deadlineTime: null,
+    dateWarnings: [],
     parentTaskId: null,
     recurrence: null,
     seriesId: null,
@@ -383,5 +387,29 @@ describe("formatFlowSummary", () => {
     expect(output).toContain("2026-07-27  ## 2");
     expect(output).toContain("2026-08-03  0");
     expect(output).toContain("ML-7       9d  In progress  Old one  [over p95]");
+  });
+});
+
+describe("defer and deadline dates (GAP-16)", () => {
+  it("shows the deadline and deferral in the table and the detail, with any warning", () => {
+    const dated = task({
+      dueDate: "2026-09-03",
+      deadline: "2026-09-01",
+      deadlineTime: "17:00",
+      deferUntil: "2026-09-10",
+      dateWarnings: ["defer_after_due", "due_after_deadline", "defer_after_deadline"],
+    });
+
+    expect(formatTaskTable([dated])).toBe(
+      "[ ] ML-1    Prepare research presentation  (due 2026-09-03)  (deadline 2026-09-01)  (deferred until 2026-09-10)",
+    );
+    const detail = formatTaskDetail(dated);
+    expect(detail).toContain("  deadline    2026-09-01 17:00");
+    expect(detail).toContain("  deferred    until 2026-09-10");
+    expect(detail).toContain(
+      "  warning     deferred past its due date; due after its deadline; deferred past its deadline",
+    );
+    expect(formatTaskDetail(task())).toContain("  deferred    no");
+    expect(formatTaskDetail(task())).not.toContain("warning");
   });
 });

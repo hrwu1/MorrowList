@@ -313,3 +313,28 @@ describe("ActivityService.listForProject", () => {
     ).rejects.toMatchObject({ code: "PROJECT_NOT_FOUND" });
   });
 });
+
+describe("date fields in the readable diff (GAP-16)", () => {
+  it("labels defer, deadline, and deadline time changes", async () => {
+    const workspaceId = seeded.workspace.id;
+    const task = await tasks.create(seeded.context, { workspaceId, title: "Dated" });
+    await tasks.update(seeded.context, workspaceId, task.id, {
+      deferUntil: "2026-09-01",
+      deadline: "2026-09-05",
+      deadlineTime: "17:00",
+    });
+
+    const { data } = await activity.listForTask(
+      seeded.context,
+      workspaceId,
+      task.id,
+      query(),
+    );
+
+    expect(data[0]?.changes).toEqual([
+      { field: "deferUntil", from: null, to: "2026-09-01" },
+      { field: "deadline", from: null, to: "2026-09-05" },
+      { field: "deadlineTime", from: null, to: "17:00" },
+    ]);
+  });
+});

@@ -214,3 +214,38 @@ describe("recurrenceRuleSchema", () => {
     expect(listTasksQuerySchema.parse({ seriesId: TASK_ID }).seriesId).toBe(TASK_ID);
   });
 });
+
+describe("defer and deadline dates (GAP-16)", () => {
+  it("accepts the three dates on create and rejects a deadline time without a deadline", () => {
+    const parsed = createTaskRequestSchema.parse({
+      title: "x",
+      deferUntil: "2026-09-01",
+      deadline: "2026-09-05",
+      deadlineTime: "17:00",
+    });
+    expect(parsed).toMatchObject({
+      deferUntil: "2026-09-01",
+      deadline: "2026-09-05",
+      deadlineTime: "17:00",
+    });
+
+    expect(
+      createTaskRequestSchema.safeParse({ title: "x", deadlineTime: "17:00" }).success,
+    ).toBe(false);
+  });
+
+  it("lets a patch clear each date explicitly", () => {
+    const cleared = updateTaskRequestSchema.parse({ deferUntil: null, deadline: null });
+    expect(cleared.deferUntil).toBeNull();
+    expect(cleared.deadline).toBeNull();
+    expect("deadlineTime" in cleared).toBe(false);
+  });
+
+  it("parses the deferred and deadline list filters", () => {
+    const query = listTasksQuerySchema.parse({ deferred: "false", deadline: "week" });
+    expect(query.deferred).toBe(false);
+    expect(query.deadline).toBe("week");
+    expect(listTasksQuerySchema.safeParse({ deadline: "soon" }).success).toBe(false);
+    expect(listTasksQuerySchema.parse({}).deferred).toBeUndefined();
+  });
+});

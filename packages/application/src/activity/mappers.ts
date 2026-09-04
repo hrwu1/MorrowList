@@ -20,6 +20,9 @@ const DISPLAYED_FIELDS = [
   "dueTime",
   "dueTimezone",
   "recurrence",
+  "deferUntil",
+  "deadline",
+  "deadlineTime",
 ] as const;
 
 /** A description can be 50,000 characters; the history shows enough to recognise it. */

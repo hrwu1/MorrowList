@@ -314,6 +314,8 @@ export class ProjectService {
         projectId,
         limit: Math.min(query.limit ?? BOARD_TASK_LIMIT, BOARD_TASK_LIMIT),
         includeSubtasks: query.includeSubtasks ?? false,
+        includeDeferred: query.includeDeferred ?? false,
+        today: toLocalDate(this.clock.now(), workspace.timezone),
       });
       const boardTaskIds = tasks.items.map((task) => task.id);
       // Cards show the My Day indicator (spec 9.5), subtask progress, tag chips, the

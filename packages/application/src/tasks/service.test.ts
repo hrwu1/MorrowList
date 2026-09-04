@@ -2104,3 +2104,73 @@ describe("status intervals (flow read model)", () => {
     ]);
   });
 });
+
+describe("defer and deadline dates (GAP-16)", () => {
+  // NOW is 11:00 on 29 August in Europe/Berlin.
+  it("stores the dates on create, exposes order warnings, and records the fields as changes", async () => {
+    const created = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Dated",
+      deferUntil: "2026-09-10",
+      dueDate: "2026-09-03",
+      deadline: "2026-09-05",
+      deadlineTime: "17:00",
+    });
+    expect(created).toMatchObject({
+      deferUntil: "2026-09-10",
+      deadline: "2026-09-05",
+      deadlineTime: "17:00",
+      dateWarnings: ["defer_after_due", "defer_after_deadline"],
+    });
+
+    const updated = await service.update(
+      seeded.context,
+      seeded.workspace.id,
+      created.id,
+      { deferUntil: null, deadline: null },
+    );
+    expect(updated).toMatchObject({
+      deferUntil: null,
+      deadline: null,
+      deadlineTime: null,
+      dateWarnings: [],
+      version: 2,
+    });
+    expect(unitOfWork.data.activity.at(-1)?.payload).toEqual({
+      taskId: created.id,
+      changes: {
+        deferUntil: { from: "2026-09-10", to: null },
+        deadline: { from: "2026-09-05", to: null },
+        deadlineTime: { from: "17:00", to: null },
+      },
+    });
+  });
+
+  it("filters deferred tasks and deadlines against the workspace date", async () => {
+    const deferred = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Deferred",
+      deferUntil: "2026-09-05",
+    });
+    const back = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Back today",
+      deferUntil: "2026-08-29",
+      deadline: "2026-09-05",
+    });
+    const overdue = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Past deadline",
+      deadline: "2026-08-28",
+    });
+
+    const ids = async (overrides: Record<string, unknown>) =>
+      (await service.list(seeded.context, listQuery(overrides))).data.map((t) => t.id);
+
+    expect(await ids({ deferred: true })).toEqual([deferred.id]);
+    expect(await ids({ deferred: false })).toEqual([back.id, overdue.id]);
+    expect(await ids({ deadline: "week" })).toEqual([back.id]);
+    expect(await ids({ deadline: "overdue" })).toEqual([overdue.id]);
+    expect(await ids({ deadline: "none" })).toEqual([deferred.id]);
+  });
+});

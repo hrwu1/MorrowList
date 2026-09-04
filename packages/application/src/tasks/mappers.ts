@@ -1,5 +1,6 @@
 import type { SubtaskProgress, TaskDto, TaskRelationDto } from "@morrowlist/contracts";
 import {
+  dateOrderWarnings,
   isBlocked,
   isCompleted,
   isDeleted,
@@ -70,6 +71,10 @@ export function toTaskDto(
     dueDate: task.dueDate,
     dueTime: task.dueTime,
     dueTimezone: task.dueTimezone,
+    deferUntil: task.deferUntil,
+    deadline: task.deadline,
+    deadlineTime: task.deadlineTime,
+    dateWarnings: dateOrderWarnings(task),
     parentTaskId: task.parentTaskId,
     recurrence: task.recurrence
       ? {

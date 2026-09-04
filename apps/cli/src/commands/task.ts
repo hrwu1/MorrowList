@@ -37,6 +37,12 @@ export function taskCommand(): Command {
     .option("-p, --priority <priority>", "none | low | medium | high | urgent")
     .option("--due <date>", "due date as YYYY-MM-DD")
     .option("--due-time <time>", "due time as HH:mm; requires --due")
+    .option(
+      "--defer <date>",
+      "hide it from Today, Upcoming, and the Inbox until YYYY-MM-DD",
+    )
+    .option("--deadline <date>", "hard deadline as YYYY-MM-DD")
+    .option("--deadline-time <time>", "deadline time as HH:mm; requires --deadline")
     .option("--project <id>", "project id; omit for the Inbox")
     .option("--status <id>", "workflow status id; requires --project")
     .option(
@@ -84,6 +90,9 @@ export function taskCommand(): Command {
             ...(options.priority ? { priority: options.priority } : {}),
             ...(options.due ? { dueDate: options.due } : {}),
             ...(options.dueTime ? { dueTime: options.dueTime } : {}),
+            ...(options.defer ? { deferUntil: options.defer } : {}),
+            ...(options.deadline ? { deadline: options.deadline } : {}),
+            ...(options.deadlineTime ? { deadlineTime: options.deadlineTime } : {}),
             ...(options.project ? { projectId: options.project } : {}),
             ...(options.status ? { statusId: options.status } : {}),
             ...(options.parent
@@ -113,6 +122,8 @@ export function taskCommand(): Command {
     .option("--project <id>", "restrict to a project")
     .option("--priority <priority>", "restrict to a priority")
     .option("--due <filter>", "overdue | today | future | none")
+    .option("--deferred", "deferred tasks only: those hidden until a later day")
+    .option("--deadline <filter>", "overdue | week | none")
     .option("--tag <name>", "restrict to tasks carrying a tag")
     .option("--blocked", "blocked tasks only: flagged, or waiting on an open blocker")
     .option("--limit <n>", "page size, 1-200", "50")
@@ -131,6 +142,8 @@ export function taskCommand(): Command {
             ...(options.project ? { projectId: options.project } : {}),
             ...(options.priority ? { priority: options.priority } : {}),
             ...(options.due ? { due: options.due } : {}),
+            ...(options.deferred ? { deferred: true } : {}),
+            ...(options.deadline ? { deadline: options.deadline } : {}),
             ...(tag ? { tagId: tag.id } : {}),
             ...(options.blocked ? { isBlocked: true } : {}),
             limit: Number(options.limit),
@@ -206,6 +219,11 @@ export function taskCommand(): Command {
     .option("-p, --priority <priority>", "none | low | medium | high | urgent")
     .option("--due <date>", "due date as YYYY-MM-DD")
     .option("--clear-due", "remove the due date")
+    .option("--defer <date>", "hide it until YYYY-MM-DD")
+    .option("--clear-defer", "remove the defer date")
+    .option("--deadline <date>", "hard deadline as YYYY-MM-DD")
+    .option("--deadline-time <time>", "deadline time as HH:mm; requires a deadline")
+    .option("--clear-deadline", "remove the deadline and its time")
     .option("--parent <idOrKey>", "make it a subtask of this task")
     .option("--no-parent", "detach it from its parent")
     .option(
@@ -272,6 +290,19 @@ export function taskCommand(): Command {
                 ? { dueDate: options.due }
                 : {}),
             ...(recurrence !== undefined ? { recurrence } : {}),
+            ...(options.clearDefer
+              ? { deferUntil: null }
+              : options.defer
+                ? { deferUntil: options.defer }
+                : {}),
+            ...(options.clearDeadline
+              ? { deadline: null }
+              : {
+                  ...(options.deadline ? { deadline: options.deadline } : {}),
+                  ...(options.deadlineTime
+                    ? { deadlineTime: options.deadlineTime }
+                    : {}),
+                }),
           };
           if (Object.keys(fields).length === 0) return client.getTask(current.id);
           return client.updateTask(

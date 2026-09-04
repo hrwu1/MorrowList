@@ -160,6 +160,9 @@ export class TaskService {
         dueDate: (request.dueDate ?? null) as PlainDate | null,
         dueTime: (request.dueTime ?? null) as PlainTime | null,
         dueTimezone: request.dueTimezone ?? workspace.timezone,
+        deferUntil: (request.deferUntil ?? null) as PlainDate | null,
+        deadline: (request.deadline ?? null) as PlainDate | null,
+        deadlineTime: (request.deadlineTime ?? null) as PlainTime | null,
         parentTaskId: parent?.id ?? null,
         recurrence: request.recurrence ?? null,
         project: destination,
@@ -284,6 +287,8 @@ export class TaskService {
           deletedOnly: query.deleted,
           includeSubtasks: query.includeSubtasks,
           due: query.due,
+          deferred: query.deferred,
+          deadline: query.deadline,
           today: this.workspaceToday(workspace.timezone),
           sort: query.sort,
           order: query.order,
@@ -338,6 +343,15 @@ export class TaskService {
               : {}),
             ...(request.recurrence !== undefined
               ? { recurrence: request.recurrence }
+              : {}),
+            ...(request.deferUntil !== undefined
+              ? { deferUntil: request.deferUntil as PlainDate | null }
+              : {}),
+            ...(request.deadline !== undefined
+              ? { deadline: request.deadline as PlainDate | null }
+              : {}),
+            ...(request.deadlineTime !== undefined
+              ? { deadlineTime: request.deadlineTime as PlainTime | null }
               : {}),
           },
           { actor: actorRef(context), clock: this.clock },

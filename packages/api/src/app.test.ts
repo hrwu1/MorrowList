@@ -1239,3 +1239,81 @@ describe("workflow editing endpoints", () => {
     expect(response.status).toBe(422);
   });
 });
+
+describe("defer and deadline dates (GAP-16)", () => {
+  // NOW is 29 August in Europe/Berlin.
+  it("carries the dates and order warnings on the task and filters the list by them", async () => {
+    const created = await (
+      await jsonRequest("/api/v1/tasks", "POST", {
+        title: "Deferred",
+        deferUntil: "2026-09-10",
+        dueDate: "2026-09-03",
+        deadline: "2026-09-06",
+        deadlineTime: "17:00",
+      })
+    ).json();
+    expect(created.data).toMatchObject({
+      deferUntil: "2026-09-10",
+      deadline: "2026-09-06",
+      deadlineTime: "17:00",
+      dateWarnings: ["defer_after_due", "defer_after_deadline"],
+    });
+    await jsonRequest("/api/v1/tasks", "POST", {
+      title: "Plain",
+      deadline: "2026-09-02",
+    });
+
+    const deferred = await (await request("/api/v1/tasks?deferred=true")).json();
+    const live = await (await request("/api/v1/tasks?deferred=false")).json();
+    const week = await (await request("/api/v1/tasks?deadline=week")).json();
+    expect(deferred.data.map((t: { title: string }) => t.title)).toEqual(["Deferred"]);
+    expect(live.data.map((t: { title: string }) => t.title)).toEqual(["Plain"]);
+    expect(week.data.map((t: { title: string }) => t.title)).toEqual(["Plain"]);
+    expect((await request("/api/v1/tasks?deadline=soon")).status).toBe(422);
+
+    const bad = await jsonRequest("/api/v1/tasks", "POST", {
+      title: "x",
+      deadlineTime: "17:00",
+    });
+    expect(bad.status).toBe(422);
+
+    const cleared = await (
+      await jsonRequest(`/api/v1/tasks/${created.data.id}`, "PATCH", {
+        deadline: null,
+        deferUntil: null,
+      })
+    ).json();
+    expect(cleared.data).toMatchObject({
+      deadline: null,
+      deadlineTime: null,
+      deferUntil: null,
+      dateWarnings: [],
+      version: 2,
+    });
+  });
+
+  it("keeps a deferred card off the board unless includeDeferred is set", async () => {
+    const project = await (
+      await jsonRequest("/api/v1/projects", "POST", { name: "Deferral" })
+    ).json();
+    await jsonRequest("/api/v1/tasks", "POST", {
+      title: "Later",
+      projectId: project.data.project.id,
+      deferUntil: "2026-09-10",
+    });
+    await jsonRequest("/api/v1/tasks", "POST", {
+      title: "Now",
+      projectId: project.data.project.id,
+      deferUntil: "2026-08-29",
+    });
+
+    const base = `/api/v1/projects/${project.data.project.id}/board`;
+    const hidden = await (await request(base)).json();
+    const shown = await (await request(`${base}?includeDeferred=true`)).json();
+    expect(hidden.data.tasks.map((t: { title: string }) => t.title)).toEqual(["Now"]);
+    expect(shown.data.tasks.map((t: { title: string }) => t.title).sort()).toEqual([
+      "Later",
+      "Now",
+    ]);
+  });
+});
