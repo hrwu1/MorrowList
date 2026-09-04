@@ -63,6 +63,11 @@ recurrence.
   one land in the future.
 - Reopening a completed occurrence does not resurrect its rule; the live occurrence
   already carries it. Reopening and completing again therefore cannot spawn twice.
+- Only the complete command spawns. Completion that happens through a column — dragging
+  a card into Done, a column becoming a Done column, or an archived column's tasks
+  landing in Done — goes through the move policy, which completes the task and leaves
+  its rule in place; the next occurrence is created once the task is reopened and then
+  completed by the command or skipped.
 - Completing a repeating task in an archived project fails, because the next occurrence
   has nowhere to go; clearing the rule first is the way out.
 - The grammar is deliberately smaller than RRULE (no `BYSETPOS` lists, no hourly rules,

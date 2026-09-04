@@ -17,7 +17,7 @@ import {
 import { createUnitOfWork } from "../unit-of-work.js";
 
 /**
- * Recurring tasks against real PostgreSQL (GAP-12). Migration 0005 adds the JSONB rule
+ * Recurring tasks against real PostgreSQL (GAP-12). Migration 0006 adds the JSONB rule
  * and the series column with its index; the spawn on completion must be one transaction
  * with the completion itself, which only a real database can demonstrate.
  */
@@ -84,7 +84,7 @@ beforeEach(async () => {
   };
 });
 
-describe("migration 0005", () => {
+describe("migration 0006", () => {
   it("adds the rule column, the series column, and the series index", async () => {
     const columns = await handle.pool.query<{ column_name: string; data_type: string }>(
       `select column_name, data_type from information_schema.columns

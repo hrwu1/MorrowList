@@ -150,6 +150,8 @@ export function buildTask(
     completedAt: null,
     blockedReason: null,
     blockedSince: null,
+    recurrence: null,
+    seriesId: null,
     version: 1,
     createdBy: { kind: "user", id: seeded.userId },
     lastActor: { kind: "user", id: seeded.userId },
