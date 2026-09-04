@@ -23,7 +23,12 @@ export function TaskPanel({
   useEffect(() => {
     const panel = container.current;
     panel?.focus({ preventScroll: true });
-    if (panel && window.matchMedia("(max-width: 59.99rem)").matches) {
+    // Between the phone sheet and the desktop side panel the panel stacks under the
+    // list; below 45rem it is a fixed sheet that is already on screen.
+    if (
+      panel &&
+      window.matchMedia("(min-width: 45.01rem) and (max-width: 59.99rem)").matches
+    ) {
       // Next restores `scroll: false` after a route-query change. Let that settle before
       // positioning a stacked mobile panel, otherwise only its top border peeks onscreen.
       let settleFrame = 0;

@@ -3098,11 +3098,92 @@
     .kanban-column__tasks {
       min-height: 19rem;
     }
+    /* The view disclosure is a row of chips on a wide toolbar; on a phone it wraps. */
+    .board-toolbar {
+      flex-wrap: wrap;
+    }
+    .board-toolbar__view {
+      min-width: 0;
+      flex: 1 1 100%;
+    }
+    .view-disclosure__summary {
+      flex-wrap: wrap;
+    }
+
+    /* The task detail is a bottom sheet (spec 9.5): the list stays where it is and the
+       sheet scrolls on its own. It is non-modal, so nothing behind it is blocked. */
+    .list-page .task-panel,
     .board-page__layout > .task-panel {
+      position: fixed;
+      inset: auto 0 0 0;
+      top: auto;
+      z-index: 40;
+      max-height: min(85dvh, calc(100dvh - 3.55rem));
+      margin: 0;
+      padding-bottom: max(1rem, env(safe-area-inset-bottom));
+      overflow-y: auto;
+      border-bottom: 0;
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      box-shadow: var(--shadow-lg);
+    }
+    /* Room to scroll the list past the sheet. */
+    .list-page:has(.task-panel),
+    .board-page__layout[data-panel-open] {
+      padding-bottom: 50dvh;
+    }
+  }
+
+  /* Touch targets (spec 14, 25): 44px on a phone or wherever the pointer is coarse. */
+  @media (max-width: 45rem), (pointer: coarse) {
+    .ml-button,
+    .ml-input,
+    .ml-select,
+    .workspace-nav__link,
+    .workspace-mobile-inbox,
+    .workspace-mobile-signout,
+    .history-nav nav a,
+    .view-disclosure__summary {
+      min-height: 2.75rem;
+    }
+    .history-nav nav a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .workspace-mobile-header__capture,
+    .workspace-mobile-menu > summary {
+      width: 2.75rem;
+      height: 2.75rem;
+    }
+    .workspace-mobile-full-inbox,
+    .task-page__back {
+      display: inline-flex;
+      align-items: center;
+      min-height: 2.75rem;
+    }
+    .workspace-project-link {
+      min-height: 2.75rem;
+    }
+    .board-card__my-day,
+    .board-card__drag,
+    .kanban-column__menu > summary {
+      width: 2.75rem;
+      height: 2.75rem;
+      min-height: 2.75rem;
+    }
+    .board-card__move {
+      min-height: 2.75rem;
+    }
+    /* Small glyph controls keep their size; the hit area grows around them. */
+    .task-row__check,
+    .tag-chip__remove {
       position: relative;
-      top: 0;
-      max-height: none;
-      margin-top: 0.75rem;
+    }
+    .task-row__check::before,
+    .tag-chip__remove::before {
+      content: "";
+      position: absolute;
+      inset: -0.8rem;
     }
   }
 

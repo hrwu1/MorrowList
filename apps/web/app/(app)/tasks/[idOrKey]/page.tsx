@@ -27,7 +27,9 @@ export default async function Page({
   return (
     <div className="stack">
       <nav aria-label="Breadcrumb">
-        <Link href="/inbox">← Back to Inbox</Link>
+        <Link className="task-page__back" href="/inbox">
+          ← Back to Inbox
+        </Link>
       </nav>
       <h1 className="ml-visually-hidden">Task {decodeURIComponent(idOrKey)}</h1>
       <TaskDetail idOrKey={decodeURIComponent(idOrKey)} variant="page" />
