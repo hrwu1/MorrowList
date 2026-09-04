@@ -59,6 +59,10 @@ const CATALOGUE: Record<string, Partial<ActivityEntryDto>> = {
   [TASK_EVENTS.relationRemoved]: { summary: "Removed relation: blocked by ML-1" },
   [TASK_EVENTS.blocked]: { summary: "Marked task blocked: waiting on vendor" },
   [TASK_EVENTS.unblocked]: { summary: "Cleared the blocked flag" },
+  [TASK_EVENTS.occurrenceSkipped]: {
+    summary: "Skipped occurrence due 2026-09-03",
+    changes: [{ field: "dueDate", from: "2026-09-03", to: "2026-09-10" }],
+  },
   [PROJECT_EVENTS.created]: {
     aggregateType: "project",
     summary: "Created project Launch",

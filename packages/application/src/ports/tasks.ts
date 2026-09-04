@@ -18,6 +18,8 @@ export interface TaskFilter {
   readonly priority?: Task["priority"] | undefined;
   /** Only tasks carrying this tag (spec 9.8). */
   readonly tagId?: string | undefined;
+  /** Every occurrence of one repeating task (GAP-12). */
+  readonly seriesId?: string | undefined;
   /** True selects Inbox tasks only: those with no project (spec 9.1). */
   readonly inboxOnly?: boolean | undefined;
   readonly isCompleted?: boolean | undefined;

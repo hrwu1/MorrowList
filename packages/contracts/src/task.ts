@@ -14,6 +14,43 @@ import { tagSchema } from "./tag.js";
 
 /** Task transport schemas (spec 20.3–20.5). */
 
+/** Mirrors the constants in `@morrowlist/domain`'s recurrence module; contracts is a leaf. */
+export const recurrenceFrequencySchema = z.enum([
+  "daily",
+  "weekly",
+  "monthly",
+  "yearly",
+]);
+export const recurrenceModeSchema = z.enum(["schedule", "after_completion"]);
+export const weekdaySchema = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
+export const nthWeekSchema = z.union([
+  z.literal(1),
+  z.literal(2),
+  z.literal(3),
+  z.literal(4),
+  z.literal(-1),
+]);
+
+/**
+ * A recurrence rule (GAP-12). The transport accepts the parts a frequency needs and fills
+ * the rest with null; the domain validates the combination (a weekly rule needs
+ * weekdays, a monthly rule exactly one of `monthDay` and `nthWeekday`) and canonicalises
+ * it, so a task always reports the same shape it was given.
+ */
+export const recurrenceRuleSchema = z.object({
+  freq: recurrenceFrequencySchema,
+  interval: z.number().int().min(1).max(365).default(1),
+  mode: recurrenceModeSchema.default("schedule"),
+  weekdays: z.array(weekdaySchema).min(1).max(7).nullable().default(null),
+  monthDay: z.number().int().min(1).max(31).nullable().default(null),
+  nthWeekday: z
+    .object({ nth: nthWeekSchema, weekday: weekdaySchema })
+    .nullable()
+    .default(null),
+  until: plainDateSchema.nullable().default(null),
+  count: z.number().int().min(1).max(1000).nullable().default(null),
+});
+
 /** Completed over total direct children (spec 8.3); null when a task has no children. */
 export const subtaskProgressSchema = z.object({
   completed: z.number().int().nonnegative(),
@@ -64,6 +101,9 @@ export const taskSchema = z.object({
   dueTime: plainTimeSchema.nullable(),
   dueTimezone: timezoneSchema.nullable(),
   parentTaskId: uuidSchema.nullable(),
+  recurrence: recurrenceRuleSchema.nullable(),
+  /** Shared by every occurrence of a repeating task; the first occurrence's id. */
+  seriesId: uuidSchema.nullable(),
   rank: z.string(),
   isCompleted: z.boolean(),
   completedAt: z.iso.datetime().nullable(),
@@ -106,6 +146,7 @@ export const createTaskRequestSchema = z
     dueTime: plainTimeSchema.nullish(),
     dueTimezone: timezoneSchema.nullish(),
     parentTaskId: uuidSchema.nullish(),
+    recurrence: recurrenceRuleSchema.nullish(),
     /** Add the new task to a My Day date in the same command (spec 20.4). */
     addToDay: plainDateSchema.nullish(),
   })
@@ -131,6 +172,8 @@ export const updateTaskRequestSchema = z
     dueDate: plainDateSchema.nullable().optional(),
     dueTime: plainTimeSchema.nullable().optional(),
     dueTimezone: timezoneSchema.nullable().optional(),
+    /** A rule applies to this and future occurrences; null stops the series here. */
+    recurrence: recurrenceRuleSchema.nullable().optional(),
     expectedVersion: z.number().int().positive().optional(),
   })
   .refine((body) => Object.keys(body).some((key) => key !== "expectedVersion"), {
@@ -212,6 +255,9 @@ export const setTaskBlockedRequestSchema = z.object({
   expectedVersion: z.number().int().positive().optional(),
 });
 
+/** `POST /tasks/{id}/skip`: move a repeating task on to its next occurrence (GAP-12). */
+export const skipOccurrenceRequestSchema = reopenTaskRequestSchema;
+
 /** `POST /tasks/{id}/today`: the date defaults to the workspace's current date. */
 export const addTaskToDayRequestSchema = z.object({
   date: plainDateSchema.optional(),
@@ -232,6 +278,8 @@ export const listTasksQuerySchema = paginationQuerySchema.extend({
   priority: prioritySchema.optional(),
   tagId: uuidSchema.optional(),
   parentTaskId: uuidSchema.optional(),
+  /** Every occurrence of one repeating task, completed ones included (GAP-12). */
+  seriesId: uuidSchema.optional(),
   isCompleted: z.stringbool().optional(),
   isBlocked: z.stringbool().optional(),
   due: dueFilterSchema.optional(),
@@ -287,6 +335,8 @@ export interface TaskCommandResult {
   readonly task: TaskDto;
   readonly warnings: readonly WipWarningDto[];
 }
+export type RecurrenceRuleDto = z.infer<typeof recurrenceRuleSchema>;
+export type RecurrenceRuleRequest = z.input<typeof recurrenceRuleSchema>;
 export type SubtaskProgress = z.infer<typeof subtaskProgressSchema>;
 export type RelationType = z.infer<typeof relationTypeSchema>;
 export type RelatedTaskDto = z.infer<typeof relatedTaskSchema>;

@@ -38,6 +38,8 @@ import {
   resolveReopenStatus,
   restoreTask,
   setParent as applyParent,
+  skipOccurrence as applySkip,
+  spawnNextOccurrence,
   systemClock,
   taskKey,
   toLocalDate,
@@ -46,6 +48,7 @@ import {
   uuidv7,
   wipWarning,
   type Clock,
+  type CreateTaskInput,
   type DayPlanSource,
   type PlainDate,
   type PlainTime,
@@ -147,47 +150,17 @@ export class TaskService {
           )
         : null;
 
-      const scope: RankScope = {
-        workspaceId: request.workspaceId,
-        projectId: destination?.id ?? null,
-        statusId: destination?.status.id ?? null,
-      };
-      // New tasks land at the end of their scope so capture never reorders existing work.
-      const lastRank = await tx.tasks.lastRankIn(scope);
-
-      const task = createTask(
-        {
-          id,
-          workspaceId: request.workspaceId,
-          taskNumber: await tx.taskCounters.allocate(request.workspaceId),
-          title: request.title,
-          rank: rankBetween(lastRank, null),
-          descriptionMd: request.descriptionMd ?? null,
-          ...(request.priority ? { priority: request.priority } : {}),
-          dueDate: (request.dueDate ?? null) as PlainDate | null,
-          dueTime: (request.dueTime ?? null) as PlainTime | null,
-          dueTimezone: request.dueTimezone ?? workspace.timezone,
-          parentTaskId: parent?.id ?? null,
-          project: destination,
-        },
-        { actor: actorRef(context), clock: this.clock },
-      );
-
-      await tx.tasks.insert(task);
-      await recordEvent(tx, context, this.clock, {
-        workspaceId: task.workspaceId,
-        aggregateType: "task",
-        aggregateId: task.id,
-        eventType: TASK_EVENTS.created,
-        summary: `Created task ${workspace.taskKeyPrefix}-${task.taskNumber}`,
-        payload: {
-          taskId: task.id,
-          taskNumber: task.taskNumber,
-          projectId: task.projectId,
-          statusId: task.statusId,
-          priority: task.priority,
-          parentTaskId: task.parentTaskId,
-        },
+      const task = await this.insertNewTask(tx, context, workspace, {
+        id,
+        title: request.title,
+        descriptionMd: request.descriptionMd ?? null,
+        ...(request.priority ? { priority: request.priority } : {}),
+        dueDate: (request.dueDate ?? null) as PlainDate | null,
+        dueTime: (request.dueTime ?? null) as PlainTime | null,
+        dueTimezone: request.dueTimezone ?? workspace.timezone,
+        parentTaskId: parent?.id ?? null,
+        recurrence: request.recurrence ?? null,
+        project: destination,
       });
 
       if (request.addToDay) {
@@ -302,6 +275,7 @@ export class TaskService {
           parentTaskId: query.parentTaskId,
           priority: query.priority,
           tagId: query.tagId,
+          seriesId: query.seriesId,
           inboxOnly: query.inbox,
           isCompleted: query.isCompleted,
           isBlocked: query.isBlocked,
@@ -359,6 +333,9 @@ export class TaskService {
               : {}),
             ...(request.dueTimezone !== undefined
               ? { dueTimezone: request.dueTimezone }
+              : {}),
+            ...(request.recurrence !== undefined
+              ? { recurrence: request.recurrence }
               : {}),
           },
           { actor: actorRef(context), clock: this.clock },
@@ -519,6 +496,11 @@ export class TaskService {
    * end of that column; an Inbox task keeps its null project and status. A blocked task
    * completes only once the caller has acknowledged the warning (spec 8.4): the product
    * warns, it does not enforce one productivity philosophy.
+   *
+   * A repeating task also spawns its next occurrence here, in the same transaction, and
+   * hands its rule over to it (GAP-12): there is no scheduler, and a completed occurrence
+   * without a rule cannot spawn a duplicate if it is reopened and completed again. The
+   * last occurrence of a bounded series spawns nothing and simply drops its rule.
    */
   async complete(
     context: ActorContext,
@@ -529,10 +511,14 @@ export class TaskService {
     assertWorkspaceAccess(context, workspaceId);
     assertScope(context, SCOPES.tasksWrite);
 
+    let spawned: Task | null = null;
     return this.mutate(context, workspaceId, taskId, request.expectedVersion, {
       eventType: TASK_EVENTS.completed,
-      summarize: () => "Completed task",
-      apply: async (task, tx) => {
+      summarize: (_next, _previous, workspace) =>
+        spawned
+          ? `Completed task; next occurrence is ${taskKey(workspace.taskKeyPrefix, spawned.taskNumber)}`
+          : "Completed task",
+      apply: async (task, tx, workspace) => {
         if (
           !request.acknowledgeBlocked &&
           isBlocked(task, await this.blockersOf(tx, task))
@@ -546,11 +532,55 @@ export class TaskService {
         const doneStatus = task.projectId
           ? await this.resolveDoneStatus(tx, task)
           : undefined;
-        return completeTask(task, doneStatus ? { doneStatus } : {}, {
+        const completed = completeTask(task, doneStatus ? { doneStatus } : {}, {
           actor: actorRef(context),
           clock: this.clock,
         });
+        if (completed === task || task.recurrence === null) return completed;
+
+        const next = spawnNextOccurrence(task, this.workspaceToday(workspace.timezone));
+        if (next) {
+          const destination = next.projectId
+            ? await this.resolveDestination(tx, workspaceId, next.projectId, null)
+            : null;
+          spawned = await this.insertNewTask(
+            tx,
+            context,
+            workspace,
+            { ...next, id: uuidv7(), project: destination },
+            { spawnedFrom: task.id, tags: await this.tagsOf(tx, task) },
+          );
+        }
+        return { ...completed, recurrence: null };
       },
+    });
+  }
+
+  /**
+   * Skip the current occurrence of a repeating task (GAP-12): the task itself moves on
+   * to its next date, exactly where completion would have put the next occurrence, and
+   * nothing is created. The last occurrence is rejected; complete or delete it instead.
+   */
+  async skipOccurrence(
+    context: ActorContext,
+    workspaceId: string,
+    taskId: string,
+    expectedVersion?: number,
+  ): Promise<TaskDto> {
+    assertWorkspaceAccess(context, workspaceId);
+    assertScope(context, SCOPES.tasksWrite);
+
+    return this.mutate(context, workspaceId, taskId, expectedVersion, {
+      eventType: TASK_EVENTS.occurrenceSkipped,
+      summarize: (_next, previous) =>
+        previous.dueDate
+          ? `Skipped occurrence due ${previous.dueDate}`
+          : "Skipped occurrence",
+      apply: (task, _tx, workspace) =>
+        applySkip(task, this.workspaceToday(workspace.timezone), {
+          actor: actorRef(context),
+          clock: this.clock,
+        }),
     });
   }
 
@@ -959,7 +989,7 @@ export class TaskService {
 
       assertExpectedVersion(previous, expectedVersion);
 
-      const next = await step.apply(previous, tx);
+      const next = await step.apply(previous, tx, workspace);
       if (next === previous) {
         // The policy decided nothing material changed: no version bump, no event.
         return { task: await this.toDto(tx, workspace, previous), warnings: [] };
@@ -985,7 +1015,7 @@ export class TaskService {
         aggregateType: "task",
         aggregateId: taskId,
         eventType: step.eventType,
-        summary: step.summarize(next, previous),
+        summary: step.summarize(next, previous, workspace),
         payload: step.payload
           ? step.payload(next, previous)
           : { taskId, changes: materialChanges(next, previous) },
@@ -1037,6 +1067,63 @@ export class TaskService {
         })),
       },
     ];
+  }
+
+  /**
+   * Persist a new task at the end of its scope with its `task.created` event. Shared by
+   * capture and by the spawn of a repeating task's next occurrence, so both land the same
+   * way: a workspace number, a rank after everything else, and one activity row.
+   */
+  private async insertNewTask(
+    tx: TransactionContext,
+    context: ActorContext,
+    workspace: Workspace,
+    fields: Omit<CreateTaskInput, "workspaceId" | "taskNumber" | "rank">,
+    origin: { spawnedFrom: string; tags: readonly Tag[] } | null = null,
+  ): Promise<Task> {
+    const scope: RankScope = {
+      workspaceId: workspace.id,
+      projectId: fields.project?.id ?? null,
+      statusId: fields.project?.status.id ?? null,
+    };
+    // New tasks land at the end of their scope so capture never reorders existing work.
+    const lastRank = await tx.tasks.lastRankIn(scope);
+
+    const task = createTask(
+      {
+        ...fields,
+        workspaceId: workspace.id,
+        taskNumber: await tx.taskCounters.allocate(workspace.id),
+        rank: rankBetween(lastRank, null),
+      },
+      { actor: actorRef(context), clock: this.clock },
+    );
+
+    await tx.tasks.insert(task);
+    for (const tag of origin?.tags ?? []) {
+      await tx.tasks.addTag(task.id, tag.id, this.clock.now());
+    }
+    const key = taskKey(workspace.taskKeyPrefix, task.taskNumber);
+    await recordEvent(tx, context, this.clock, {
+      workspaceId: task.workspaceId,
+      aggregateType: "task",
+      aggregateId: task.id,
+      eventType: TASK_EVENTS.created,
+      summary: origin
+        ? `Created task ${key} as the next occurrence of a repeating task`
+        : `Created task ${key}`,
+      payload: {
+        taskId: task.id,
+        taskNumber: task.taskNumber,
+        projectId: task.projectId,
+        statusId: task.statusId,
+        priority: task.priority,
+        parentTaskId: task.parentTaskId,
+        seriesId: task.seriesId,
+        ...(origin ? { spawnedFrom: origin.spawnedFrom } : {}),
+      },
+    });
+    return task;
   }
 
   private async insertDayPlan(
@@ -1308,8 +1395,12 @@ function describeRelation(relation: TaskRelation, fromTaskId: string): string {
 
 interface MutationStep {
   readonly eventType: string;
-  readonly summarize: (next: Task, previous: Task) => string;
-  readonly apply: (task: Task, tx: TransactionContext) => Task | Promise<Task>;
+  readonly summarize: (next: Task, previous: Task, workspace: Workspace) => string;
+  readonly apply: (
+    task: Task,
+    tx: TransactionContext,
+    workspace: Workspace,
+  ) => Task | Promise<Task>;
   /** Event payload; defaults to the field-level diff (spec 18.2). */
   readonly payload?: (next: Task, previous: Task) => Record<string, unknown>;
 }

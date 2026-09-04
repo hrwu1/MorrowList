@@ -121,6 +121,7 @@ export function createTaskRepository(db: Database): TaskRepository {
       if (filter.inboxOnly) conditions.push(isNull(tasks.projectId));
       if (filter.projectId) conditions.push(eq(tasks.projectId, filter.projectId));
       if (filter.statusId) conditions.push(eq(tasks.statusId, filter.statusId));
+      if (filter.seriesId) conditions.push(eq(tasks.seriesId, filter.seriesId));
       if (filter.priority) conditions.push(eq(tasks.priority, filter.priority));
       if (filter.tagId) {
         conditions.push(

@@ -1,4 +1,5 @@
 import type { ActivityChangeDto, ActivityEntryDto } from "@morrowlist/contracts";
+import { describeRecurrence, type RecurrenceRule } from "@morrowlist/domain";
 
 import type { ActivityEvent } from "../ports/index.js";
 
@@ -18,6 +19,7 @@ const DISPLAYED_FIELDS = [
   "dueDate",
   "dueTime",
   "dueTimezone",
+  "recurrence",
 ] as const;
 
 /** A description can be 50,000 characters; the history shows enough to recognise it. */
@@ -59,6 +61,9 @@ export function changesOf(payload: Record<string, unknown>): ActivityChangeDto[]
 
 function displayValue(field: string, value: unknown): string | null {
   if (value === null || value === undefined) return null;
+  if (field === "recurrence" && isRecord(value)) {
+    return describeRecurrence(value as unknown as RecurrenceRule);
+  }
   const text = typeof value === "string" ? value : String(value);
   if (field === "descriptionMd" && text.length > DESCRIPTION_PREVIEW_LENGTH) {
     return `${text.slice(0, DESCRIPTION_PREVIEW_LENGTH)}…`;

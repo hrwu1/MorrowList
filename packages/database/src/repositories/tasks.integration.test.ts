@@ -262,6 +262,8 @@ describe("transactional event recording", () => {
           dueTime: null,
           dueTimezone: null,
           parentTaskId: null,
+          recurrence: null,
+          seriesId: null,
           rank: "a0",
           lastActiveStatusId: null,
           completedAt: null,

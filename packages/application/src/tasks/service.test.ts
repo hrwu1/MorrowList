@@ -1579,3 +1579,337 @@ describe("cross-project in-progress limit (GAP-20)", () => {
     ]);
   });
 });
+
+describe("TaskService recurrence", () => {
+  const weekly = { freq: "weekly" as const, weekdays: ["sat" as const] };
+  // NOW is Saturday 2026-08-29 09:00Z, which is the same date in Europe/Berlin.
+  const TODAY = "2026-08-29";
+
+  it("starts a series on creation and carries the rule on the DTO", async () => {
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Water plants",
+      dueDate: TODAY,
+      recurrence: {
+        ...weekly,
+        interval: 1,
+        mode: "schedule",
+        monthDay: null,
+        nthWeekday: null,
+        until: null,
+        count: null,
+      },
+    });
+
+    expect(task.recurrence).toEqual({
+      freq: "weekly",
+      interval: 1,
+      mode: "schedule",
+      weekdays: ["sat"],
+      monthDay: null,
+      nthWeekday: null,
+      until: null,
+      count: null,
+    });
+    expect(task.seriesId).toBe(task.id);
+    expect(unitOfWork.data.activity[0]?.payload).toMatchObject({ seriesId: task.id });
+  });
+
+  it("sets, changes, and clears the rule through update with readable history", async () => {
+    const created = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Review inbox",
+    });
+    const repeating = await service.update(
+      seeded.context,
+      seeded.workspace.id,
+      created.id,
+      {
+        recurrence: {
+          freq: "daily",
+          interval: 2,
+          mode: "after_completion",
+          weekdays: null,
+          monthDay: null,
+          nthWeekday: null,
+          until: null,
+          count: null,
+        },
+      },
+    );
+    expect(repeating.recurrence?.freq).toBe("daily");
+    expect(repeating.seriesId).toBe(created.id);
+    expect(repeating.version).toBe(2);
+
+    const stopped = await service.update(
+      seeded.context,
+      seeded.workspace.id,
+      created.id,
+      {
+        recurrence: null,
+      },
+    );
+    expect(stopped.recurrence).toBeNull();
+    expect(stopped.seriesId).toBe(created.id);
+    expect(unitOfWork.data.activity.at(-1)?.payload).toMatchObject({
+      changes: { recurrence: { to: null } },
+    });
+
+    await expect(
+      service.update(seeded.context, seeded.workspace.id, created.id, {
+        recurrence: {
+          freq: "weekly",
+          interval: 1,
+          mode: "schedule",
+          weekdays: null,
+          monthDay: null,
+          nthWeekday: null,
+          until: null,
+          count: null,
+        },
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  });
+
+  it("completing spawns the next occurrence with the same fields, tags, and series in one transaction", async () => {
+    const tagService = new TagService({ unitOfWork, clock: fixedClock(NOW) });
+    const focus = await tagService.create(seeded.context, seeded.workspace.id, {
+      name: "Focus",
+    });
+    const inProgress = statusByCategory(seeded.statuses, "in_progress");
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const first = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Weekly review",
+      descriptionMd: "Look back",
+      priority: "high",
+      projectId: seeded.project.id,
+      statusId: inProgress.id,
+      dueDate: TODAY,
+      dueTime: "17:00",
+      recurrence: {
+        ...weekly,
+        interval: 1,
+        mode: "schedule",
+        monthDay: null,
+        nthWeekday: null,
+        until: null,
+        count: 3,
+      },
+    });
+    await service.addTag(seeded.context, seeded.workspace.id, first.id, focus.id);
+    const eventsBefore = unitOfWork.data.activity.length;
+
+    const completed = await service.complete(
+      seeded.context,
+      seeded.workspace.id,
+      first.id,
+    );
+    expect(completed.isCompleted).toBe(true);
+    expect(completed.recurrence).toBeNull();
+    expect(completed.seriesId).toBe(first.id);
+
+    const series = await service.list(
+      seeded.context,
+      listQuery({ seriesId: first.id, sort: "dueDate" }),
+    );
+    expect(series.data.map((task) => task.key)).toEqual([first.key, "ML-2"]);
+    const next = series.data[1]!;
+    expect(next).toMatchObject({
+      title: "Weekly review",
+      descriptionMd: "Look back",
+      priority: "high",
+      projectId: seeded.project.id,
+      statusId: ready.id,
+      dueDate: "2026-09-05",
+      dueTime: "17:00",
+      dueTimezone: seeded.workspace.timezone,
+      isCompleted: false,
+      seriesId: first.id,
+      recurrence: { ...first.recurrence, count: 2 },
+    });
+    expect(next.tags.map((tag) => tag.name)).toEqual(["Focus"]);
+
+    const recorded = unitOfWork.data.activity.slice(eventsBefore);
+    expect(recorded.map((event) => [event.eventType, event.aggregateId])).toEqual([
+      ["task.created", next.id],
+      ["task.completed", first.id],
+    ]);
+    expect(recorded[0]?.payload).toMatchObject({
+      seriesId: first.id,
+      spawnedFrom: first.id,
+    });
+    expect(recorded[1]?.summary).toBe("Completed task; next occurrence is ML-2");
+    expect(unitOfWork.data.outbox.slice(-2).map((event) => event.eventType)).toEqual([
+      "task.created",
+      "task.completed",
+    ]);
+  });
+
+  it("spawns from the completion date in after_completion mode and skips past a late completion in schedule mode", async () => {
+    const afterCompletion = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Change filter",
+      dueDate: "2026-06-01",
+      recurrence: {
+        freq: "monthly",
+        interval: 1,
+        mode: "after_completion",
+        weekdays: null,
+        monthDay: 1,
+        nthWeekday: null,
+        until: null,
+        count: null,
+      },
+    });
+    await service.complete(seeded.context, seeded.workspace.id, afterCompletion.id);
+    const spawnedAfter = (
+      await service.list(
+        seeded.context,
+        listQuery({ seriesId: afterCompletion.id, isCompleted: false }),
+      )
+    ).data[0];
+    expect(spawnedAfter?.dueDate).toBe("2026-09-01");
+
+    const overdue = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Daily standup notes",
+      dueDate: "2026-08-20",
+      recurrence: {
+        freq: "daily",
+        interval: 1,
+        mode: "schedule",
+        weekdays: null,
+        monthDay: null,
+        nthWeekday: null,
+        until: null,
+        count: null,
+      },
+    });
+    await service.complete(seeded.context, seeded.workspace.id, overdue.id);
+    const spawnedScheduled = (
+      await service.list(
+        seeded.context,
+        listQuery({ seriesId: overdue.id, isCompleted: false }),
+      )
+    ).data[0];
+    expect(spawnedScheduled?.dueDate).toBe("2026-08-30");
+  });
+
+  it("completing the last occurrence creates nothing and clears the rule", async () => {
+    const last = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Final session",
+      dueDate: TODAY,
+      recurrence: {
+        ...weekly,
+        interval: 1,
+        mode: "schedule",
+        monthDay: null,
+        nthWeekday: null,
+        until: null,
+        count: 1,
+      },
+    });
+    const completed = await service.complete(
+      seeded.context,
+      seeded.workspace.id,
+      last.id,
+    );
+    expect(completed.recurrence).toBeNull();
+    expect(unitOfWork.data.tasks.size).toBe(1);
+
+    // Reopening and completing again cannot spawn either: the rule is gone.
+    await service.reopen(seeded.context, seeded.workspace.id, last.id);
+    await service.complete(seeded.context, seeded.workspace.id, last.id);
+    expect(unitOfWork.data.tasks.size).toBe(1);
+
+    const untilPassed = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Ends this week",
+      dueDate: TODAY,
+      recurrence: {
+        ...weekly,
+        interval: 1,
+        mode: "schedule",
+        monthDay: null,
+        nthWeekday: null,
+        until: "2026-09-01",
+        count: null,
+      },
+    });
+    await service.complete(seeded.context, seeded.workspace.id, untilPassed.id);
+    expect(unitOfWork.data.tasks.size).toBe(2);
+  });
+
+  it("rolls the completion back with the spawned occurrence and every event row", async () => {
+    const first = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Atomic",
+      dueDate: TODAY,
+      recurrence: {
+        ...weekly,
+        interval: 1,
+        mode: "schedule",
+        monthDay: null,
+        nthWeekday: null,
+        until: null,
+        count: null,
+      },
+    });
+    const activityBefore = unitOfWork.data.activity.length;
+    unitOfWork.failNextCommit();
+
+    await expect(
+      service.complete(seeded.context, seeded.workspace.id, first.id),
+    ).rejects.toThrow(/simulated commit failure/);
+
+    const original = await service.get(seeded.context, seeded.workspace.id, first.id);
+    expect(original.isCompleted).toBe(false);
+    expect(original.recurrence).not.toBeNull();
+    expect(original.version).toBe(1);
+    expect(unitOfWork.data.tasks.size).toBe(1);
+    expect(unitOfWork.data.activity).toHaveLength(activityBefore);
+    expect(unitOfWork.data.outbox).toHaveLength(activityBefore);
+  });
+
+  it("skips an occurrence on the same task and refuses the last one", async () => {
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Skip me",
+      dueDate: TODAY,
+      recurrence: {
+        ...weekly,
+        interval: 1,
+        mode: "schedule",
+        monthDay: null,
+        nthWeekday: null,
+        until: null,
+        count: 2,
+      },
+    });
+
+    const skipped = await service.skipOccurrence(
+      seeded.context,
+      seeded.workspace.id,
+      task.id,
+    );
+    expect(skipped.id).toBe(task.id);
+    expect(skipped.dueDate).toBe("2026-09-05");
+    expect(skipped.recurrence?.count).toBe(1);
+    expect(skipped.version).toBe(2);
+    expect(unitOfWork.data.tasks.size).toBe(1);
+    expect(unitOfWork.data.activity.at(-1)).toMatchObject({
+      eventType: "task.occurrence_skipped",
+      summary: "Skipped occurrence due 2026-08-29",
+      payload: { changes: { dueDate: { from: "2026-08-29", to: "2026-09-05" } } },
+    });
+
+    await expect(
+      service.skipOccurrence(seeded.context, seeded.workspace.id, task.id),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    await expect(
+      service.skipOccurrence(seeded.context, seeded.workspace.id, task.id, 1),
+    ).rejects.toMatchObject({ code: "TASK_VERSION_CONFLICT" });
+  });
+});

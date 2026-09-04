@@ -39,6 +39,10 @@ export const domainEventSchema = z.object({
 
 /** Event catalogue implemented in this slice (spec 19.5). */
 export const TASK_EVENTS = {
+  /**
+   * Payload: `{ taskId, taskNumber, projectId, statusId, priority, parentTaskId,
+   * seriesId }` plus `spawnedFrom` when completion of a repeating task created it.
+   */
   created: "task.created",
   updated: "task.updated",
   moved: "task.moved",
@@ -65,6 +69,8 @@ export const TASK_EVENTS = {
   blocked: "task.blocked",
   /** Payload: `{ taskId, reason, since, clearedAt }`. */
   unblocked: "task.unblocked",
+  /** A repeating task moved on without being done. Payload: `{ taskId, changes }`. */
+  occurrenceSkipped: "task.occurrence_skipped",
 } as const;
 
 export const TAG_EVENTS = {

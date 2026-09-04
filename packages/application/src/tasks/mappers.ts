@@ -70,6 +70,13 @@ export function toTaskDto(
     dueTime: task.dueTime,
     dueTimezone: task.dueTimezone,
     parentTaskId: task.parentTaskId,
+    recurrence: task.recurrence
+      ? {
+          ...task.recurrence,
+          weekdays: task.recurrence.weekdays ? [...task.recurrence.weekdays] : null,
+        }
+      : null,
+    seriesId: task.seriesId,
     rank: task.rank,
     isCompleted: isCompleted(task),
     completedAt: task.completedAt?.toISOString() ?? null,

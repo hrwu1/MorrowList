@@ -160,3 +160,57 @@ describe("relation and blocked schemas", () => {
     });
   });
 });
+
+describe("recurrenceRuleSchema", () => {
+  it("fills the parts a frequency does not use with null", () => {
+    const parsed = createTaskRequestSchema.parse({
+      title: "Water plants",
+      recurrence: { freq: "weekly", weekdays: ["mon", "thu"] },
+    });
+
+    expect(parsed.recurrence).toEqual({
+      freq: "weekly",
+      interval: 1,
+      mode: "schedule",
+      weekdays: ["mon", "thu"],
+      monthDay: null,
+      nthWeekday: null,
+      until: null,
+      count: null,
+    });
+  });
+
+  it("accepts an nth weekday and bounds, and rejects out-of-range values", () => {
+    const parsed = updateTaskRequestSchema.parse({
+      recurrence: {
+        freq: "monthly",
+        interval: 2,
+        nthWeekday: { nth: -1, weekday: "fri" },
+        until: "2027-01-01",
+      },
+    });
+    expect(parsed.recurrence).toMatchObject({
+      nthWeekday: { nth: -1, weekday: "fri" },
+    });
+
+    expect(
+      updateTaskRequestSchema.safeParse({ recurrence: { freq: "daily", interval: 0 } })
+        .success,
+    ).toBe(false);
+    expect(
+      updateTaskRequestSchema.safeParse({
+        recurrence: { freq: "monthly", monthDay: 32 },
+      }).success,
+    ).toBe(false);
+    expect(
+      updateTaskRequestSchema.safeParse({
+        recurrence: { freq: "monthly", nthWeekday: { nth: 5, weekday: "fri" } },
+      }).success,
+    ).toBe(false);
+    expect(updateTaskRequestSchema.parse({ recurrence: null }).recurrence).toBeNull();
+  });
+
+  it("lists a series by id", () => {
+    expect(listTasksQuerySchema.parse({ seriesId: TASK_ID }).seriesId).toBe(TASK_ID);
+  });
+});

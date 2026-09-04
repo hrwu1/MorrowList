@@ -93,6 +93,20 @@ async function taskWithFullHistory(): Promise<TaskDto> {
     reason: "waiting on vendor",
   });
   task = await tasks.clearBlocked(seeded.context, workspaceId, task.id);
+  task = await tasks.update(seeded.context, workspaceId, task.id, {
+    dueDate: "2026-08-29",
+    recurrence: {
+      freq: "daily",
+      interval: 1,
+      mode: "schedule",
+      weekdays: null,
+      monthDay: null,
+      nthWeekday: null,
+      until: null,
+      count: null,
+    },
+  });
+  task = await tasks.skipOccurrence(seeded.context, workspaceId, task.id);
   task = await tasks.delete(seeded.context, workspaceId, task.id);
   return tasks.restore(seeded.context, workspaceId, task.id);
 }
@@ -111,6 +125,8 @@ describe("ActivityService.listForTask", () => {
     expect(data.map((entry) => entry.eventType)).toEqual([
       TASK_EVENTS.restored,
       TASK_EVENTS.deleted,
+      TASK_EVENTS.occurrenceSkipped,
+      TASK_EVENTS.updated,
       TASK_EVENTS.unblocked,
       TASK_EVENTS.blocked,
       TASK_EVENTS.relationRemoved,
@@ -175,6 +191,17 @@ describe("ActivityService.listForTask", () => {
       { field: "title", from: "Original", to: "Renamed" },
       { field: "priority", from: "none", to: "high" },
     ]);
+    // A rule is shown in words, never as JSON.
+    expect(
+      data.find((entry) => "recurrence" in ((entry.payload.changes ?? {}) as object))
+        ?.changes,
+    ).toEqual([
+      { field: "dueDate", from: null, to: "2026-08-29" },
+      { field: "recurrence", from: null, to: "Every day" },
+    ]);
+    expect(byType.get(TASK_EVENTS.occurrenceSkipped)?.changes).toEqual([
+      { field: "dueDate", from: "2026-08-29", to: "2026-08-30" },
+    ]);
     // A move changes ids and rank; none of those is a readable diff.
     expect(byType.get(TASK_EVENTS.moved)?.changes).toEqual([]);
     expect(byType.get(TASK_EVENTS.reordered)?.changes).toEqual([]);
@@ -206,8 +233,8 @@ describe("ActivityService.listForTask", () => {
       seen.push(...next.data);
       cursor = next.page.nextCursor;
     }
-    expect(seen).toHaveLength(18);
-    expect(new Set(seen.map((entry) => entry.id)).size).toBe(18);
+    expect(seen).toHaveLength(20);
+    expect(new Set(seen.map((entry) => entry.id)).size).toBe(20);
 
     const [body] = (first.page.nextCursor as string).split(".");
     await expect(

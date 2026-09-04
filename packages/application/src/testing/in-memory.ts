@@ -120,6 +120,7 @@ function taskRepository(data: InMemoryData): TaskRepository {
       if (filter.projectId)
         items = items.filter((t) => t.projectId === filter.projectId);
       if (filter.statusId) items = items.filter((t) => t.statusId === filter.statusId);
+      if (filter.seriesId) items = items.filter((t) => t.seriesId === filter.seriesId);
       if (filter.parentTaskId) {
         items = items.filter((t) => t.parentTaskId === filter.parentTaskId);
       } else if (filter.includeSubtasks === false) {

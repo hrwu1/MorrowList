@@ -1,6 +1,7 @@
 import type { Project, Workspace } from "@morrowlist/application";
 import type {
   ActorKind,
+  RecurrenceRule,
   Tag,
   TagColorToken,
   Task,
@@ -44,6 +45,8 @@ export function toTask(row: TaskRow): Task {
     dueTime: (row.dueTime ? row.dueTime.slice(0, 5) : null) as Task["dueTime"],
     dueTimezone: row.dueTimezone,
     parentTaskId: row.parentTaskId,
+    recurrence: (row.recurrence as RecurrenceRule | null) ?? null,
+    seriesId: row.seriesId,
     rank: row.rank,
     lastActiveStatusId: row.lastActiveStatusId,
     completedAt: row.completedAt,
@@ -76,6 +79,8 @@ export function toTaskRow(task: Task): TaskRow {
     dueTime: task.dueTime,
     dueTimezone: task.dueTimezone,
     parentTaskId: task.parentTaskId,
+    recurrence: task.recurrence,
+    seriesId: task.seriesId,
     rank: task.rank,
     lastActiveStatusId: task.lastActiveStatusId,
     completedAt: task.completedAt,

@@ -48,6 +48,11 @@ export const tasks = pgTable(
       (): any => tasks.id,
       { onDelete: "set null" },
     ),
+    // A recurrence rule as canonical JSON (GAP-12); validated by the contract and the
+    // domain before it is written, so the column itself stays schemaless.
+    recurrence: jsonb("recurrence"),
+    // The first occurrence's id, shared by every task in one repeating series.
+    seriesId: uuid("series_id"),
     // COLLATE "C" is applied in the migration; see domain/shared/rank.ts for why.
     rank: varchar("rank", { length: 64 }).notNull(),
     // The COLLATE "C" clause itself lives in migration 0001; Drizzle does not model
@@ -78,6 +83,7 @@ export const tasks = pgTable(
     index("tasks_board_idx").on(table.projectId, table.statusId, table.rank),
     index("tasks_due_idx").on(table.workspaceId, table.dueDate),
     index("tasks_parent_idx").on(table.parentTaskId),
+    index("tasks_series_idx").on(table.workspaceId, table.seriesId),
     // Invariant 3: a due time cannot exist without a due date (spec 8.2).
     check(
       "tasks_due_time_requires_date",

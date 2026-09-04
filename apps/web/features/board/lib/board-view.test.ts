@@ -31,6 +31,8 @@ const BASE_TASK: TaskDto = {
   dueTime: null,
   dueTimezone: null,
   parentTaskId: null,
+  recurrence: null,
+  seriesId: null,
   rank: "a0",
   isCompleted: false,
   completedAt: null,

@@ -12,6 +12,7 @@ const FIELD_LABELS: Record<string, string> = {
   dueDate: "Due date",
   dueTime: "Due time",
   dueTimezone: "Time zone",
+  recurrence: "Repeat",
 };
 
 const ACTOR_KIND_LABELS: Record<ActivityEntryDto["actorKind"], string> = {

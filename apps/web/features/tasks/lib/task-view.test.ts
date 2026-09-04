@@ -24,6 +24,8 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     dueTime: null,
     dueTimezone: null,
     parentTaskId: null,
+    recurrence: null,
+    seriesId: null,
     rank: "aa",
     isCompleted: false,
     completedAt: null,
