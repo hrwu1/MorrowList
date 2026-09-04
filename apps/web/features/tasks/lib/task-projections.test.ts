@@ -62,6 +62,9 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     deletedAt: null,
     dayPlans: [],
     subtaskProgress: null,
+    relations: [],
+    blocked: null,
+    isBlocked: false,
     ...overrides,
   };
 }

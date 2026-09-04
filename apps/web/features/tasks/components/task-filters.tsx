@@ -5,12 +5,14 @@ import { Button, Select } from "@morrowlist/ui";
 import { useId } from "react";
 
 import {
+  BLOCKED_FILTERS,
   COMPLETIONS,
   DEFAULT_VIEW,
   DUE_FILTERS,
   ORDERS,
   PRIORITIES,
   SORTS,
+  type BlockedFilter,
   type Completion,
   type DueFilter,
   type TaskOrder,
@@ -50,6 +52,11 @@ const ORDER_LABELS: Record<TaskOrder, string> = {
   desc: "Descending",
 };
 
+const BLOCKED_LABELS: Record<BlockedFilter, string> = {
+  yes: "Blocked only",
+  no: "Not blocked",
+};
+
 const COMPLETION_LABELS: Record<Completion, string> = {
   open: "Open only",
   done: "Completed only",
@@ -81,6 +88,7 @@ export function TaskFilters({
     view.priority === base.priority &&
     view.due === base.due &&
     view.tag === base.tag &&
+    view.blocked === base.blocked &&
     view.sort === base.sort &&
     view.order === base.order &&
     (!showCompletion || view.completion === base.completion);
@@ -101,6 +109,9 @@ export function TaskFilters({
     ...(!showCompletion || view.completion === base.completion
       ? []
       : [COMPLETION_LABELS[view.completion]]),
+    ...(view.blocked === base.blocked
+      ? []
+      : [view.blocked === "any" ? "Any blocked state" : BLOCKED_LABELS[view.blocked]]),
     ...(view.sort === base.sort ? [] : [SORT_LABELS[view.sort]]),
     ...(view.order === base.order ? [] : [ORDER_LABELS[view.order]]),
   ];
@@ -210,6 +221,29 @@ export function TaskFilters({
               </Select>
             </div>
           ) : null}
+
+          <div className="filters__control">
+            <label className="ml-field__label" htmlFor={`${id}-blocked`}>
+              Blocked
+            </label>
+            <Select
+              id={`${id}-blocked`}
+              value={view.blocked}
+              onChange={(event) =>
+                onChange({
+                  ...view,
+                  blocked: event.target.value as BlockedFilter | "any",
+                })
+              }
+            >
+              <option value="any">Any blocked state</option>
+              {BLOCKED_FILTERS.map((blocked) => (
+                <option key={blocked} value={blocked}>
+                  {BLOCKED_LABELS[blocked]}
+                </option>
+              ))}
+            </Select>
+          </div>
 
           <div className="filters__control">
             <label className="ml-field__label" htmlFor={`${id}-sort`}>

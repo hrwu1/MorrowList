@@ -141,6 +141,13 @@ export function KanbanColumn({
               onCollapse={() => onToggleCollapse(status.id)}
             />
           </div>
+          {status.category === "blocked" ? (
+            // The column stays a view (spec 9.5); the flag is the preferred signal.
+            <p className="kanban-column__hint">
+              Prefer marking a task blocked with a reason: it keeps its stage and says
+              why.
+            </p>
+          ) : null}
           {status.wipLimit !== null ? (
             <span
               className="kanban-column__wip"

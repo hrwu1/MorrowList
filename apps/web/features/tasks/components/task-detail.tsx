@@ -34,6 +34,9 @@ import { DueDateInput, DueTimeInput, PrioritySelect } from "./task-fields";
 
 import { ActivityList } from "@/features/activity/components/activity-list";
 import { useProjects } from "@/features/projects/hooks/use-projects";
+import { BlockedFlag } from "@/features/relations/components/blocked-flag";
+import { RelationList } from "@/features/relations/components/relation-list";
+import { blockedSummary } from "@/features/relations/lib/relations";
 import { TagPicker } from "@/features/tags/components/tag-picker";
 
 /**
@@ -137,7 +140,9 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
   // History is fetched only once its disclosure is open: on the task's own page that is
   // immediately, in the side panel on demand.
   const [showActivity, setShowActivity] = useState(variant === "page");
-  const [confirmingComplete, setConfirmingComplete] = useState(false);
+  const [confirmingComplete, setConfirmingComplete] = useState<
+    "subtasks" | "blocked" | null
+  >(null);
 
   // Refs, not state: the debounce callback must read the newest values without being
   // rescheduled every keystroke.
@@ -335,8 +340,10 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
           loading={complete.isPending || reopen.isPending}
           onClick={() => {
             if (task.isCompleted) return reopen.mutate(task);
-            // Completing a parent with open children needs confirmation (spec 8.3).
-            if (hasOpenSubtasks(task)) return setConfirmingComplete(true);
+            // A blocked task completes only after an explicit warning (spec 8.4), and a
+            // parent with open children needs confirmation (spec 8.3).
+            if (task.isBlocked) return setConfirmingComplete("blocked");
+            if (hasOpenSubtasks(task)) return setConfirmingComplete("subtasks");
             complete.mutate(task);
           }}
         >
@@ -357,7 +364,27 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
         ) : null}
       </div>
 
-      {confirmingComplete && !task.isCompleted ? (
+      {confirmingComplete === "blocked" && !task.isCompleted ? (
+        <Alert tone="info" title="This task is blocked">
+          <p>
+            {blockedSummary(task)}. Completing it now leaves the blockers as they are.
+          </p>
+          <div className="button-row">
+            <Button
+              variant="primary"
+              onClick={() => {
+                setConfirmingComplete(null);
+                complete.mutate(task);
+              }}
+            >
+              Complete anyway
+            </Button>
+            <Button onClick={() => setConfirmingComplete(null)}>Keep it open</Button>
+          </div>
+        </Alert>
+      ) : null}
+
+      {confirmingComplete === "subtasks" && !task.isCompleted ? (
         <Alert tone="info" title="Some subtasks are still open">
           <p>
             {(task.subtaskProgress?.total ?? 0) -
@@ -369,13 +396,13 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
             <Button
               variant="primary"
               onClick={() => {
-                setConfirmingComplete(false);
+                setConfirmingComplete(null);
                 complete.mutate(task);
               }}
             >
               Complete anyway
             </Button>
-            <Button onClick={() => setConfirmingComplete(false)}>Keep it open</Button>
+            <Button onClick={() => setConfirmingComplete(null)}>Keep it open</Button>
           </div>
         </Alert>
       ) : null}
@@ -386,7 +413,9 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
           <Button
             variant="primary"
             loading={complete.isPending}
-            onClick={() => complete.mutate(task)}
+            onClick={() =>
+              task.isBlocked ? setConfirmingComplete("blocked") : complete.mutate(task)
+            }
           >
             Complete parent
           </Button>
@@ -510,6 +539,10 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
       </div>
 
       <TagPicker task={task} disabled={!editable} />
+
+      <BlockedFlag task={task} disabled={!editable} />
+
+      <RelationList task={task} disabled={!editable} />
 
       <details className="task-detail__disclosure">
         <summary className="task-detail__disclosure-summary">

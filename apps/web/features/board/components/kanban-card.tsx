@@ -5,6 +5,7 @@ import type { TaskDto, WorkflowStatusDto } from "@morrowlist/contracts";
 import Link from "next/link";
 import type { CSSProperties, KeyboardEventHandler } from "react";
 
+import { BlockedBadge } from "@/features/relations/components/blocked-badge";
 import { TagChips } from "@/features/tags/components/tag-chip";
 import {
   DueBadge,
@@ -57,6 +58,7 @@ export function KanbanCard({
       ref={setNodeRef}
       style={style}
       className="board-card"
+      data-blocked={task.isBlocked || undefined}
       data-dragging={isDragging || undefined}
       data-done={task.isCompleted || undefined}
       aria-current={selected ? "true" : undefined}
@@ -140,6 +142,7 @@ export function KanbanCard({
           isCompleted={task.isCompleted}
         />
         <MyDayBadge dayPlans={task.dayPlans} />
+        <BlockedBadge task={task} />
         <SubtaskProgressBadge progress={task.subtaskProgress} />
       </div>
 

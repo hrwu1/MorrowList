@@ -15,6 +15,9 @@ import {
 } from "../hooks/use-tasks";
 
 import { SubtaskProgressBadge } from "./task-fields";
+import { blockedWarning } from "./task-row";
+
+import { BlockedBadge } from "@/features/relations/components/blocked-badge";
 
 /**
  * The subtasks of one task (spec 8.3). Each is an ordinary task listed by parent, so
@@ -95,9 +98,11 @@ export function SubtaskList({ parent }: { readonly parent: TaskDto }) {
                   disabled={busy}
                   aria-label={`${task.isCompleted ? "Reopen" : "Complete"} ${task.title}`}
                   aria-pressed={task.isCompleted}
-                  onClick={() =>
-                    task.isCompleted ? reopen.mutate(task) : complete.mutate(task)
-                  }
+                  onClick={() => {
+                    if (task.isCompleted) return reopen.mutate(task);
+                    if (task.isBlocked && !window.confirm(blockedWarning(task))) return;
+                    complete.mutate(task);
+                  }}
                 >
                   <span aria-hidden="true">{task.isCompleted ? "✓" : ""}</span>
                 </button>
@@ -108,6 +113,7 @@ export function SubtaskList({ parent }: { readonly parent: TaskDto }) {
                   {task.title}
                 </Link>
                 <span className="task-row__key">{task.key}</span>
+                <BlockedBadge task={task} />
                 <SubtaskProgressBadge progress={task.subtaskProgress} />
                 <span className="subtask-list__actions">
                   <Button

@@ -329,9 +329,17 @@ function stripControlFields(patch: UpdateTaskRequest): Partial<TaskDto> {
   return fields as Partial<TaskDto>;
 }
 
+/**
+ * Every caller warns before completing a blocked task (spec 8.4), so the acknowledgement
+ * travels with the request; the server still refuses if a stale cache hid the block.
+ */
 export function useCompleteTask() {
   return useTaskAction(
-    (task) => apiClient.completeTask(task.id, task.version),
+    (task) =>
+      apiClient.completeTask(task.id, {
+        expectedVersion: task.version,
+        ...(task.isBlocked ? { acknowledgeBlocked: true } : {}),
+      }),
     (task) => ({
       ...task,
       isCompleted: true,

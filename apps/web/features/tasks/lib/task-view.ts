@@ -14,11 +14,13 @@ export const DUE_FILTERS = ["overdue", "today", "future", "none"] as const;
 export const SORTS = ["rank", "createdAt", "dueDate", "priority", "updatedAt"] as const;
 export const ORDERS = ["asc", "desc"] as const;
 export const COMPLETIONS = ["open", "done", "any"] as const;
+export const BLOCKED_FILTERS = ["yes", "no"] as const;
 
 export type DueFilter = (typeof DUE_FILTERS)[number];
 export type TaskSort = (typeof SORTS)[number];
 export type TaskOrder = (typeof ORDERS)[number];
 export type Completion = (typeof COMPLETIONS)[number];
+export type BlockedFilter = (typeof BLOCKED_FILTERS)[number];
 
 export interface TaskView {
   readonly priority: Priority | "any";
@@ -26,6 +28,8 @@ export interface TaskView {
   /** A tag id, or "any". Ids are opaque, so anything non-empty is accepted from the URL. */
   readonly tag: string | "any";
   readonly completion: Completion;
+  /** Blocked state (spec 8.4): flagged or waiting on an open blocker. */
+  readonly blocked: BlockedFilter | "any";
   readonly sort: TaskSort;
   readonly order: TaskOrder;
 }
@@ -38,6 +42,7 @@ export const DEFAULT_VIEW: TaskView = {
   due: "any",
   tag: "any",
   completion: "open",
+  blocked: "any",
   sort: "rank",
   order: "asc",
 };
@@ -59,6 +64,7 @@ export function readTaskView(
     due: oneOf(DUE_FILTERS, params.get("due")) ?? base.due,
     tag: params.get("tag")?.trim() || base.tag,
     completion: oneOf(COMPLETIONS, params.get("completed")) ?? base.completion,
+    blocked: oneOf(BLOCKED_FILTERS, params.get("blocked")) ?? base.blocked,
     sort: oneOf(SORTS, params.get("sort")) ?? base.sort,
     order: oneOf(ORDERS, params.get("order")) ?? base.order,
   };
@@ -83,6 +89,7 @@ export function writeTaskView(
   set("due", view.due, base.due);
   set("tag", view.tag, base.tag);
   set("completed", view.completion, base.completion);
+  set("blocked", view.blocked, base.blocked);
   set("sort", view.sort, base.sort);
   set("order", view.order, base.order);
 
@@ -104,6 +111,7 @@ export function toListQuery(scope: TaskScope, view: TaskView): Partial<ListTasks
     ...(view.priority === "any" ? {} : { priority: view.priority }),
     ...(view.due === "any" ? {} : { due: view.due }),
     ...(view.tag === "any" ? {} : { tagId: view.tag }),
+    ...(view.blocked === "any" ? {} : { isBlocked: view.blocked === "yes" }),
     sort: view.sort,
     order: view.order,
   };
@@ -144,5 +152,8 @@ export function matchesFilters(
   }
   if (filters.tagId !== undefined && !task.tags.some((tag) => tag.id === filters.tagId))
     return false;
+  if (filters.isBlocked !== undefined && task.isBlocked !== filters.isBlocked) {
+    return false;
+  }
   return true;
 }

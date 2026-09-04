@@ -1125,6 +1125,74 @@
     align-items: center;
     gap: 0.35rem 0.5rem;
   }
+  .task-row__blocked {
+    padding: 0.05rem 0.45rem;
+    border-radius: 99px;
+    background: var(--danger-subtle);
+    color: var(--danger);
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .task-row__blocked::before {
+    content: "⛔ ";
+  }
+  .board-card[data-blocked] {
+    border-left: 3px solid var(--danger);
+  }
+  .kanban-column__hint {
+    margin: 0.3rem 0 0;
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+  }
+  .blocked-flag,
+  .relation-list {
+    display: grid;
+    gap: 0.4rem;
+  }
+  .blocked-flag__reason {
+    margin: 0;
+    font-size: 0.875rem;
+  }
+  .blocked-flag__form {
+    display: grid;
+    gap: 0.3rem;
+  }
+  .relation-list__label {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+  }
+  .relation-list__items {
+    display: grid;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .relation-list__item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+  }
+  .relation-list__item[data-done] .relation-list__title {
+    color: var(--text-muted);
+    text-decoration: line-through;
+  }
+  .relation-list__form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .relation-list__form .ml-input {
+    flex: 1;
+    min-width: 10rem;
+  }
   .task-row__subtasks {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

@@ -36,6 +36,9 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     deletedAt: null,
     dayPlans: [],
     subtaskProgress: null,
+    relations: [],
+    blocked: null,
+    isBlocked: false,
     ...overrides,
   };
 }
@@ -59,6 +62,7 @@ describe("readTaskView", () => {
       due: "overdue",
       tag: "any",
       completion: "any",
+      blocked: "any",
       sort: "dueDate",
       order: "desc",
     });
@@ -158,6 +162,20 @@ describe("matchesFilters", () => {
   it("leaves a due-filtered list alone, since the browser cannot evaluate it", () => {
     // `due` is relative to the workspace timezone, which lives on the server.
     expect(matchesFilters(task({ dueDate: null }), { due: "today" })).toBe(true);
+  });
+});
+
+describe("blocked filter", () => {
+  it("travels through the URL and the query, and drops an unblocked task", () => {
+    const view = readTaskView(new URLSearchParams("blocked=yes"));
+    expect(view.blocked).toBe("yes");
+    expect(writeTaskView(view)).toBe("blocked=yes");
+    expect(toListQuery("inbox", view)).toMatchObject({ isBlocked: true });
+    expect(toListQuery("inbox", DEFAULT_VIEW)).not.toHaveProperty("isBlocked");
+
+    expect(matchesFilters(task({ isBlocked: true }), { isBlocked: true })).toBe(true);
+    expect(matchesFilters(task(), { isBlocked: true })).toBe(false);
+    expect(matchesFilters(task({ isBlocked: true }), { isBlocked: false })).toBe(false);
   });
 });
 

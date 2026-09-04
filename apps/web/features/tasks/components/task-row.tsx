@@ -27,6 +27,8 @@ import {
   SubtaskProgressBadge,
 } from "./task-fields";
 
+import { BlockedBadge } from "@/features/relations/components/blocked-badge";
+import { blockedSummary } from "@/features/relations/lib/relations";
 import { TagChips } from "@/features/tags/components/tag-chip";
 
 /**
@@ -82,7 +84,9 @@ export function TaskRow({ task, detailHref, selected, today }: TaskRowProps) {
           className="task-row__check"
           onClick={() => {
             if (task.isCompleted) return reopen.mutate(task);
-            // Completing a parent leaves its open children as they are (spec 8.3).
+            // A blocked task is warned about first (spec 8.4), and completing a parent
+            // leaves its open children as they are (spec 8.3).
+            if (task.isBlocked && !window.confirm(blockedWarning(task))) return;
             if (hasOpenSubtasks(task) && !window.confirm(openSubtasksWarning(task))) {
               return;
             }
@@ -119,6 +123,7 @@ export function TaskRow({ task, detailHref, selected, today }: TaskRowProps) {
               today={today}
             />
             <MyDayBadge dayPlans={task.dayPlans} />
+            <BlockedBadge task={task} />
             <SubtaskProgressBadge progress={task.subtaskProgress} />
             {task.completedAt ? (
               <time dateTime={task.completedAt}>
@@ -147,6 +152,10 @@ export function TaskRow({ task, detailHref, selected, today }: TaskRowProps) {
       ) : null}
     </li>
   );
+}
+
+export function blockedWarning(task: TaskDto): string {
+  return `"${task.title}" is blocked: ${blockedSummary(task)}. Complete it anyway?`;
 }
 
 export function openSubtasksWarning(task: TaskDto): string {

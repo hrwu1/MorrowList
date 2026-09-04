@@ -43,6 +43,9 @@ const BASE_TASK: TaskDto = {
   deletedAt: null,
   dayPlans: [],
   subtaskProgress: null,
+  relations: [],
+  blocked: null,
+  isBlocked: false,
 };
 
 const READY = "0198f0a0-0000-7000-8000-000000000030";

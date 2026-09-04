@@ -55,6 +55,10 @@ const CATALOGUE: Record<string, Partial<ActivityEntryDto>> = {
   [TASK_EVENTS.parentChanged]: { summary: "Made task a subtask" },
   [TASK_EVENTS.tagAdded]: { summary: "Added tag Focus" },
   [TASK_EVENTS.tagRemoved]: { summary: "Removed tag Focus" },
+  [TASK_EVENTS.relationAdded]: { summary: "Added relation: blocks ML-2" },
+  [TASK_EVENTS.relationRemoved]: { summary: "Removed relation: blocked by ML-1" },
+  [TASK_EVENTS.blocked]: { summary: "Marked task blocked: waiting on vendor" },
+  [TASK_EVENTS.unblocked]: { summary: "Cleared the blocked flag" },
   [PROJECT_EVENTS.created]: {
     aggregateType: "project",
     summary: "Created project Launch",

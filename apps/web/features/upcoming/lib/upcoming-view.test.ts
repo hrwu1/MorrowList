@@ -30,6 +30,9 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     dayPlans: [],
     tags: [],
     subtaskProgress: null,
+    relations: [],
+    blocked: null,
+    isBlocked: false,
     ...overrides,
   };
 }
