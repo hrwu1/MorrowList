@@ -33,6 +33,7 @@ import type {
   TaskCounterRepository,
   TaskFilter,
   TaskRepository,
+  TaskSearchQuery,
   TransactionContext,
   UnitOfWork,
   WorkflowStatusRepository,
@@ -99,6 +100,80 @@ function compareTags(left: Tag, right: Tag): number {
 
 const PRIORITY_ORDER = ["none", "low", "medium", "high", "urgent"];
 
+/** The list predicate, shared by `list` and `search` so both read the same filters. */
+function filterTasks(data: InMemoryData, filter: TaskFilter): Task[] {
+  let items = [...data.tasks.values()].filter(
+    (task) => task.workspaceId === filter.workspaceId,
+  );
+
+  items = items.filter((t) =>
+    filter.deletedOnly ? t.deletedAt !== null : t.deletedAt === null,
+  );
+  if (filter.inboxOnly) items = items.filter((t) => t.projectId === null);
+  if (filter.projectId) items = items.filter((t) => t.projectId === filter.projectId);
+  if (filter.statusId) items = items.filter((t) => t.statusId === filter.statusId);
+  if (filter.seriesId) items = items.filter((t) => t.seriesId === filter.seriesId);
+  if (filter.parentTaskId) {
+    items = items.filter((t) => t.parentTaskId === filter.parentTaskId);
+  } else if (filter.includeSubtasks === false) {
+    items = items.filter((t) => t.parentTaskId === null);
+  }
+  if (filter.priority) items = items.filter((t) => t.priority === filter.priority);
+  if (filter.tagId) {
+    const tagId = filter.tagId;
+    items = items.filter((t) =>
+      data.taskTags.some((link) => link.taskId === t.id && link.tagId === tagId),
+    );
+  }
+  if (filter.isCompleted !== undefined) {
+    items = items.filter((t) => (t.completedAt !== null) === filter.isCompleted);
+  }
+  if (filter.due && filter.today) {
+    const today = filter.today;
+    items = items.filter((task) => {
+      switch (filter.due) {
+        case "none":
+          return task.dueDate === null;
+        case "overdue":
+          return task.dueDate !== null && task.dueDate < today;
+        case "today":
+          return task.dueDate === today;
+        case "future":
+          return task.dueDate !== null && task.dueDate > today;
+        default:
+          return true;
+      }
+    });
+  }
+  if (filter.deferred !== undefined && filter.today) {
+    const today = filter.today as PlainDate;
+    items = items.filter((task) => isDeferred(task, today) === filter.deferred);
+  }
+  if (filter.deadline && filter.today) {
+    const today = filter.today as PlainDate;
+    const weekEnd = addDays(today, 7);
+    items = items.filter((task) => {
+      switch (filter.deadline) {
+        case "none":
+          return task.deadline === null;
+        case "overdue":
+          return task.deadline !== null && task.deadline < today;
+        case "week":
+          return (
+            task.deadline !== null && task.deadline >= today && task.deadline <= weekEnd
+          );
+        default:
+          return true;
+      }
+    });
+  }
+
+  if (filter.isBlocked !== undefined) {
+    items = items.filter((t) => blockedIn(data, t) === filter.isBlocked);
+  }
+  return items;
+}
+
 function taskRepository(data: InMemoryData): TaskRepository {
   const inScope = (task: Task, scope: RankScope) =>
     task.workspaceId === scope.workspaceId &&
@@ -119,77 +194,7 @@ function taskRepository(data: InMemoryData): TaskRepository {
       );
     },
     async list(filter: TaskFilter, cursor: Cursor): Promise<Page<Task>> {
-      let items = [...data.tasks.values()].filter(
-        (task) => task.workspaceId === filter.workspaceId,
-      );
-
-      items = items.filter((t) =>
-        filter.deletedOnly ? t.deletedAt !== null : t.deletedAt === null,
-      );
-      if (filter.inboxOnly) items = items.filter((t) => t.projectId === null);
-      if (filter.projectId)
-        items = items.filter((t) => t.projectId === filter.projectId);
-      if (filter.statusId) items = items.filter((t) => t.statusId === filter.statusId);
-      if (filter.seriesId) items = items.filter((t) => t.seriesId === filter.seriesId);
-      if (filter.parentTaskId) {
-        items = items.filter((t) => t.parentTaskId === filter.parentTaskId);
-      } else if (filter.includeSubtasks === false) {
-        items = items.filter((t) => t.parentTaskId === null);
-      }
-      if (filter.priority) items = items.filter((t) => t.priority === filter.priority);
-      if (filter.tagId) {
-        const tagId = filter.tagId;
-        items = items.filter((t) =>
-          data.taskTags.some((link) => link.taskId === t.id && link.tagId === tagId),
-        );
-      }
-      if (filter.isCompleted !== undefined) {
-        items = items.filter((t) => (t.completedAt !== null) === filter.isCompleted);
-      }
-      if (filter.isBlocked !== undefined) {
-        items = items.filter((t) => blockedIn(data, t) === filter.isBlocked);
-      }
-      if (filter.due && filter.today) {
-        const today = filter.today;
-        items = items.filter((task) => {
-          switch (filter.due) {
-            case "none":
-              return task.dueDate === null;
-            case "overdue":
-              return task.dueDate !== null && task.dueDate < today;
-            case "today":
-              return task.dueDate === today;
-            case "future":
-              return task.dueDate !== null && task.dueDate > today;
-            default:
-              return true;
-          }
-        });
-      }
-      if (filter.deferred !== undefined && filter.today) {
-        const today = filter.today as PlainDate;
-        items = items.filter((task) => isDeferred(task, today) === filter.deferred);
-      }
-      if (filter.deadline && filter.today) {
-        const today = filter.today as PlainDate;
-        const weekEnd = addDays(today, 7);
-        items = items.filter((task) => {
-          switch (filter.deadline) {
-            case "none":
-              return task.deadline === null;
-            case "overdue":
-              return task.deadline !== null && task.deadline < today;
-            case "week":
-              return (
-                task.deadline !== null &&
-                task.deadline >= today &&
-                task.deadline <= weekEnd
-              );
-            default:
-              return true;
-          }
-        });
-      }
+      let items = filterTasks(data, filter);
 
       const direction = filter.order === "desc" ? -1 : 1;
       const key = (task: Task): string | number => {
@@ -221,6 +226,39 @@ function taskRepository(data: InMemoryData): TaskRepository {
       const pageItems = items.slice(0, cursor.limit);
       return {
         items: pageItems,
+        hasMore: items.length > cursor.limit,
+        nextCursor: null,
+      };
+    },
+    async search(query: TaskSearchQuery, cursor: Cursor): Promise<Page<Task>> {
+      const words = (text: string | null) =>
+        (text ?? "").toLocaleLowerCase("en-US").split(/[^\p{L}\p{N}]+/u);
+      const hits = (text: string | null) =>
+        query.terms.filter((term) => words(text).some((word) => word.startsWith(term)))
+          .length;
+      const tagHit = (task: Task) =>
+        data.taskTags
+          .filter((link) => link.taskId === task.id)
+          .some((link) => {
+            const name = data.tags.get(link.tagId)?.normalizedName ?? "";
+            return query.terms.some((term) => name.startsWith(term));
+          });
+      // Mirrors the SQL order: title hits outrank description hits, a task matched only
+      // through a tag name ranks zero, and the newest id breaks ties.
+      const score = (task: Task) => hits(task.title) * 2 + hits(task.descriptionMd);
+      let items = filterTasks(data, query).filter(
+        (task) =>
+          query.terms.length === 0 ||
+          hits(`${task.title} ${task.descriptionMd ?? ""}`) === query.terms.length ||
+          tagHit(task),
+      );
+      items.sort((a, b) => score(b) - score(a) || (a.id < b.id ? 1 : -1));
+      if (cursor.after) {
+        const index = items.findIndex((task) => task.id === cursor.after);
+        if (index >= 0) items = items.slice(index + 1);
+      }
+      return {
+        items: items.slice(0, cursor.limit),
         hasMore: items.length > cursor.limit,
         nextCursor: null,
       };

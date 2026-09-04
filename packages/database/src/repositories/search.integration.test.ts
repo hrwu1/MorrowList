@@ -1,14 +1,26 @@
-import { TaskService, bootstrapUser, type ActorContext } from "@morrowlist/application";
-import { fixedClock, uuidv7 } from "@morrowlist/domain";
+import {
+  ProjectService,
+  TagService,
+  TaskService,
+  bootstrapUser,
+  type ActorContext,
+  type Cursor,
+  type TaskSearchQuery,
+} from "@morrowlist/application";
+import { fixedClock, searchTerms, uuidv7 } from "@morrowlist/domain";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import type { DatabaseHandle } from "../client.js";
+import type { Database, DatabaseHandle } from "../client.js";
+import * as schema from "../schema/index.js";
 import {
   setupTestDatabase,
   teardownTestDatabase,
   truncateAll,
 } from "../test-harness.js";
 import { createUnitOfWork } from "../unit-of-work.js";
+
+import { createTaskRepository } from "./tasks.js";
 
 /**
  * Search and saved views against real PostgreSQL (GAP-02, spec 9.8). Migration 0004
@@ -24,6 +36,11 @@ let context: ActorContext;
 let workspaceId: string;
 let userId: string;
 let tasks: TaskService;
+let tagService: TagService;
+let projects: ProjectService;
+/** The statement Drizzle last sent, so a test can EXPLAIN exactly what shipped. */
+let lastQuery: { sql: string; params: unknown[] } = { sql: "", params: [] };
+let repository: ReturnType<typeof createTaskRepository>;
 
 beforeAll(async () => {
   handle = await setupTestDatabase();
@@ -61,7 +78,29 @@ beforeEach(async () => {
     clock: fixedClock(NOW),
     cursorSecret: "search-integration-cursor-secret",
   });
+  tagService = new TagService({ unitOfWork, clock: fixedClock(NOW) });
+  projects = new ProjectService({ unitOfWork, clock: fixedClock(NOW) });
+  const logged = drizzle(handle.pool, {
+    schema,
+    logger: {
+      logQuery(sql, params) {
+        lastQuery = { sql, params };
+      },
+    },
+  });
+  repository = createTaskRepository(logged as unknown as Database);
 });
+
+function search(
+  text: string,
+  overrides: Partial<TaskSearchQuery> = {},
+  cursor: Cursor = { limit: 50 },
+) {
+  return repository.search(
+    { workspaceId, terms: searchTerms(text), ...overrides },
+    cursor,
+  );
+}
 
 async function searchVectorOf(taskId: string): Promise<string> {
   const { rows } = await handle.pool.query<{ search_vector: string }>(
@@ -175,26 +214,122 @@ describe("migration 0004", () => {
     await seedReferenceScale();
     await handle.pool.query("analyze tasks");
 
-    const predicate = `select id, title from tasks
-      where workspace_id = $1 and deleted_at is null
-        and search_vector @@ to_tsquery('simple', $2)
-      order by ts_rank_cd(search_vector, to_tsquery('simple', $2)) desc, id desc
-      limit 51`;
-    const params = [workspaceId, "quarter:* & budget:*"];
+    const started = performance.now();
+    const page = await search("quarter budget", {}, { limit: 50 });
+    const elapsed = performance.now() - started;
+    console.log(`search first page over 10,000 tasks: ${elapsed.toFixed(1)} ms`);
+    expect(page.items).toHaveLength(50);
+    expect(page.hasMore).toBe(true);
+    expect(elapsed).toBeLessThan(500);
 
     const { rows: plan } = await handle.pool.query<{ "QUERY PLAN": string }>(
-      `explain (analyze, buffers) ${predicate}`,
-      params,
+      `explain (analyze, buffers) ${lastQuery.sql}`,
+      lastQuery.params,
     );
     const planText = plan.map((row) => row["QUERY PLAN"]).join("\n");
     console.log(`search plan at reference scale:\n${planText}`);
     expect(planText).toMatch(/tasks_search_idx/);
+  });
+});
 
-    const started = performance.now();
-    const { rows } = await handle.pool.query(predicate, params);
-    const elapsed = performance.now() - started;
-    console.log(`search first page over 10,000 tasks: ${elapsed.toFixed(1)} ms`);
-    expect(rows).toHaveLength(51);
-    expect(elapsed).toBeLessThan(500);
+describe("task search", () => {
+  it("prefix-matches every term, title hits before description hits, then newest first", async () => {
+    const inDescription = await tasks.create(context, {
+      workspaceId,
+      title: "Slides",
+      descriptionMd: "Draft the budget review deck",
+    });
+    const older = await tasks.create(context, {
+      workspaceId,
+      title: "Budget review with finance",
+    });
+    const newer = await tasks.create(context, { workspaceId, title: "Budget review" });
+    await tasks.create(context, { workspaceId, title: "Budget only" });
+    await tasks.create(context, { workspaceId, title: "Review only" });
+
+    const page = await search("budg rev");
+    expect(page.items.map((task) => task.id)).toEqual([
+      newer.id,
+      older.id,
+      inDescription.id,
+    ]);
+    expect(page.hasMore).toBe(false);
+  });
+
+  it("matches a tag name and honours the list filters", async () => {
+    const tag = await tagService.create(context, workspaceId, { name: "Deep Work" });
+    const tagged = await tasks.create(context, { workspaceId, title: "Untitled" });
+    await tasks.addTag(context, workspaceId, tagged.id, tag.id);
+    const done = await tasks.create(context, { workspaceId, title: "Deep dive" });
+    await tasks.complete(context, workspaceId, done.id);
+    const deleted = await tasks.create(context, { workspaceId, title: "Deep sleep" });
+    await tasks.delete(context, workspaceId, deleted.id);
+
+    const all = await search("deep");
+    expect(all.items.map((task) => task.title).sort()).toEqual([
+      "Deep dive",
+      "Untitled",
+    ]);
+
+    const open = await search("deep", { isCompleted: false });
+    expect(open.items.map((task) => task.title)).toEqual(["Untitled"]);
+  });
+
+  it("pages with a keyset cursor on rank then id without skipping or repeating", async () => {
+    const created = [];
+    for (const title of ["Plan a", "Plan b", "Plan c", "Plan d", "Plan e"]) {
+      created.push(await tasks.create(context, { workspaceId, title }));
+    }
+
+    const first = await search("plan", {}, { limit: 2 });
+    const second = await search("plan", {}, { limit: 2, after: first.items[1]?.id });
+    const third = await search("plan", {}, { limit: 2, after: second.items[1]?.id });
+
+    const seen = [...first.items, ...second.items, ...third.items].map((t) => t.id);
+    expect(new Set(seen).size).toBe(5);
+    expect(seen.sort()).toEqual(created.map((task) => task.id).sort());
+    expect([first.hasMore, second.hasMore, third.hasMore]).toEqual([true, true, false]);
+  });
+
+  it("filters blocked work by status category in both list and search", async () => {
+    const { project, statuses } = await projects.create(context, {
+      workspaceId,
+      name: "Research",
+    });
+    const blocked = statuses.find((status) => status.category === "blocked");
+    const ready = statuses.find((status) => status.category === "ready");
+    const stuck = await tasks.create(context, {
+      workspaceId,
+      title: "Stuck experiment",
+      projectId: project.id,
+      statusId: blocked?.id,
+    });
+    await tasks.create(context, {
+      workspaceId,
+      title: "Moving experiment",
+      projectId: project.id,
+      statusId: ready?.id,
+    });
+
+    const listed = await tasks.list(context, {
+      workspaceId,
+      limit: 50,
+      includeSubtasks: true,
+      isBlocked: true,
+      sort: "rank",
+      order: "asc",
+    } as never);
+    expect(listed.data.map((task) => task.id)).toEqual([stuck.id]);
+
+    const searched = await search("experiment", { isBlocked: false });
+    expect(searched.items.map((task) => task.title)).toEqual(["Moving experiment"]);
+  });
+
+  it("returns every task that passes the filters when there are no terms", async () => {
+    await tasks.create(context, { workspaceId, title: "One" });
+    await tasks.create(context, { workspaceId, title: "Two" });
+
+    const page = await search("");
+    expect(page.items.map((task) => task.title)).toEqual(["Two", "One"]);
   });
 });

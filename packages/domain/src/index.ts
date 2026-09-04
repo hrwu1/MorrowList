@@ -211,3 +211,18 @@ export {
   type StatusInterval,
   type WeekBucket,
 } from "./flow/metrics.js";
+
+export {
+  DUE_STATES,
+  MAX_MATCH_RANGES,
+  MAX_SEARCH_TERMS,
+  SEARCH_GRAMMAR_EXAMPLES,
+  SEARCH_OPERATORS,
+  matchRanges,
+  parseSearchQuery,
+  searchTerms,
+  type DueState,
+  type MatchRange,
+  type SearchFilters,
+  type SearchQuery,
+} from "./search/query.js";

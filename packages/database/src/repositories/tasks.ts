@@ -10,6 +10,7 @@ import {
   type TaskCounterRepository,
   type TaskFilter,
   type TaskRepository,
+  type TaskSearchQuery,
 } from "@morrowlist/application";
 import {
   addDays,
@@ -33,6 +34,7 @@ import {
   lte,
   or,
   sql,
+  type SQL,
 } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
@@ -102,6 +104,72 @@ export function createTaskRepository(db: Database): TaskRepository {
       isNull(tasks.deletedAt),
     );
 
+  /** The list predicate, shared by `list` and `search` so both read the same filters. */
+  const filterConditions = (filter: TaskFilter): SQL[] => {
+    const conditions: SQL[] = [eq(tasks.workspaceId, filter.workspaceId)];
+
+    conditions.push(
+      filter.deletedOnly ? isNotNull(tasks.deletedAt) : isNull(tasks.deletedAt),
+    );
+    if (filter.inboxOnly) conditions.push(isNull(tasks.projectId));
+    if (filter.projectId) conditions.push(eq(tasks.projectId, filter.projectId));
+    if (filter.statusId) conditions.push(eq(tasks.statusId, filter.statusId));
+    if (filter.seriesId) conditions.push(eq(tasks.seriesId, filter.seriesId));
+    if (filter.priority) conditions.push(eq(tasks.priority, filter.priority));
+    if (filter.tagId) {
+      conditions.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(taskTags)
+            .where(
+              and(eq(taskTags.taskId, tasks.id), eq(taskTags.tagId, filter.tagId)),
+            ),
+        ),
+      );
+    }
+    if (filter.parentTaskId) {
+      conditions.push(eq(tasks.parentTaskId, filter.parentTaskId));
+    } else if (filter.includeSubtasks === false) {
+      conditions.push(isNull(tasks.parentTaskId));
+    }
+    if (filter.isCompleted !== undefined) {
+      conditions.push(
+        filter.isCompleted ? isNotNull(tasks.completedAt) : isNull(tasks.completedAt),
+      );
+    }
+    if (filter.due && filter.today) {
+      const today = filter.today;
+      if (filter.due === "none") conditions.push(isNull(tasks.dueDate));
+      if (filter.due === "overdue") conditions.push(lt(tasks.dueDate, today));
+      if (filter.due === "today") conditions.push(eq(tasks.dueDate, today));
+      if (filter.due === "future") conditions.push(gt(tasks.dueDate, today));
+    }
+    if (filter.deferred !== undefined && filter.today) {
+      conditions.push(
+        filter.deferred
+          ? gt(tasks.deferUntil, filter.today)
+          : notDeferredOn(filter.today as PlainDate),
+      );
+    }
+    if (filter.deadline && filter.today) {
+      const today = filter.today as PlainDate;
+      if (filter.deadline === "none") conditions.push(isNull(tasks.deadline));
+      if (filter.deadline === "overdue") conditions.push(lt(tasks.deadline, today));
+      if (filter.deadline === "week") {
+        conditions.push(
+          gte(tasks.deadline, today),
+          lte(tasks.deadline, addDays(today, 7)),
+        );
+      }
+    }
+
+    if (filter.isBlocked !== undefined) {
+      conditions.push(filter.isBlocked ? BLOCKED : sql`not ${BLOCKED}`);
+    }
+    return conditions;
+  };
+
   return {
     async findById(workspaceId, taskId) {
       const [row] = await db
@@ -124,66 +192,7 @@ export function createTaskRepository(db: Database): TaskRepository {
     },
 
     async list(filter: TaskFilter, cursor: Cursor): Promise<Page<Task>> {
-      const conditions = [eq(tasks.workspaceId, filter.workspaceId)];
-
-      conditions.push(
-        filter.deletedOnly ? isNotNull(tasks.deletedAt) : isNull(tasks.deletedAt),
-      );
-      if (filter.inboxOnly) conditions.push(isNull(tasks.projectId));
-      if (filter.projectId) conditions.push(eq(tasks.projectId, filter.projectId));
-      if (filter.statusId) conditions.push(eq(tasks.statusId, filter.statusId));
-      if (filter.seriesId) conditions.push(eq(tasks.seriesId, filter.seriesId));
-      if (filter.priority) conditions.push(eq(tasks.priority, filter.priority));
-      if (filter.tagId) {
-        conditions.push(
-          exists(
-            db
-              .select({ one: sql`1` })
-              .from(taskTags)
-              .where(
-                and(eq(taskTags.taskId, tasks.id), eq(taskTags.tagId, filter.tagId)),
-              ),
-          ),
-        );
-      }
-      if (filter.parentTaskId) {
-        conditions.push(eq(tasks.parentTaskId, filter.parentTaskId));
-      } else if (filter.includeSubtasks === false) {
-        conditions.push(isNull(tasks.parentTaskId));
-      }
-      if (filter.isCompleted !== undefined) {
-        conditions.push(
-          filter.isCompleted ? isNotNull(tasks.completedAt) : isNull(tasks.completedAt),
-        );
-      }
-      if (filter.isBlocked !== undefined) {
-        conditions.push(filter.isBlocked ? BLOCKED : sql`not ${BLOCKED}`);
-      }
-      if (filter.due && filter.today) {
-        const today = filter.today;
-        if (filter.due === "none") conditions.push(isNull(tasks.dueDate));
-        if (filter.due === "overdue") conditions.push(lt(tasks.dueDate, today));
-        if (filter.due === "today") conditions.push(eq(tasks.dueDate, today));
-        if (filter.due === "future") conditions.push(gt(tasks.dueDate, today));
-      }
-      if (filter.deferred !== undefined && filter.today) {
-        conditions.push(
-          filter.deferred
-            ? gt(tasks.deferUntil, filter.today)
-            : notDeferredOn(filter.today as PlainDate),
-        );
-      }
-      if (filter.deadline && filter.today) {
-        const today = filter.today as PlainDate;
-        if (filter.deadline === "none") conditions.push(isNull(tasks.deadline));
-        if (filter.deadline === "overdue") conditions.push(lt(tasks.deadline, today));
-        if (filter.deadline === "week") {
-          conditions.push(
-            gte(tasks.deadline, today),
-            lte(tasks.deadline, addDays(today, 7)),
-          );
-        }
-      }
+      const conditions = filterConditions(filter);
 
       const descending = filter.order === "desc";
       const direction = descending ? desc : asc;
@@ -226,6 +235,71 @@ export function createTaskRepository(db: Database): TaskRepository {
         .from(tasks)
         .where(and(...conditions))
         .orderBy(direction(sortColumn), direction(tasks.id))
+        .limit(cursor.limit + 1);
+
+      const hasMore = rows.length > cursor.limit;
+      return {
+        items: rows.slice(0, cursor.limit).map(toTask),
+        hasMore,
+        nextCursor: null,
+      };
+    },
+
+    async search(query: TaskSearchQuery, cursor: Cursor): Promise<Page<Task>> {
+      const conditions = filterConditions(query);
+      // Prefix terms joined by AND; the terms are letters and digits only, so the
+      // tsquery text cannot be misread (domain `searchTerms`).
+      const tsquery =
+        query.terms.length > 0
+          ? sql`to_tsquery('simple', ${query.terms.map((term) => `${term}:*`).join(" & ")})`
+          : null;
+      // Relevance: ts_rank_cd weights the title (A) above the description (B). A task
+      // matched only through a tag name ranks zero and sorts by recency.
+      const rank = tsquery
+        ? sql`ts_rank_cd(${tasks.searchVector}, ${tsquery})`
+        : sql`0::real`;
+
+      if (tsquery) {
+        // The tag match is an uncorrelated array so the planner can BitmapOr it with
+        // the GIN scan; a correlated EXISTS here would force a sequential scan.
+        const taggedIds = db
+          .select({ taskId: taskTags.taskId })
+          .from(taskTags)
+          .innerJoin(tags, eq(tags.id, taskTags.tagId))
+          .where(
+            and(
+              eq(tags.workspaceId, query.workspaceId),
+              or(
+                ...query.terms.map(
+                  (term) => sql`${tags.normalizedName} like ${`${term}%`}`,
+                ),
+              ),
+            ),
+          );
+        conditions.push(
+          or(
+            sql`${tasks.searchVector} @@ ${tsquery}`,
+            sql`${tasks.id} = any(array(${taggedIds}))`,
+          ) as SQL,
+        );
+      }
+
+      // Keyset pagination on (rank, id): the anchor's rank is recomputed here rather
+      // than trusted from the cursor, so a cursor can only ever name a position.
+      if (cursor.after) {
+        const anchorRank = tsquery
+          ? sql`(select ts_rank_cd(a.search_vector, ${tsquery}) from ${tasks} a where a.id = ${cursor.after})`
+          : sql`0::real`;
+        conditions.push(
+          sql`(${rank}, ${tasks.id}) < (${anchorRank}, ${cursor.after}::uuid)`,
+        );
+      }
+
+      const rows = await db
+        .select()
+        .from(tasks)
+        .where(and(...conditions))
+        .orderBy(desc(rank), desc(tasks.id))
         .limit(cursor.limit + 1);
 
       const hasMore = rows.length > cursor.limit;

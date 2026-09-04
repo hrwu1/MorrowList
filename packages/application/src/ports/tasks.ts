@@ -23,6 +23,8 @@ export interface TaskFilter {
   /** True selects Inbox tasks only: those with no project (spec 9.1). */
   readonly inboxOnly?: boolean | undefined;
   readonly isCompleted?: boolean | undefined;
+  /** Blocked means the task's status is in the `blocked` category (spec 9.5, 9.8). */
+  readonly isBlocked?: boolean | undefined;
   /**
    * Blocked state as the domain defines it (spec 8.4): open and either flagged or
    * waiting on a live, incomplete `blocks` predecessor.
@@ -53,6 +55,15 @@ export interface TaskFilter {
     | "updatedAt"
     | undefined;
   readonly order?: "asc" | "desc" | undefined;
+}
+
+/**
+ * Full-text search (spec 9.8): every filter of a list plus prefix terms matched against
+ * the title, the description and the names of the task's tags. Ordered by relevance
+ * (title hits first), then newest id, with a keyset cursor on that order.
+ */
+export interface TaskSearchQuery extends TaskFilter {
+  readonly terms: readonly string[];
 }
 
 export interface Cursor {
@@ -134,6 +145,7 @@ export interface TaskRepository {
   findById(workspaceId: string, taskId: string): Promise<Task | null>;
   findByNumber(workspaceId: string, taskNumber: number): Promise<Task | null>;
   list(filter: TaskFilter, cursor: Cursor): Promise<Page<Task>>;
+  search(query: TaskSearchQuery, cursor: Cursor): Promise<Page<Task>>;
   /** Active project tasks ordered by status rank, then task rank, in one data query. */
   listBoard(query: BoardTaskQuery): Promise<BoardTaskPage>;
   listToday(query: TodayTaskQuery): Promise<BoardTaskPage>;

@@ -12,6 +12,7 @@ export {
   type TaskCounterRepository,
   type TaskFilter,
   type TaskRepository,
+  type TaskSearchQuery,
   type TodayTaskQuery,
   type UpcomingTaskQuery,
 } from "./tasks.js";
