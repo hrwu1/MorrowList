@@ -170,6 +170,7 @@ export {
   normalizeTitle,
   toInstant,
   toLocalDate,
+  toLocalTime,
   toPlainDate,
   toPlainTime,
   toReminderOffset,

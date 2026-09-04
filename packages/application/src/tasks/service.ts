@@ -334,7 +334,7 @@ export class TaskService {
     return this.mutate(context, workspaceId, taskId, request.expectedVersion, {
       eventType: TASK_EVENTS.updated,
       summarize: () => "Updated task fields",
-      apply: async (task, tx) =>
+      apply: async (task, tx, workspace) =>
         updateTaskFields(
           task,
           {
@@ -351,7 +351,10 @@ export class TaskService {
               : {}),
             ...(request.dueTimezone !== undefined
               ? { dueTimezone: request.dueTimezone }
-              : {}),
+              : request.dueTime && task.dueTimezone === null
+                ? // A first due time without a zone takes the workspace's (spec 12.3).
+                  { dueTimezone: workspace.timezone }
+                : {}),
             ...(request.recurrence !== undefined
               ? { recurrence: request.recurrence }
               : {}),

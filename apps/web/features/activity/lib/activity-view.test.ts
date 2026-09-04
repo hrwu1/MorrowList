@@ -65,6 +65,12 @@ const CATALOGUE: Record<string, Partial<ActivityEntryDto>> = {
     summary: "Skipped occurrence due 2026-09-03",
     changes: [{ field: "dueDate", from: "2026-09-03", to: "2026-09-10" }],
   },
+  [TASK_EVENTS.reminderSent]: {
+    actorKind: "system",
+    actorDisplayName: "MorrowList",
+    summary: "Sent reminder for ML-1",
+  },
+  [TASK_EVENTS.reminderSnoozed]: { summary: "Snoozed reminder for 60 minutes" },
   [PROJECT_EVENTS.created]: {
     aggregateType: "project",
     summary: "Created project Launch",
@@ -79,6 +85,16 @@ const CATALOGUE: Record<string, Partial<ActivityEntryDto>> = {
   [WORKSPACE_EVENTS.updated]: {
     aggregateType: "workspace",
     summary: "Updated workspace Alex's Workspace",
+  },
+  [WORKSPACE_EVENTS.digestSent]: {
+    aggregateType: "workspace",
+    actorKind: "system",
+    actorDisplayName: "MorrowList",
+    summary: "Sent Today digest for 2026-08-29",
+  },
+  [WORKSPACE_EVENTS.notificationPreferencesUpdated]: {
+    aggregateType: "workspace",
+    summary: "Updated notification preferences",
   },
 };
 

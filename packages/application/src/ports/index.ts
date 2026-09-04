@@ -37,6 +37,7 @@ export type {
 export type { TagRepository } from "./tags.js";
 export type { StatusIntervalInput, StatusIntervalRepository } from "./flow.js";
 export type { SavedView, SavedViewRepository } from "./saved-views.js";
+export type { UserDirectory } from "./users.js";
 export type {
   Workspace,
   WorkspaceMembership,

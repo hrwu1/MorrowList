@@ -23,6 +23,7 @@ const DISPLAYED_FIELDS = [
   "deferUntil",
   "deadline",
   "deadlineTime",
+  "reminderOffsetMinutes",
 ] as const;
 
 /** A description can be 50,000 characters; the history shows enough to recognise it. */

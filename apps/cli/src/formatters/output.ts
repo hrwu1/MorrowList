@@ -67,6 +67,7 @@ export function exitCodeFor(errorCode: string): ExitCode {
     case "TAG_NOT_FOUND":
     case "TASK_RELATION_NOT_FOUND":
     case "SAVED_VIEW_NOT_FOUND":
+    case "NOTIFICATION_NOT_FOUND":
     case "NOT_FOUND":
       return EXIT.notFound;
     case "TASK_VERSION_CONFLICT":

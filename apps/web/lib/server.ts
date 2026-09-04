@@ -4,6 +4,7 @@ import { createApiApp, type ApiDependencies } from "@morrowlist/api";
 import {
   ActivityService,
   FlowService,
+  NotificationService,
   ProjectService,
   SavedViewService,
   SearchService,
@@ -13,8 +14,16 @@ import {
   WorkflowService,
   WorkspaceService,
   bootstrapUser,
+  createConsoleEmailSender,
+  startNotificationWorker,
+  type NotificationWorker,
 } from "@morrowlist/application";
-import { createAuth, createAuthPort, type AuthPort } from "@morrowlist/auth";
+import {
+  createAuth,
+  createAuthPort,
+  createUserDirectory,
+  type AuthPort,
+} from "@morrowlist/auth";
 import { parseServerEnv, type ServerEnv } from "@morrowlist/config/env";
 import {
   checkDatabaseHealth,
@@ -39,6 +48,8 @@ export interface Container {
   readonly auth: AuthPort;
   readonly api: ReturnType<typeof createApiApp>;
   readonly handleAuthRequest: (request: Request) => Promise<Response>;
+  /** The embedded reminder worker, when `WORKER_MODE=embedded` (GAP-13). */
+  readonly worker: NotificationWorker | null;
 }
 
 const CONTAINER_KEY = Symbol.for("morrowlist.container");
@@ -84,6 +95,19 @@ export function getContainer(): Container {
   // Cursors are signed with the application secret so a client cannot forge a page
   // position (spec 20.6).
   const cursorSecret = env.AUTH_SECRET ?? "development-only-cursor-secret";
+  // Only the console transport exists so far; `smtp` is accepted by the schema for the
+  // day a transport lands, and until then falls back loudly rather than failing to start.
+  if (env.EMAIL_PROVIDER === "smtp") {
+    logger.warn("EMAIL_PROVIDER=smtp has no transport yet; using the console sender");
+  }
+  const notificationService = new NotificationService({
+    unitOfWork,
+    cursorSecret,
+    emailSender: createConsoleEmailSender(logger),
+    userDirectory: createUserDirectory(database.db),
+    appUrl: env.APP_URL,
+    logger,
+  });
   const dependencies: ApiDependencies = {
     auth,
     unitOfWork,
@@ -97,9 +121,21 @@ export function getContainer(): Container {
     tagService: new TagService({ unitOfWork }),
     searchService: new SearchService({ unitOfWork, cursorSecret }),
     savedViewService: new SavedViewService({ unitOfWork }),
+    notificationService,
     logger,
     checkHealth: () => checkDatabaseHealth(database),
   };
+
+  // One-container deploys run the reminder worker inside the web process; `external`
+  // leaves it to `pnpm worker` (scripts/worker.mjs).
+  const worker =
+    env.WORKER_MODE === "embedded"
+      ? startNotificationWorker({
+          service: notificationService,
+          logger: logger.child({ component: "notification-worker" }),
+          pollIntervalMs: env.WORKER_POLL_SECONDS * 1000,
+        })
+      : null;
 
   const container: Container = {
     env,
@@ -108,6 +144,7 @@ export function getContainer(): Container {
     auth,
     api: createApiApp(dependencies),
     handleAuthRequest: (request) => authInstance.handler(request),
+    worker,
   };
 
   store[CONTAINER_KEY] = container;

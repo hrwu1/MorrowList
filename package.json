@@ -22,7 +22,8 @@
     "openapi:generate": "pnpm --filter @morrowlist/api openapi:generate",
     "openapi:check": "pnpm --filter @morrowlist/api openapi:check",
     "lint:boundaries": "node scripts/check-boundaries.mjs",
-    "test:e2e": "pnpm --filter @morrowlist/web test:e2e"
+    "test:e2e": "pnpm --filter @morrowlist/web test:e2e",
+    "worker": "node scripts/worker.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.34.0",

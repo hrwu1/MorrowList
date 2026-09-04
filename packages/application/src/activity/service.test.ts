@@ -2,6 +2,8 @@ import { TASK_EVENTS, type TaskDto } from "@morrowlist/contracts";
 import { fixedClock, uuidv7 } from "@morrowlist/domain";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { createRecordingEmailSender } from "../notifications/email.js";
+import { NotificationService } from "../notifications/service.js";
 import { ProjectService } from "../projects/service.js";
 import { TagService } from "../tags/service.js";
 import { TaskService } from "../tasks/service.js";
@@ -25,6 +27,7 @@ let tasks: TaskService;
 let projects: ProjectService;
 let tags: TagService;
 let activity: ActivityService;
+let notifications: NotificationService;
 
 const query = (overrides: { limit?: number; cursor?: string } = {}) => ({
   limit: 50,
@@ -42,6 +45,14 @@ beforeEach(() => {
   projects = new ProjectService({ unitOfWork, clock: fixedClock(NOW) });
   tags = new TagService({ unitOfWork, clock: fixedClock(NOW) });
   activity = new ActivityService({ unitOfWork, cursorSecret: CURSOR_SECRET });
+  notifications = new NotificationService({
+    unitOfWork,
+    clock: fixedClock(NOW),
+    cursorSecret: CURSOR_SECRET,
+    emailSender: createRecordingEmailSender(),
+    userDirectory: { findById: async () => null },
+    appUrl: "http://localhost:3000",
+  });
 });
 
 /** Drive a task through every command so each catalogued event type is recorded once. */
@@ -52,6 +63,10 @@ async function taskWithFullHistory(): Promise<TaskDto> {
   task = await tasks.update(seeded.context, workspaceId, task.id, {
     title: "Renamed",
     priority: "high",
+    // A due time schedules a reminder, so the delivery events can be recorded below.
+    dueDate: "2026-08-29",
+    dueTime: "12:00",
+    dueTimezone: "UTC",
   });
   ({ task } = await tasks.move(seeded.context, workspaceId, task.id, {
     projectId: seeded.project.id,
@@ -108,7 +123,12 @@ async function taskWithFullHistory(): Promise<TaskDto> {
   });
   task = await tasks.skipOccurrence(seeded.context, workspaceId, task.id);
   task = await tasks.delete(seeded.context, workspaceId, task.id);
-  return tasks.restore(seeded.context, workspaceId, task.id);
+  task = await tasks.restore(seeded.context, workspaceId, task.id);
+  // The reminder (11:30Z) fires as the system actor, then the user snoozes it.
+  await notifications.deliverDue(new Date("2026-08-29T11:30:00.000Z"));
+  const inbox = await notifications.list(seeded.context, workspaceId, { limit: 1 });
+  await notifications.snooze(seeded.context, workspaceId, inbox.data[0]!.id);
+  return task;
 }
 
 describe("ActivityService.listForTask", () => {
@@ -123,6 +143,8 @@ describe("ActivityService.listForTask", () => {
     );
 
     expect(data.map((entry) => entry.eventType)).toEqual([
+      TASK_EVENTS.reminderSnoozed,
+      TASK_EVENTS.reminderSent,
       TASK_EVENTS.restored,
       TASK_EVENTS.deleted,
       TASK_EVENTS.occurrenceSkipped,
@@ -170,6 +192,11 @@ describe("ActivityService.listForTask", () => {
     ).toEqual(["Cleared the blocked flag", "Marked task blocked: waiting on vendor"]);
     for (const entry of data) {
       expect(entry.summary.length).toBeGreaterThan(0);
+      if (entry.eventType === TASK_EVENTS.reminderSent) {
+        expect(entry.actorKind).toBe("system");
+        expect(entry.actorDisplayName).toBe("MorrowList");
+        continue;
+      }
       expect(entry.actorDisplayName).toBe("Test User");
       expect(entry.actorKind).toBe("user");
     }
@@ -190,6 +217,10 @@ describe("ActivityService.listForTask", () => {
     expect(byType.get(TASK_EVENTS.updated)?.changes).toEqual([
       { field: "title", from: "Original", to: "Renamed" },
       { field: "priority", from: "none", to: "high" },
+      { field: "dueDate", from: null, to: "2026-08-29" },
+      { field: "dueTime", from: null, to: "12:00" },
+      { field: "dueTimezone", from: null, to: "UTC" },
+      { field: "reminderOffsetMinutes", from: null, to: "30" },
     ]);
     // A rule is shown in words, never as JSON.
     expect(

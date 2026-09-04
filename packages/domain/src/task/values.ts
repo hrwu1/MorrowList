@@ -111,6 +111,16 @@ export function localDateFormatter(timezone: string): (instant: Date) => PlainDa
   return (instant) => format.format(instant) as PlainDate;
 }
 
+/** The wall-clock `HH:mm` of an instant in an IANA timezone, for comparing with a digest time. */
+export function toLocalTime(instant: Date, timezone: string): PlainTime {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: timezone,
+    hourCycle: "h23",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(instant) as PlainTime;
+}
+
 /** A reminder fires this many minutes before the due instant unless the task says otherwise. */
 export const DEFAULT_REMINDER_OFFSET_MINUTES = 30;
 /** A week is the furthest ahead a reminder can be pulled (GAP-13). */

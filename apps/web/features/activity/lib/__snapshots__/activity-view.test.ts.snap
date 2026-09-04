@@ -17,6 +17,8 @@ exports[`describeEntry > renders a readable line for every event type in the cat
   "task.parent_changed": "Made task a subtask",
   "task.relation_added": "Added relation: blocks ML-2",
   "task.relation_removed": "Removed relation: blocked by ML-1",
+  "task.reminder_sent": "Sent reminder for ML-1",
+  "task.reminder_snoozed": "Snoozed reminder for 60 minutes",
   "task.reopened": "Reopened task",
   "task.reordered": "Reordered task",
   "task.restored": "Restored task from Trash",
@@ -25,6 +27,8 @@ exports[`describeEntry > renders a readable line for every event type in the cat
   "task.unblocked": "Cleared the blocked flag",
   "task.updated": "Updated task fields · Title: Draft brief → Draft the brief · Priority: none → high · Due date: none → 2026-09-15 · Defer until: none → 2026-09-10 · Deadline: 2026-09-20 → none · Description: none → ## Notes",
   "workspace.created": "Created workspace Alex's Workspace",
+  "workspace.digest_sent": "Sent Today digest for 2026-08-29",
+  "workspace.notification_preferences_updated": "Updated notification preferences",
   "workspace.updated": "Updated workspace Alex's Workspace",
 }
 `;

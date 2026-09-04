@@ -50,6 +50,13 @@ export const serverEnvSchema = z
     EMAIL_PROVIDER: z.enum(["console", "smtp"]).default("console"),
     EMAIL_FROM: z.string().default("morrowlist@localhost"),
 
+    /**
+     * Where the reminder worker runs (GAP-13): inside the web process (one-container
+     * deploys), as `pnpm worker`, or nowhere.
+     */
+    WORKER_MODE: z.enum(["embedded", "external", "off"]).default("embedded"),
+    WORKER_POLL_SECONDS: z.coerce.number().int().positive().max(3600).default(30),
+
     TRASH_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
     IDEMPOTENCY_RETENTION_HOURS: z.coerce.number().int().positive().default(24),
     OUTBOX_RETENTION_DAYS: z.coerce.number().int().positive().default(90),

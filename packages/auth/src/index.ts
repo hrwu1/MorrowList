@@ -1,4 +1,5 @@
 export { createAuth, type AuthInstance, type CreateAuthOptions } from "./auth.js";
+export { createUserDirectory } from "./directory.js";
 export {
   createAuthPort,
   userActorContext,

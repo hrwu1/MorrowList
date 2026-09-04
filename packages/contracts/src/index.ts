@@ -5,6 +5,7 @@ export * from "./project.js";
 export * from "./views.js";
 export * from "./search.js";
 export * from "./saved-view.js";
+export * from "./notification.js";
 export * from "./workspace.js";
 export * from "./events.js";
 export * from "./flow.js";

@@ -1,6 +1,7 @@
 import {
   ActivityService,
   FlowService,
+  NotificationService,
   ProjectService,
   SavedViewService,
   SearchService,
@@ -16,6 +17,7 @@ import { fixedClock, uuidv7 } from "@morrowlist/domain";
 import { silentLogger } from "@morrowlist/observability";
 import {
   createInMemoryUnitOfWork,
+  createRecordingEmailSender,
   emptyData,
   type InMemoryUnitOfWork,
 } from "@morrowlist/testkit";
@@ -91,6 +93,14 @@ beforeEach(async () => {
       cursorSecret: "test-secret",
     }),
     savedViewService: new SavedViewService({ unitOfWork, clock: fixedClock(NOW) }),
+    notificationService: new NotificationService({
+      unitOfWork,
+      clock: fixedClock(NOW),
+      cursorSecret: "test-secret",
+      emailSender: createRecordingEmailSender(),
+      userDirectory: { findById: async () => currentUser },
+      appUrl: "http://localhost:3000",
+    }),
     logger: silentLogger,
     checkHealth: async () =>
       healthy

@@ -16,6 +16,7 @@ const FIELD_LABELS: Record<string, string> = {
   deferUntil: "Defer until",
   deadline: "Deadline",
   deadlineTime: "Deadline time",
+  reminderOffsetMinutes: "Reminder (minutes before)",
 };
 
 const ACTOR_KIND_LABELS: Record<ActivityEntryDto["actorKind"], string> = {

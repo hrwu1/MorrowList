@@ -72,6 +72,10 @@ export const TASK_EVENTS = {
   unblocked: "task.unblocked",
   /** A repeating task moved on without being done. Payload: `{ taskId, changes }`. */
   occurrenceSkipped: "task.occurrence_skipped",
+  /** A reminder was delivered (GAP-13). Payload: `{ taskId, remindAt, recipients, channels }`. */
+  reminderSent: "task.reminder_sent",
+  /** Payload: `{ taskId, notificationId, remindAt }`. */
+  reminderSnoozed: "task.reminder_snoozed",
 } as const;
 
 export const TAG_EVENTS = {
@@ -91,6 +95,10 @@ export const WORKSPACE_EVENTS = {
   created: "workspace.created",
   /** Payload: `{ workspaceId, changes }` with the field-level diff (GAP-20). */
   updated: "workspace.updated",
+  /** Payload: `{ workspaceId, userId, date, counts }` (GAP-13). */
+  digestSent: "workspace.digest_sent",
+  /** Payload: `{ workspaceId, userId, changes }`. */
+  notificationPreferencesUpdated: "workspace.notification_preferences_updated",
 } as const;
 
 export const PROJECT_EVENTS = {
