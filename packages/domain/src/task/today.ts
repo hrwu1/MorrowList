@@ -1,6 +1,6 @@
 import type { ActorRef } from "../shared/actor.js";
 
-import { isCompleted, isDeleted, type Task } from "./task.js";
+import { isCompleted, isDeferred, isDeleted, type Task } from "./task.js";
 import { addDays, type PlainDate } from "./values.js";
 
 /**
@@ -37,12 +37,17 @@ export interface TodaySection {
   readonly tasks: readonly TodayEntry[];
 }
 
-/** Which of the Today conditions an open task satisfies on `today`. */
+/**
+ * Which of the Today conditions an open task satisfies on `today`. A deferred task is out
+ * of sight until its defer date (GAP-16): only a deliberate My Day selection brings it in,
+ * and then only as My Day, never as overdue or due today.
+ */
 export function todayReasons(
   task: Task,
   plannedToday: boolean,
   today: PlainDate,
 ): TodayReason[] {
+  if (isDeferred(task, today)) return plannedToday ? ["my_day"] : [];
   const reasons: TodayReason[] = [];
   if (task.dueDate !== null && task.dueDate < today) reasons.push("overdue");
   if (task.dueDate === today) reasons.push("due_today");
@@ -87,7 +92,8 @@ export interface UpcomingGroup {
 /**
  * Open tasks due after `from`, grouped by due date in chronological order (spec 9.3). A
  * null horizon means every future date. Within a day, date-only tasks come first, then
- * timed tasks by time, so nothing is given an artificial midnight.
+ * timed tasks by time, so nothing is given an artificial midnight. A task deferred past
+ * `from` is left out until its defer date, like in Today (GAP-16).
  */
 export function upcomingGroups(
   tasks: readonly Task[],
@@ -99,7 +105,7 @@ export function upcomingGroups(
 
   for (const task of tasks) {
     if (isCompleted(task) || isDeleted(task) || task.dueDate === null) continue;
-    if (task.dueDate <= from) continue;
+    if (task.dueDate <= from || isDeferred(task, from)) continue;
     if (last !== null && task.dueDate > last) continue;
     const group = byDate.get(task.dueDate) ?? [];
     group.push(task);

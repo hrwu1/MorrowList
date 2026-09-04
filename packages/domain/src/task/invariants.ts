@@ -46,6 +46,14 @@ export function assertTaskInvariants(task: Task): void {
     });
   }
 
+  // A deadline time cannot exist without a deadline, for the same reason (GAP-16).
+  if (task.deadlineTime !== null && task.deadline === null) {
+    throw new ValidationError("A deadline time requires a deadline.", {
+      field: "deadlineTime",
+      taskId: task.id,
+    });
+  }
+
   // 4. A task must not be its own parent.
   if (task.parentTaskId !== null && task.parentTaskId === task.id) {
     throw new DomainError("TASK_RELATION_CYCLE", "A task cannot be its own parent.", {

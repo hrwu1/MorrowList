@@ -58,6 +58,9 @@ export interface CreateTaskInput {
   readonly dueDate?: PlainDate | null;
   readonly dueTime?: PlainTime | null;
   readonly dueTimezone?: string | null;
+  readonly deferUntil?: PlainDate | null;
+  readonly deadline?: PlainDate | null;
+  readonly deadlineTime?: PlainTime | null;
   readonly parentTaskId?: string | null;
   readonly recurrence?: RecurrenceRuleInput | null;
   /** The series this task continues; a new repeating task starts its own. */
@@ -92,6 +95,9 @@ export function createTask(input: CreateTaskInput, context: PolicyContext): Task
     dueDate: input.dueDate ?? null,
     dueTime: input.dueTime ?? null,
     dueTimezone: input.dueTime ? (input.dueTimezone ?? null) : null,
+    deferUntil: input.deferUntil ?? null,
+    deadline: input.deadline ?? null,
+    deadlineTime: input.deadlineTime ?? null,
     parentTaskId: input.parentTaskId ?? null,
     recurrence: input.recurrence ? toRecurrenceRule(input.recurrence) : null,
     seriesId: input.seriesId ?? (input.recurrence ? input.id : null),
@@ -122,11 +128,17 @@ export interface UpdateTaskFieldsInput {
   readonly dueTimezone?: Patch<string>;
   /** Setting a rule on a task that never repeated starts a series with this task. */
   readonly recurrence?: Patch<RecurrenceRuleInput>;
+  readonly deferUntil?: Patch<PlainDate>;
+  readonly deadline?: Patch<PlainDate>;
+  readonly deadlineTime?: Patch<PlainTime>;
 }
 
 /**
  * Update the simple, non-structural fields. Project, status, rank, parent, and completion
  * each have their own command because they carry additional workflow consequences.
+ *
+ * The three dates are not checked against each other here: `dateOrderWarnings` reports
+ * an unusual order so a client can warn, but the change is always accepted (GAP-16).
  */
 export function updateTaskFields(
   task: Task,
@@ -149,6 +161,11 @@ export function updateTaskFields(
         ? null
         : toRecurrenceRule(input.recurrence);
 
+  // The deadline and its time follow the same rule.
+  const deadline = input.deadline === undefined ? task.deadline : input.deadline;
+  const requestedDeadlineTime =
+    input.deadlineTime === undefined ? task.deadlineTime : input.deadlineTime;
+
   const next: Task = {
     ...task,
     title: input.title === undefined ? task.title : normalizeTitle(input.title),
@@ -163,6 +180,9 @@ export function updateTaskFields(
     recurrence,
     // Clearing a rule keeps the series link, so the history of a stopped series stays.
     seriesId: task.seriesId ?? (recurrence ? task.id : null),
+    deferUntil: input.deferUntil === undefined ? task.deferUntil : input.deferUntil,
+    deadline,
+    deadlineTime: deadline === null ? null : requestedDeadlineTime,
   };
 
   return touch(next, task, context);
@@ -597,6 +617,9 @@ const MATERIAL_FIELDS = [
   "dueDate",
   "dueTime",
   "dueTimezone",
+  "deferUntil",
+  "deadline",
+  "deadlineTime",
   "parentTaskId",
   "recurrence",
   "seriesId",

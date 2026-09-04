@@ -19,6 +19,9 @@ function task(overrides: Partial<Task> & { readonly id: string }): Task {
     dueDate: null,
     dueTime: null,
     dueTimezone: null,
+    deferUntil: null,
+    deadline: null,
+    deadlineTime: null,
     parentTaskId: null,
     rank: "a0",
     lastActiveStatusId: null,
@@ -188,5 +191,57 @@ describe("upcomingGroups", () => {
       "tomorrow-timed",
       "week",
     ]);
+  });
+});
+
+describe("deferred tasks (GAP-16)", () => {
+  it("keeps a deferred task out of Today unless it is in My Day, and then only as My Day", () => {
+    const deferredOverdue = task({
+      id: "deferred",
+      dueDate: date("2026-09-01"),
+      deferUntil: date("2026-09-10"),
+    });
+    const deferredPlanned = task({
+      id: "chosen",
+      dueDate: TODAY,
+      deferUntil: date("2026-09-10"),
+    });
+    const returned = task({ id: "back", dueDate: TODAY, deferUntil: TODAY });
+
+    const sections = todaySections(
+      [deferredOverdue, deferredPlanned, returned],
+      new Set(["chosen"]),
+      TODAY,
+    );
+
+    expect(sections[0]?.tasks).toEqual([]);
+    expect(sections[1]?.tasks).toEqual([{ task: returned, reasons: ["due_today"] }]);
+    expect(sections[2]?.tasks).toEqual([
+      { task: deferredPlanned, reasons: ["my_day"] },
+    ]);
+  });
+
+  it("leaves deferred tasks out of Upcoming until their defer date", () => {
+    const hidden = task({
+      id: "hidden",
+      dueDate: date("2026-09-05"),
+      deferUntil: date("2026-09-04"),
+    });
+    const shown = task({
+      id: "shown",
+      dueDate: date("2026-09-05"),
+      deferUntil: TODAY,
+    });
+
+    expect(
+      upcomingGroups([hidden, shown], TODAY, 14).flatMap((g) =>
+        g.tasks.map((t) => t.id),
+      ),
+    ).toEqual(["shown"]);
+    expect(
+      upcomingGroups([hidden], date("2026-09-04"), 14).flatMap((g) =>
+        g.tasks.map((t) => t.id),
+      ),
+    ).toEqual(["hidden"]);
   });
 });

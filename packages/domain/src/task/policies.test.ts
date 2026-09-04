@@ -27,7 +27,13 @@ import {
   spawnNextOccurrence,
   updateTaskFields,
 } from "./policies.js";
-import { isInboxTask, type Task } from "./task.js";
+import {
+  dateOrderWarnings,
+  isDeferred,
+  isInboxTask,
+  isPastDeadline,
+  type Task,
+} from "./task.js";
 import { toPlainDate, toPlainTime } from "./values.js";
 
 const baseInput = {
@@ -798,5 +804,88 @@ describe("recurrence", () => {
     expect(() =>
       skipOccurrence(done, toPlainDate("2026-09-03"), testContext()),
     ).toThrow(/completed/);
+  });
+});
+
+describe("defer and deadline dates (GAP-16)", () => {
+  it("stores the three dates on create and drops a deadline time without a deadline", () => {
+    const task = createTask(
+      {
+        ...baseInput,
+        deferUntil: toPlainDate("2026-09-01"),
+        dueDate: toPlainDate("2026-09-03"),
+        deadline: toPlainDate("2026-09-05"),
+        deadlineTime: toPlainTime("17:00"),
+      },
+      testContext(),
+    );
+
+    expect(task.deferUntil).toBe("2026-09-01");
+    expect(task.deadline).toBe("2026-09-05");
+    expect(task.deadlineTime).toBe("17:00");
+    expect(dateOrderWarnings(task)).toEqual([]);
+
+    expect(() =>
+      createTask({ ...baseInput, deadlineTime: toPlainTime("17:00") }, testContext()),
+    ).toThrow(/deadline time requires a deadline/);
+  });
+
+  it("clears the deadline time with the deadline and records the fields as changes", () => {
+    const dated = updateTaskFields(
+      inboxTask(),
+      { deadline: toPlainDate("2026-09-05"), deadlineTime: toPlainTime("17:00") },
+      testContext(),
+    );
+    expect(dated.version).toBe(2);
+    expect(materialChanges(dated, inboxTask())).toEqual({
+      deadline: { from: null, to: "2026-09-05" },
+      deadlineTime: { from: null, to: "17:00" },
+    });
+
+    const cleared = updateTaskFields(dated, { deadline: null }, testContext());
+    expect(cleared.deadline).toBeNull();
+    expect(cleared.deadlineTime).toBeNull();
+
+    const deferred = updateTaskFields(
+      cleared,
+      { deferUntil: toPlainDate("2026-09-10") },
+      testContext(),
+    );
+    expect(deferred.deferUntil).toBe("2026-09-10");
+    expect(materialChanges(deferred, cleared)).toEqual({
+      deferUntil: { from: null, to: "2026-09-10" },
+    });
+  });
+
+  it("warns about an unusual date order instead of rejecting it", () => {
+    const task = updateTaskFields(
+      inboxTask(),
+      {
+        deferUntil: toPlainDate("2026-09-10"),
+        dueDate: toPlainDate("2026-09-03"),
+        deadline: toPlainDate("2026-09-01"),
+      },
+      testContext(),
+    );
+
+    expect(dateOrderWarnings(task)).toEqual([
+      "defer_after_due",
+      "due_after_deadline",
+      "defer_after_deadline",
+    ]);
+    expect(dateOrderWarnings(inboxTask())).toEqual([]);
+  });
+
+  it("judges deferral and past deadline by date comparison at read time", () => {
+    const task = inboxTask({
+      deferUntil: toPlainDate("2026-09-10"),
+      deadline: toPlainDate("2026-09-05"),
+    });
+
+    expect(isDeferred(task, toPlainDate("2026-09-09"))).toBe(true);
+    expect(isDeferred(task, toPlainDate("2026-09-10"))).toBe(false);
+    expect(isPastDeadline(task, toPlainDate("2026-09-05"))).toBe(false);
+    expect(isPastDeadline(task, toPlainDate("2026-09-06"))).toBe(true);
+    expect(isDeferred(inboxTask(), toPlainDate("2026-09-09"))).toBe(false);
   });
 });

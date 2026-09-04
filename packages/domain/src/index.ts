@@ -44,11 +44,16 @@ export {
 } from "./project/status.js";
 
 export {
+  DATE_WARNINGS,
+  dateOrderWarnings,
   isCompleted,
+  isDeferred,
   isDeleted,
   isInboxTask,
+  isPastDeadline,
   parseTaskKey,
   taskKey,
+  type DateWarning,
   type Task,
 } from "./task/task.js";
 export {

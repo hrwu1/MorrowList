@@ -19,9 +19,16 @@ export interface Task {
   readonly title: string;
   readonly descriptionMd: string | null;
   readonly priority: Priority;
+  /** The day the task is planned to be done (spec 8.1 "due date"). */
   readonly dueDate: PlainDate | null;
   readonly dueTime: PlainTime | null;
   readonly dueTimezone: string | null;
+  /** Hidden from Today, Upcoming, the Inbox and the board until this day (GAP-16). */
+  readonly deferUntil: PlainDate | null;
+  /** The hard limit, distinct from the planned day; shown as its own marker (GAP-16). */
+  readonly deadline: PlainDate | null;
+  /** Wall-clock time of the deadline in the workspace timezone; requires `deadline`. */
+  readonly deadlineTime: PlainTime | null;
   readonly parentTaskId: string | null;
   /** How the task repeats; completing it creates the next occurrence (GAP-12). */
   readonly recurrence: RecurrenceRule | null;
@@ -74,4 +81,51 @@ export function isDeleted(task: Task): boolean {
 /** A task with no project is an Inbox task (spec 8.2 invariant 1). */
 export function isInboxTask(task: Task): boolean {
   return task.projectId === null;
+}
+
+/**
+ * A task is deferred while its defer date is still ahead of the workspace's calendar
+ * date (GAP-16). Pure date comparison at read time: nothing rewrites the task when the
+ * day arrives, so a deferred task returns on its own, like a My Day selection expires.
+ */
+export function isDeferred(task: Task, today: PlainDate): boolean {
+  return task.deferUntil !== null && task.deferUntil > today;
+}
+
+/** Overdue is judged on the planned day; this is the harder question (GAP-16). */
+export function isPastDeadline(task: Task, today: PlainDate): boolean {
+  return task.deadline !== null && task.deadline < today;
+}
+
+/**
+ * The expected order is `deferUntil ≤ dueDate ≤ deadline`. Breaking it is allowed, because
+ * real plans break it; the codes let a client warn without the command refusing.
+ */
+export const DATE_WARNINGS = [
+  "defer_after_due",
+  "due_after_deadline",
+  "defer_after_deadline",
+] as const;
+export type DateWarning = (typeof DATE_WARNINGS)[number];
+
+export function dateOrderWarnings(task: Task): DateWarning[] {
+  const warnings: DateWarning[] = [];
+  if (
+    task.deferUntil !== null &&
+    task.dueDate !== null &&
+    task.deferUntil > task.dueDate
+  ) {
+    warnings.push("defer_after_due");
+  }
+  if (task.dueDate !== null && task.deadline !== null && task.dueDate > task.deadline) {
+    warnings.push("due_after_deadline");
+  }
+  if (
+    task.deferUntil !== null &&
+    task.deadline !== null &&
+    task.deferUntil > task.deadline
+  ) {
+    warnings.push("defer_after_deadline");
+  }
+  return warnings;
 }
