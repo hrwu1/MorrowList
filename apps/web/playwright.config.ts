@@ -6,6 +6,10 @@ import { e2eDatabaseUrl } from "./e2e/database";
 // Playwright reads no env file of its own; the suite's database comes from the root `.env`.
 loadRootEnv();
 
+// Requests the service worker makes are routed like the page's own, so the offline
+// suite can cut the worker off from the network deterministically (spec 25, 28.1).
+process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS = "1";
+
 /**
  * Browser end-to-end baseline (FND-009, spec 28.2).
  *

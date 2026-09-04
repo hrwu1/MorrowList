@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
 
 import { type CacheScope } from "../lib/cache-policy";
@@ -46,11 +47,15 @@ function notify() {
   for (const listener of listeners) listener();
 }
 
-export function setCacheScope(scope: CacheScope): void {
+/**
+ * Announces the scope and resolves once the worker has it; true when it differs from
+ * the one this device last knew.
+ */
+export async function setCacheScope(scope: CacheScope): Promise<boolean> {
   const known = readStored();
   if (known?.userId === scope.userId && known.workspaceId === scope.workspaceId) {
-    void tellWorker({ type: "SET_SCOPE", scope });
-    return;
+    await tellWorker({ type: "SET_SCOPE", scope });
+    return false;
   }
   current = scope;
   try {
@@ -59,7 +64,8 @@ export function setCacheScope(scope: CacheScope): void {
     // Storage is unavailable; the scope still reaches the worker for this session.
   }
   notify();
-  void tellWorker({ type: "SET_SCOPE", scope });
+  await tellWorker({ type: "SET_SCOPE", scope });
+  return true;
 }
 
 export function clearCacheScope(): void {
@@ -80,6 +86,7 @@ export function useCacheScope(): CacheScope | null {
 
 /** Resolves the signed-in identity and keeps the worker's partition in step with it. */
 export function useSyncCacheScope(): void {
+  const queryClient = useQueryClient();
   const me = useQuery({
     queryKey: meKeys.all,
     queryFn: () => apiClient.me(),
@@ -89,6 +96,28 @@ export function useSyncCacheScope(): void {
   const workspaceId = me.data?.defaultWorkspaceId;
 
   useEffect(() => {
-    if (userId && workspaceId) setCacheScope({ userId, workspaceId });
-  }, [userId, workspaceId]);
+    if (!userId || !workspaceId) return;
+    // The first sign-in on a device: what loaded before the partition was known was
+    // not stored, so the open views are read once more, now that it is.
+    void setCacheScope({ userId, workspaceId }).then((changed) => {
+      if (!changed) return;
+      return queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] !== meKeys.all[0],
+      });
+    });
+  }, [queryClient, userId, workspaceId]);
+}
+
+/**
+ * Tells the worker which view is open so its document is stored for a cold offline
+ * start: the client router never requests documents, so the worker cannot see them.
+ */
+export function useWarmCurrentView(): void {
+  const pathname = usePathname();
+  const scope = useCacheScope();
+
+  useEffect(() => {
+    if (!scope) return;
+    void tellWorker({ type: "WARM", url: `${window.location.origin}${pathname}` });
+  }, [pathname, scope]);
 }

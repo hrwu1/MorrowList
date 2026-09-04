@@ -10,7 +10,8 @@ import { clearAllDrafts } from "./drafts";
 export type WorkerMessage =
   | { readonly type: "SKIP_WAITING" }
   | { readonly type: "SET_SCOPE"; readonly scope: CacheScope }
-  | { readonly type: "CLEAR_SCOPE" };
+  | { readonly type: "CLEAR_SCOPE" }
+  | { readonly type: "WARM"; readonly url: string };
 
 const ACK_TIMEOUT_MS = 2_000;
 

@@ -31,6 +31,7 @@ import {
 import {
   clearCacheScope,
   useSyncCacheScope,
+  useWarmCurrentView,
 } from "@/features/offline/hooks/use-cache-scope";
 import { purgeOfflineCaches } from "@/features/offline/lib/service-worker";
 import { useCreateProject, useProjects } from "@/features/projects/hooks/use-projects";
@@ -73,6 +74,7 @@ export function WorkspaceShell({
   const queryClient = useQueryClient();
   const projects = useProjects();
   useSyncCacheScope();
+  useWarmCurrentView();
   const inbox = useTaskList({
     inbox: true,
     isCompleted: false,

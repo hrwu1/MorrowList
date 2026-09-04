@@ -43,11 +43,46 @@ const PRECACHE = [
 type WorkerMessage =
   | { readonly type: "SKIP_WAITING" }
   | { readonly type: "SET_SCOPE"; readonly scope: CacheScope }
-  | { readonly type: "CLEAR_SCOPE" };
+  | { readonly type: "CLEAR_SCOPE" }
+  | { readonly type: "WARM"; readonly url: string };
+
+/** A view warmed this recently is not fetched again. */
+const WARM_INTERVAL_MS = 5 * 60 * 1000;
 
 worker.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(SHELL_CACHE).then((cache) => cache.addAll(PRECACHE)));
+  event.waitUntil(precacheShell());
 });
+
+/**
+ * The fallback page must render on a device that has never loaded the app, so its own
+ * scripts and stylesheets are precached with it. Their hashed names are only known once
+ * the page is fetched, hence the second pass.
+ */
+async function precacheShell(): Promise<void> {
+  const cache = await caches.open(SHELL_CACHE);
+  await cache.addAll(PRECACHE);
+  const page = await cache.match("/offline");
+  if (page) await storeAssetsOf(await page.text());
+}
+
+/**
+ * Stores the static assets a document references that the shell does not hold yet — a
+ * chunk the client router loaded before this worker took control, for instance.
+ */
+async function storeAssetsOf(html: string): Promise<void> {
+  const cache = await caches.open(SHELL_CACHE);
+  const missing: string[] = [];
+  for (const match of html.matchAll(/(?:src|href)="(\/_next\/static\/[^"]+)"/g)) {
+    const url = match[1]!.replaceAll("&amp;", "&");
+    if (!(await cache.match(url, { ignoreSearch: true }))) missing.push(url);
+  }
+  await Promise.all(
+    missing.map(async (url) => {
+      const response = await fetch(url);
+      if (response.ok) await cache.put(url, response);
+    }),
+  );
+}
 
 worker.addEventListener("activate", (event) => {
   event.waitUntil(
@@ -63,22 +98,34 @@ worker.addEventListener("activate", (event) => {
   );
 });
 
+// Messages are handled one at a time, in the order they were posted: the page announces
+// the partition and then the view it opened, and warming must see the partition.
+let inbox: Promise<void> = Promise.resolve();
+
 worker.addEventListener("message", (event) => {
   const message = event.data as WorkerMessage | undefined;
   const acknowledge = () => event.ports[0]?.postMessage({ type: "DONE" });
-  switch (message?.type) {
-    case "SKIP_WAITING":
-      void worker.skipWaiting();
-      return;
-    case "SET_SCOPE":
-      event.waitUntil(setScope(message.scope).then(acknowledge));
-      return;
-    case "CLEAR_SCOPE":
-      event.waitUntil(clearScope().then(acknowledge));
-      return;
-    default:
-      return;
+  if (message?.type === "SKIP_WAITING") {
+    void worker.skipWaiting();
+    return;
   }
+  inbox = inbox.then(async () => {
+    switch (message?.type) {
+      case "SET_SCOPE":
+        await setScope(message.scope);
+        break;
+      case "CLEAR_SCOPE":
+        await clearScope();
+        break;
+      case "WARM":
+        await warm(message.url);
+        break;
+      default:
+        return;
+    }
+    acknowledge();
+  });
+  event.waitUntil(inbox);
 });
 
 worker.addEventListener("fetch", (event) => {
@@ -123,6 +170,34 @@ async function clearScope(): Promise<void> {
   scopeHash = null;
 }
 
+/**
+ * The client router moves between views without ever requesting their documents, so the
+ * page announces each view it opens and the worker stores the document itself. That is
+ * what lets a cold start while offline land on a recently opened view (spec 25.1).
+ */
+async function warm(href: string): Promise<void> {
+  const url = new URL(href, worker.location.origin);
+  url.search = "";
+  if (cachePolicyFor(url, "navigate", worker.location.origin) !== "partition") return;
+  const hash = await readScopeHash();
+  if (!hash) return;
+  const cacheName = partitionCacheName(VERSION, hash);
+  const cache = await caches.open(cacheName);
+  const existing = await cache.match(url.href, { ignoreVary: true });
+  const cachedAt = Number(existing?.headers.get(CACHED_AT_HEADER));
+  if (existing && Date.now() - cachedAt < WARM_INTERVAL_MS) return;
+  try {
+    const response = await fetch(url.href, { headers: { accept: "text/html" } });
+    if (response.ok && response.headers.get("content-type")?.includes("text/html")) {
+      const html = await response.clone().text();
+      await store(cacheName, new Request(url.href), response);
+      await storeAssetsOf(html);
+    }
+  } catch {
+    // Offline or the view no longer exists; there is nothing to warm.
+  }
+}
+
 async function deletePartitions(): Promise<void> {
   const names = await caches.keys();
   await Promise.all(names.filter(isPartitionCache).map((name) => caches.delete(name)));
@@ -147,13 +222,23 @@ async function networkFirst(event: FetchEvent, cacheName: string): Promise<Respo
     if (response.ok) event.waitUntil(store(cacheName, request, response.clone()));
     return response;
   } catch (error) {
-    const cached = await readFresh(cacheName, request);
+    const cached =
+      (await readFresh(cacheName, request.url)) ??
+      // A view opened with a query (a task panel, a filter) falls back to the view itself.
+      (request.mode === "navigate"
+        ? await readFresh(cacheName, request.url.split("?")[0]!)
+        : undefined);
     if (cached) return cached;
     if (request.mode === "navigate") return offlineFallback();
     throw error;
   }
 }
 
+/**
+ * Expiry and the entry cap apply to private partitions only: the shell cache holds the
+ * precached fallback (which carries no stamp) and immutable hashed assets, and is
+ * replaced wholesale when the worker's version changes.
+ */
 async function store(cacheName: string, request: Request, response: Response) {
   const cache = await caches.open(cacheName);
   const headers = new Headers(response.headers);
@@ -166,6 +251,7 @@ async function store(cacheName: string, request: Request, response: Response) {
       headers,
     }),
   );
+  if (!isPartitionCache(cacheName)) return;
   const keys = await cache.keys();
   await Promise.all(
     keys.slice(0, Math.max(0, keys.length - MAX_ENTRIES)).map((k) => cache.delete(k)),
@@ -174,13 +260,21 @@ async function store(cacheName: string, request: Request, response: Response) {
 
 async function readFresh(
   cacheName: string,
-  request: Request,
+  url: string,
 ): Promise<Response | undefined> {
   const cache = await caches.open(cacheName);
-  const cached = await cache.match(request.url, { ignoreVary: true });
+  // Shell assets are content-addressed by path; `next dev` adds a build stamp as a
+  // query, which must not separate a stored chunk from the same chunk requested later.
+  const cached = await cache.match(url, {
+    ignoreVary: true,
+    ignoreSearch: !isPartitionCache(cacheName),
+  });
   if (!cached) return undefined;
-  if (isExpired(cached.headers.get(CACHED_AT_HEADER), Date.now())) {
-    await cache.delete(request.url);
+  if (
+    isPartitionCache(cacheName) &&
+    isExpired(cached.headers.get(CACHED_AT_HEADER), Date.now())
+  ) {
+    await cache.delete(url);
     return undefined;
   }
   return cached;
