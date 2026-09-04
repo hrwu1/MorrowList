@@ -59,4 +59,6 @@ export const SCOPES = {
   tagsRead: "tags:read",
   tagsWrite: "tags:write",
   workspaceWrite: "workspace:write",
+  viewsRead: "views:read",
+  viewsWrite: "views:write",
 } as const;

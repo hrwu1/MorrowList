@@ -80,6 +80,13 @@ export const TAG_EVENTS = {
   deleted: "tag.deleted",
 } as const;
 
+/** Payload: `{ viewId, name, layout, filters }`; updated adds `changes`. */
+export const SAVED_VIEW_EVENTS = {
+  created: "saved_view.created",
+  updated: "saved_view.updated",
+  deleted: "saved_view.deleted",
+} as const;
+
 export const WORKSPACE_EVENTS = {
   created: "workspace.created",
   /** Payload: `{ workspaceId, changes }` with the field-level diff (GAP-20). */

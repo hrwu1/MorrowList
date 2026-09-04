@@ -1,4 +1,4 @@
-import type { Project, Workspace } from "@morrowlist/application";
+import type { Project, SavedView, Workspace } from "@morrowlist/application";
 import type {
   ActorKind,
   RecurrenceRule,
@@ -11,6 +11,7 @@ import type {
 
 import type {
   projects,
+  savedViews,
   tags,
   taskRelations,
   tasks,
@@ -31,6 +32,7 @@ type StatusRow = typeof workflowStatuses.$inferSelect;
 type WorkspaceRow = typeof workspaces.$inferSelect;
 type TagRow = typeof tags.$inferSelect;
 type RelationRow = typeof taskRelations.$inferSelect;
+type SavedViewRow = typeof savedViews.$inferSelect;
 
 export function toTask(row: TaskRow): Task {
   return {
@@ -191,6 +193,34 @@ export function toTagRow(tag: Tag): TagRow {
     description: tag.description,
     createdAt: tag.createdAt,
     updatedAt: tag.updatedAt,
+  };
+}
+
+export function toSavedView(row: SavedViewRow): SavedView {
+  return {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    ownerUserId: row.ownerUserId,
+    name: row.name,
+    filters: row.filters as SavedView["filters"],
+    layout: row.layout as SavedView["layout"],
+    rank: row.rank,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export function toSavedViewRow(view: SavedView): SavedViewRow {
+  return {
+    id: view.id,
+    workspaceId: view.workspaceId,
+    ownerUserId: view.ownerUserId,
+    name: view.name,
+    filters: view.filters,
+    layout: view.layout,
+    rank: view.rank,
+    createdAt: view.createdAt,
+    updatedAt: view.updatedAt,
   };
 }
 

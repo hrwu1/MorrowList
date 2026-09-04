@@ -29,6 +29,8 @@ import type {
   RelationEdge,
   StatusIntervalInput,
   StatusIntervalRepository,
+  SavedView,
+  SavedViewRepository,
   TagRepository,
   TaskCounterRepository,
   TaskFilter,
@@ -60,6 +62,7 @@ export interface InMemoryData {
   projects: Map<string, Project>;
   statuses: Map<string, WorkflowStatus>;
   tags: Map<string, Tag>;
+  savedViews: Map<string, SavedView>;
   taskTags: { taskId: string; tagId: string; createdAt: Date }[];
   relations: Map<string, TaskRelation>;
   intervals: InMemoryInterval[];
@@ -80,6 +83,7 @@ export function emptyData(): InMemoryData {
     projects: new Map(),
     statuses: new Map(),
     tags: new Map(),
+    savedViews: new Map(),
     taskTags: [],
     relations: new Map(),
     intervals: [],
@@ -703,6 +707,37 @@ function statusIntervalRepository(data: InMemoryData): StatusIntervalRepository 
   };
 }
 
+function savedViewRepository(data: InMemoryData): SavedViewRepository {
+  return {
+    async findById(workspaceId, viewId) {
+      const view = data.savedViews.get(viewId);
+      return view && view.workspaceId === workspaceId ? view : null;
+    },
+    async listForOwner(workspaceId, ownerUserId) {
+      return [...data.savedViews.values()]
+        .filter(
+          (view) =>
+            view.workspaceId === workspaceId && view.ownerUserId === ownerUserId,
+        )
+        .sort((a, b) =>
+          a.rank !== b.rank ? (a.rank < b.rank ? -1 : 1) : a.id < b.id ? -1 : 1,
+        );
+    },
+    async insert(view) {
+      data.savedViews.set(view.id, view);
+    },
+    async update(view) {
+      if (!data.savedViews.has(view.id)) return false;
+      data.savedViews.set(view.id, view);
+      return true;
+    },
+    async delete(workspaceId, viewId) {
+      const view = data.savedViews.get(viewId);
+      if (view && view.workspaceId === workspaceId) data.savedViews.delete(viewId);
+    },
+  };
+}
+
 function counterRepository(data: InMemoryData): TaskCounterRepository {
   return {
     async ensure(workspaceId) {
@@ -911,6 +946,7 @@ export function createInMemoryUnitOfWork(
     projects: new Map(source.projects),
     statuses: new Map(source.statuses),
     tags: new Map(source.tags),
+    savedViews: new Map(source.savedViews),
     taskTags: [...source.taskTags],
     relations: new Map(source.relations),
     intervals: [...source.intervals],
@@ -927,6 +963,7 @@ export function createInMemoryUnitOfWork(
     target.projects = source.projects;
     target.statuses = source.statuses;
     target.tags = source.tags;
+    target.savedViews = source.savedViews;
     target.taskTags = source.taskTags;
     target.relations = source.relations;
     target.intervals = source.intervals;
@@ -954,6 +991,7 @@ export function createInMemoryUnitOfWork(
         statuses: statusRepository(working),
         tags: tagRepository(working),
         statusIntervals: statusIntervalRepository(working),
+        savedViews: savedViewRepository(working),
         workspaces: workspaceRepository(working),
         activity: activityRepository(working),
         outbox: outboxRepository(working),

@@ -1,5 +1,6 @@
 import {
   ProjectService,
+  SavedViewService,
   TagService,
   TaskService,
   bootstrapUser,
@@ -331,5 +332,104 @@ describe("task search", () => {
 
     const page = await search("");
     expect(page.items.map((task) => task.title)).toEqual(["Two", "One"]);
+  });
+});
+
+describe("saved views", () => {
+  it("round-trips filters through jsonb, orders by rank, and isolates owners", async () => {
+    const unitOfWork = createUnitOfWork(handle);
+    const service = new SavedViewService({ unitOfWork, clock: fixedClock(NOW) });
+    const first = await service.create(context, workspaceId, {
+      name: "Overdue research",
+      filters: { due: "overdue", priority: "high", sort: "dueDate", order: "asc" },
+      layout: "list",
+    });
+    const second = await service.create(context, workspaceId, {
+      name: "Blocked",
+      filters: { isBlocked: true },
+      layout: "board",
+    });
+    await service.reorder(context, workspaceId, second.id, {
+      beforeViewId: null,
+      afterViewId: first.id,
+    });
+
+    const listed = await service.list(context, workspaceId);
+    expect(listed.data.map((view) => view.name)).toEqual([
+      "Blocked",
+      "Overdue research",
+    ]);
+    expect(listed.data[1]?.filters).toEqual({
+      due: "overdue",
+      priority: "high",
+      sort: "dueDate",
+      order: "asc",
+    });
+
+    const otherUserId = uuidv7();
+    await handle.pool.query(
+      "insert into workspace_members (workspace_id, user_id, role, joined_at) values ($1, $2, 'member', now())",
+      [workspaceId, otherUserId],
+    );
+    const other: ActorContext = {
+      ...context,
+      actorId: otherUserId,
+      userId: otherUserId,
+    };
+    expect((await service.list(other, workspaceId)).data).toEqual([]);
+    await expect(service.delete(other, workspaceId, first.id)).rejects.toMatchObject({
+      code: "SAVED_VIEW_NOT_FOUND",
+    });
+
+    const events = await handle.pool.query<{ event_type: string }>(
+      "select event_type from activity_events where aggregate_type = 'saved_view' order by created_at, id",
+    );
+    expect(events.rows.map((row) => row.event_type)).toEqual([
+      "saved_view.created",
+      "saved_view.created",
+      "saved_view.updated",
+    ]);
+  });
+
+  it("rolls back the view with its activity and outbox rows", async () => {
+    const unitOfWork = createUnitOfWork(handle);
+
+    await expect(
+      unitOfWork.execute(async (tx) => {
+        await tx.savedViews.insert({
+          id: uuidv7(),
+          workspaceId,
+          ownerUserId: userId,
+          name: "Never committed",
+          filters: {},
+          layout: "list",
+          rank: "a0",
+          createdAt: NOW,
+          updatedAt: NOW,
+        });
+        await tx.activity.append({
+          id: uuidv7(),
+          workspaceId,
+          aggregateType: "saved_view",
+          aggregateId: uuidv7(),
+          eventType: "saved_view.created",
+          actorKind: "user",
+          actorId: userId,
+          actorDisplayName: null,
+          summary: "never committed",
+          payload: {},
+          correlationId: "req_rollback",
+          createdAt: NOW,
+        });
+        throw new Error("deliberate failure");
+      }),
+    ).rejects.toThrow("deliberate failure");
+
+    const views = await handle.pool.query("select id from saved_views");
+    expect(views.rows).toHaveLength(0);
+    const events = await handle.pool.query(
+      "select id from activity_events where aggregate_type = 'saved_view'",
+    );
+    expect(events.rows).toHaveLength(0);
   });
 });

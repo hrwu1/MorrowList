@@ -64,12 +64,14 @@ export function exitCodeFor(errorCode: string): ExitCode {
     case "WORKSPACE_NOT_FOUND":
     case "TAG_NOT_FOUND":
     case "TASK_RELATION_NOT_FOUND":
+    case "SAVED_VIEW_NOT_FOUND":
     case "NOT_FOUND":
       return EXIT.notFound;
     case "TASK_VERSION_CONFLICT":
     case "TASK_BLOCKED":
     case "TAG_NAME_CONFLICT":
     case "VERSION_CONFLICT":
+    case "SAVED_VIEW_NAME_CONFLICT":
     case "IDEMPOTENCY_KEY_REUSED":
     case "STATUS_ARCHIVE_REQUIRES_DESTINATION":
     case "STATUS_ARCHIVE_REQUIRES_REPLACEMENT":

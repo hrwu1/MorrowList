@@ -11,6 +11,7 @@ import {
   createProjectRepository,
   createWorkflowStatusRepository,
 } from "./repositories/projects.js";
+import { createSavedViewRepository } from "./repositories/saved-views.js";
 import { createTagRepository } from "./repositories/tags.js";
 import {
   createTaskCounterRepository,
@@ -34,6 +35,7 @@ export function buildTransactionContext(db: Database): TransactionContext {
     statuses: createWorkflowStatusRepository(db),
     tags: createTagRepository(db),
     statusIntervals: createStatusIntervalRepository(db),
+    savedViews: createSavedViewRepository(db),
     workspaces: createWorkspaceRepository(db),
     activity: createActivityRepository(db),
     outbox: createOutboxRepository(db),

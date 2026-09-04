@@ -17,6 +17,7 @@ export {
   createProjectRepository,
   createWorkflowStatusRepository,
 } from "./repositories/projects.js";
+export { createSavedViewRepository } from "./repositories/saved-views.js";
 export { createTagRepository } from "./repositories/tags.js";
 export { createStatusIntervalRepository } from "./repositories/flow.js";
 export {
@@ -26,6 +27,7 @@ export {
 export { createWorkspaceRepository } from "./repositories/workspaces.js";
 export {
   toProject,
+  toSavedView,
   toTag,
   toTask,
   toWorkflowStatus,
