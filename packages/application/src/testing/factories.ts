@@ -147,6 +147,8 @@ export function buildTask(
     rank: INITIAL_RANK,
     lastActiveStatusId: null,
     completedAt: null,
+    blockedReason: null,
+    blockedSince: null,
     version: 1,
     createdBy: { kind: "user", id: seeded.userId },
     lastActor: { kind: "user", id: seeded.userId },
