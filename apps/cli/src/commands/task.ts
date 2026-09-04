@@ -1,3 +1,4 @@
+import { ApiClientError } from "@morrowlist/api-client";
 import type { CreateTaskRequest, UpdateTaskRequest } from "@morrowlist/contracts";
 import { Command } from "commander";
 
@@ -90,6 +91,7 @@ export function taskCommand(): Command {
     .option("--priority <priority>", "restrict to a priority")
     .option("--due <filter>", "overdue | today | future | none")
     .option("--tag <name>", "restrict to tasks carrying a tag")
+    .option("--blocked", "blocked tasks only: flagged, or waiting on an open blocker")
     .option("--limit <n>", "page size, 1-200", "50")
     .action(async (options, command: Command) => {
       const globals = globalsOf(command);
@@ -107,6 +109,7 @@ export function taskCommand(): Command {
             ...(options.priority ? { priority: options.priority } : {}),
             ...(options.due ? { due: options.due } : {}),
             ...(tag ? { tagId: tag.id } : {}),
+            ...(options.blocked ? { isBlocked: true } : {}),
             limit: Number(options.limit),
           } as never);
         });
@@ -244,37 +247,126 @@ export function taskCommand(): Command {
       }
     });
 
-  for (const [name, describe, run] of [
-    ["complete", "Complete a task", "completeTask"],
-    ["reopen", "Reopen a completed task", "reopenTask"],
-  ] as const) {
-    task
-      .command(name)
-      .description(describe)
-      .argument("<idOrKey>")
-      .option("--expected-version <n>", "fail unless the task is still at this version")
-      .action(async (idOrKey: string, options, command: Command) => {
-        const globals = globalsOf(command);
-        const json = Boolean(globals.json);
-        try {
-          const result = await withClient(globals, async (client) => {
-            const current = await client.getTask(idOrKey);
-            const expected = options.expectedVersion
-              ? Number(options.expectedVersion)
-              : current.version;
-            return client[run](current.id, expected, idempotency());
-          });
+  task
+    .command("complete")
+    .description("Complete a task")
+    .argument("<idOrKey>")
+    .option("--expected-version <n>", "fail unless the task is still at this version")
+    .option(
+      "--acknowledge-blocked",
+      "complete even though the task is blocked (spec 8.4 warns, never forbids)",
+    )
+    .action(async (idOrKey: string, options, command: Command) => {
+      const globals = globalsOf(command);
+      const json = Boolean(globals.json);
+      try {
+        const result = await withClient(globals, async (client) => {
+          const current = await client.getTask(idOrKey);
+          const expectedVersion = options.expectedVersion
+            ? Number(options.expectedVersion)
+            : current.version;
+          return client.completeTask(
+            current.id,
+            {
+              expectedVersion,
+              ...(options.acknowledgeBlocked ? { acknowledgeBlocked: true } : {}),
+            },
+            idempotency(),
+          );
+        });
 
-          if (json) printJson({ ok: true, data: result });
-          else
-            process.stdout.write(
-              `${result.key}  ${result.isCompleted ? "completed" : "reopened"}\n`,
-            );
-        } catch (error) {
-          fail(error, json);
+        if (json) printJson({ ok: true, data: result });
+        else process.stdout.write(`${result.key}  completed\n`);
+      } catch (error) {
+        if (error instanceof ApiClientError && error.code === "TASK_BLOCKED" && !json) {
+          printError(
+            "The task is blocked. Pass --acknowledge-blocked to complete it anyway.",
+          );
         }
-      });
-  }
+        fail(error, json);
+      }
+    });
+
+  task
+    .command("reopen")
+    .description("Reopen a completed task")
+    .argument("<idOrKey>")
+    .option("--expected-version <n>", "fail unless the task is still at this version")
+    .action(async (idOrKey: string, options, command: Command) => {
+      const globals = globalsOf(command);
+      const json = Boolean(globals.json);
+      try {
+        const result = await withClient(globals, async (client) => {
+          const current = await client.getTask(idOrKey);
+          const expected = options.expectedVersion
+            ? Number(options.expectedVersion)
+            : current.version;
+          return client.reopenTask(current.id, expected, idempotency());
+        });
+
+        if (json) printJson({ ok: true, data: result });
+        else process.stdout.write(`${result.key}  reopened\n`);
+      } catch (error) {
+        fail(error, json);
+      }
+    });
+
+  task
+    .command("block")
+    .description("Flag a task as blocked; it stays in its stage and says why")
+    .argument("<idOrKey>")
+    .requiredOption("--reason <text>", "why the task cannot move")
+    .option("--expected-version <n>", "fail unless the task is still at this version")
+    .action(async (idOrKey: string, options, command: Command) => {
+      const globals = globalsOf(command);
+      const json = Boolean(globals.json);
+      try {
+        const result = await withClient(globals, async (client) => {
+          const current = await client.getTask(idOrKey);
+          return client.setTaskBlocked(
+            current.id,
+            {
+              reason: options.reason,
+              ...(options.expectedVersion
+                ? { expectedVersion: Number(options.expectedVersion) }
+                : {}),
+            },
+            idempotency(),
+          );
+        });
+
+        if (json) printJson({ ok: true, data: result });
+        else
+          process.stdout.write(`${result.key}  blocked: ${result.blocked?.reason}\n`);
+      } catch (error) {
+        fail(error, json);
+      }
+    });
+
+  task
+    .command("unblock")
+    .description("Clear a task's blocked flag")
+    .argument("<idOrKey>")
+    .option("--expected-version <n>", "fail unless the task is still at this version")
+    .action(async (idOrKey: string, options, command: Command) => {
+      const globals = globalsOf(command);
+      const json = Boolean(globals.json);
+      try {
+        const result = await withClient(globals, async (client) => {
+          const current = await client.getTask(idOrKey);
+          return client.clearTaskBlocked(
+            current.id,
+            options.expectedVersion ? Number(options.expectedVersion) : undefined,
+            idempotency(),
+          );
+        });
+
+        if (json) printJson({ ok: true, data: result });
+        else process.stdout.write(`${result.key}  unblocked\n`);
+      } catch (error) {
+        fail(error, json);
+      }
+    });
 
   task
     .command("delete")

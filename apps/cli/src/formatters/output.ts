@@ -58,9 +58,11 @@ export function exitCodeFor(errorCode: string): ExitCode {
     case "STATUS_NOT_FOUND":
     case "WORKSPACE_NOT_FOUND":
     case "TAG_NOT_FOUND":
+    case "TASK_RELATION_NOT_FOUND":
     case "NOT_FOUND":
       return EXIT.notFound;
     case "TASK_VERSION_CONFLICT":
+    case "TASK_BLOCKED":
     case "TAG_NAME_CONFLICT":
     case "VERSION_CONFLICT":
     case "IDEMPOTENCY_KEY_REUSED":
@@ -97,9 +99,10 @@ export function formatTaskTable(tasks: readonly TaskDto[]): string {
       const key = task.key.padEnd(keyWidth);
       const mark = PRIORITY_MARK[task.priority] ?? "  ";
       const due = task.dueDate ? `  (due ${task.dueDate})` : "";
+      const blocked = task.isBlocked ? "  [blocked]" : "";
       const tags =
         task.tags.length > 0 ? `  #${task.tags.map((t) => t.name).join(" #")}` : "";
-      return `[${done}] ${key}  ${mark}${task.title}${due}${tags}`;
+      return `[${done}] ${key}  ${mark}${task.title}${due}${blocked}${tags}`;
     })
     .join("\n");
 }
@@ -201,6 +204,15 @@ export function formatTaskDetail(
     `  project     ${task.projectId ?? "Inbox"}`,
     `  due         ${task.dueDate ?? "none"}${task.dueTime ? ` ${task.dueTime}` : ""}`,
     `  my day      ${task.dayPlans.length > 0 ? task.dayPlans.join(", ") : "no"}`,
+    ...(task.isBlocked || task.blocked
+      ? [
+          `  blocked     ${
+            task.blocked
+              ? `${task.blocked.reason} (since ${task.blocked.since})`
+              : "yes, waiting on an open blocker"
+          }`,
+        ]
+      : []),
     ...(task.parentTaskId ? [`  parent      ${task.parentTaskId}`] : []),
     ...(task.subtaskProgress
       ? [
@@ -213,6 +225,22 @@ export function formatTaskDetail(
   ];
   if (task.descriptionMd) {
     lines.push("", task.descriptionMd);
+  }
+  if (task.relations.length > 0) {
+    lines.push(
+      "",
+      "Relations",
+      ...task.relations.map((relation) => {
+        const direction =
+          relation.type === "related_to"
+            ? "related to"
+            : relation.sourceTaskId === task.id
+              ? "blocks"
+              : "blocked by";
+        const done = relation.task.isCompleted ? "x" : " ";
+        return `  ${direction.padEnd(10)}  [${done}] ${relation.task.key}  ${relation.task.title}`;
+      }),
+    );
   }
   if (subtasks.length > 0) {
     lines.push(

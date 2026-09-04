@@ -299,6 +299,104 @@ describe("task endpoints", () => {
     });
   });
 
+  it("relates tasks, reports blocked state, and gates completion", async () => {
+    const source = await (
+      await jsonRequest("/api/v1/tasks", "POST", { title: "Collect sources" })
+    ).json();
+    const target = await (
+      await jsonRequest("/api/v1/tasks", "POST", { title: "Make slides" })
+    ).json();
+
+    const added = await jsonRequest(
+      `/api/v1/tasks/${source.data.id}/relations`,
+      "POST",
+      {
+        type: "blocks",
+        targetTaskId: target.data.id,
+      },
+    );
+    expect(added.status).toBe(201);
+    const addedBody = await added.json();
+    expect(addedBody.data.relations[0]).toMatchObject({
+      type: "blocks",
+      task: { key: "ML-2", title: "Make slides" },
+    });
+
+    const blocked = await (await request(`/api/v1/tasks?isBlocked=true`)).json();
+    expect(blocked.data.map((t: { key: string }) => t.key)).toEqual(["ML-2"]);
+
+    const refused = await jsonRequest(
+      `/api/v1/tasks/${target.data.id}/complete`,
+      "POST",
+    );
+    expect(refused.status).toBe(409);
+    await expect(refused.json()).resolves.toMatchObject({
+      error: { code: "TASK_BLOCKED" },
+    });
+    const completed = await jsonRequest(
+      `/api/v1/tasks/${target.data.id}/complete`,
+      "POST",
+      { acknowledgeBlocked: true },
+    );
+    expect(completed.status).toBe(200);
+
+    const cycle = await jsonRequest(
+      `/api/v1/tasks/${target.data.id}/relations`,
+      "POST",
+      {
+        type: "blocks",
+        targetTaskId: source.data.id,
+      },
+    );
+    expect(cycle.status).toBe(422);
+    await expect(cycle.json()).resolves.toMatchObject({
+      error: { code: "TASK_RELATION_CYCLE" },
+    });
+
+    const removed = await jsonRequest(
+      `/api/v1/tasks/${target.data.id}/relations/${addedBody.data.relations[0].id}`,
+      "DELETE",
+    );
+    expect(removed.status).toBe(200);
+    await expect(removed.json()).resolves.toMatchObject({ data: { relations: [] } });
+    const missing = await jsonRequest(
+      `/api/v1/tasks/${target.data.id}/relations/${addedBody.data.relations[0].id}`,
+      "DELETE",
+    );
+    expect(missing.status).toBe(404);
+  });
+
+  it("flags and clears the blocked reason", async () => {
+    const task = await (
+      await jsonRequest("/api/v1/tasks", "POST", { title: "Waiting" })
+    ).json();
+
+    const flagged = await jsonRequest(`/api/v1/tasks/${task.data.id}/blocked`, "POST", {
+      reason: "waiting on vendor",
+    });
+    expect(flagged.status).toBe(200);
+    await expect(flagged.json()).resolves.toMatchObject({
+      data: {
+        isBlocked: true,
+        blocked: { reason: "waiting on vendor", since: NOW.toISOString() },
+        version: 2,
+      },
+    });
+    const blank = await jsonRequest(`/api/v1/tasks/${task.data.id}/blocked`, "POST", {
+      reason: "   ",
+    });
+    expect(blank.status).toBe(422);
+
+    const cleared = await jsonRequest(
+      `/api/v1/tasks/${task.data.id}/blocked?expectedVersion=2`,
+      "DELETE",
+    );
+    expect(cleared.status).toBe(200);
+    await expect(cleared.json()).resolves.toMatchObject({
+      data: { isBlocked: false, blocked: null, version: 3 },
+    });
+  });
+
   it("maps a version conflict to 409 with the actual version", async () => {
     const created = await (
       await jsonRequest("/api/v1/tasks", "POST", {

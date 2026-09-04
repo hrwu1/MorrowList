@@ -1,5 +1,6 @@
 import {
   activityQuerySchema,
+  addTaskRelationRequestSchema,
   addTaskToDayRequestSchema,
   completeTaskRequestSchema,
   createTaskRequestSchema,
@@ -7,6 +8,7 @@ import {
   moveTaskRequestSchema,
   reorderTaskRequestSchema,
   reopenTaskRequestSchema,
+  setTaskBlockedRequestSchema,
   setTaskParentRequestSchema,
   updateTaskRequestSchema,
 } from "@morrowlist/contracts";
@@ -110,7 +112,7 @@ export function taskRoutes(deps: ApiDependencies) {
         actor,
         requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
         c.req.param("id"),
-        body.expectedVersion,
+        body,
       );
       return c.json({ data: task });
     })
@@ -142,6 +144,52 @@ export function taskRoutes(deps: ApiDependencies) {
     .delete("/tasks/:id/parent", async (c) => {
       const actor = c.get("actor");
       const task = await deps.taskService.clearParent(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("id"),
+        expectedVersionFrom(c.req.query("expectedVersion")),
+      );
+      return c.json({ data: task });
+    })
+
+    .post("/tasks/:id/relations", async (c) => {
+      const actor = c.get("actor");
+      const body = await parseJsonBody(c, addTaskRelationRequestSchema);
+      const task = await deps.taskService.addRelation(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("id"),
+        body,
+      );
+      return c.json({ data: task }, 201);
+    })
+
+    .delete("/tasks/:id/relations/:relationId", async (c) => {
+      const actor = c.get("actor");
+      const task = await deps.taskService.removeRelation(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("id"),
+        c.req.param("relationId"),
+      );
+      return c.json({ data: task });
+    })
+
+    .post("/tasks/:id/blocked", async (c) => {
+      const actor = c.get("actor");
+      const body = await parseJsonBody(c, setTaskBlockedRequestSchema);
+      const task = await deps.taskService.setBlocked(
+        actor,
+        requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        c.req.param("id"),
+        body,
+      );
+      return c.json({ data: task });
+    })
+
+    .delete("/tasks/:id/blocked", async (c) => {
+      const actor = c.get("actor");
+      const task = await deps.taskService.clearBlocked(
         actor,
         requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
         c.req.param("id"),

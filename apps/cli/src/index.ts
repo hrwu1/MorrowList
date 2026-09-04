@@ -2,6 +2,7 @@ import { Command } from "commander";
 
 import { authCommand } from "./commands/auth.js";
 import { projectCommand } from "./commands/project.js";
+import { relationCommand } from "./commands/relation.js";
 import { statusCommand } from "./commands/status.js";
 import { tagCommand } from "./commands/tag.js";
 import { taskCommand } from "./commands/task.js";
@@ -35,6 +36,7 @@ program.addCommand(statusCommand());
 program.addCommand(taskCommand());
 program.addCommand(todayCommand());
 program.addCommand(tagCommand());
+program.addCommand(relationCommand());
 
 try {
   await program.parseAsync(process.argv);

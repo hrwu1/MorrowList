@@ -1,8 +1,10 @@
 import type {
   ActivityListResponse,
   ActivityQuery,
+  AddTaskRelationRequest,
   AddTaskToDayRequest,
   ArchiveStatusRequest,
+  CompleteTaskRequest,
   CreateProjectRequest,
   CreateTagRequest,
   CreateStatusRequest,
@@ -22,6 +24,7 @@ import type {
   ProjectResponse,
   ReorderStatusRequest,
   ReorderTaskRequest,
+  SetTaskBlockedRequest,
   SetTaskParentRequest,
   TagDto,
   TagListResponse,
@@ -358,15 +361,16 @@ export class ApiClient {
     return response.data;
   }
 
+  /** A blocked task completes only with `acknowledgeBlocked` (spec 8.4). */
   async completeTask(
     id: string,
-    expectedVersion?: number,
+    body: CompleteTaskRequest = {},
     options: RequestOptions = {},
   ): Promise<TaskDto> {
     const response = await this.send<{ data: TaskDto }>(
       "POST",
       `/tasks/${encodeURIComponent(id)}/complete${this.queryString({}, options)}`,
-      expectedVersion === undefined ? {} : { expectedVersion },
+      body,
       options,
     );
     return response.data;
@@ -408,6 +412,63 @@ export class ApiClient {
     const response = await this.send<{ data: TaskDto }>(
       "DELETE",
       `/tasks/${encodeURIComponent(id)}/parent${this.queryString({ expectedVersion }, options)}`,
+      undefined,
+      options,
+    );
+    return response.data;
+  }
+
+  /** `taskId` is the source of a `blocks` relation; `related_to` is symmetric. */
+  async addTaskRelation(
+    taskId: string,
+    body: AddTaskRelationRequest,
+    options: RequestOptions = {},
+  ): Promise<TaskDto> {
+    const response = await this.send<{ data: TaskDto }>(
+      "POST",
+      `/tasks/${encodeURIComponent(taskId)}/relations${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async removeTaskRelation(
+    taskId: string,
+    relationId: string,
+    options: RequestOptions = {},
+  ): Promise<TaskDto> {
+    const response = await this.send<{ data: TaskDto }>(
+      "DELETE",
+      `/tasks/${encodeURIComponent(taskId)}/relations/${encodeURIComponent(relationId)}${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+    return response.data;
+  }
+
+  async setTaskBlocked(
+    id: string,
+    body: SetTaskBlockedRequest,
+    options: RequestOptions = {},
+  ): Promise<TaskDto> {
+    const response = await this.send<{ data: TaskDto }>(
+      "POST",
+      `/tasks/${encodeURIComponent(id)}/blocked${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async clearTaskBlocked(
+    id: string,
+    expectedVersion?: number,
+    options: RequestOptions = {},
+  ): Promise<TaskDto> {
+    const response = await this.send<{ data: TaskDto }>(
+      "DELETE",
+      `/tasks/${encodeURIComponent(id)}/blocked${this.queryString({ expectedVersion }, options)}`,
       undefined,
       options,
     );

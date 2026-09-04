@@ -39,6 +39,9 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     deletedAt: null,
     dayPlans: [],
     subtaskProgress: null,
+    relations: [],
+    blocked: null,
+    isBlocked: false,
     ...overrides,
   };
 }
@@ -190,6 +193,50 @@ describe("formatTaskDetail", () => {
     expect(output).toContain("Subtasks");
     expect(output).toContain("[x] ML-2  ");
     expect(output).toContain("[ ] ML-3  ");
+  });
+
+  it("prints the blocked flag and relations from the task's point of view", () => {
+    const output = formatTaskDetail(
+      task({
+        isBlocked: true,
+        blocked: { reason: "waiting on vendor", since: "2026-09-03T09:00:00.000Z" },
+        relations: [
+          {
+            id: "01a04e0f-0000-7000-8000-000000000010",
+            type: "blocks",
+            sourceTaskId: "01a04e0f-0000-7000-8000-000000000003",
+            targetTaskId: "01a04e0f-0000-7000-8000-000000000001",
+            task: {
+              id: "01a04e0f-0000-7000-8000-000000000003",
+              key: "ML-3",
+              title: "Collect sources",
+              isCompleted: false,
+            },
+            createdAt: "2026-09-03T09:00:00.000Z",
+          },
+          {
+            id: "01a04e0f-0000-7000-8000-000000000011",
+            type: "related_to",
+            sourceTaskId: "01a04e0f-0000-7000-8000-000000000001",
+            targetTaskId: "01a04e0f-0000-7000-8000-000000000004",
+            task: {
+              id: "01a04e0f-0000-7000-8000-000000000004",
+              key: "ML-4",
+              title: "Book venue",
+              isCompleted: true,
+            },
+            createdAt: "2026-09-03T09:00:00.000Z",
+          },
+        ],
+      }),
+    );
+
+    expect(output).toContain(
+      "  blocked     waiting on vendor (since 2026-09-03T09:00:00.000Z)",
+    );
+    expect(output).toContain("  blocked by  [ ] ML-3  Collect sources");
+    expect(output).toContain("  related to  [x] ML-4  Book venue");
+    expect(formatTaskTable([task({ isBlocked: true })])).toContain("[blocked]");
   });
 
   it("omits the subtask lines for a childless task", () => {

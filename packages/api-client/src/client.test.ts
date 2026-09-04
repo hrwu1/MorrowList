@@ -177,6 +177,49 @@ describe("subtask requests", () => {
   });
 });
 
+describe("relation and blocked requests", () => {
+  it("relates, unrelates, flags, clears, and completes with acknowledgement", async () => {
+    const task = { id: TASK_ID, relations: [] };
+    const { client, requests } = recordingClient({ data: task });
+
+    await expect(
+      client.addTaskRelation(TASK_ID, { type: "blocks", targetTaskId: PROJECT_ID }),
+    ).resolves.toEqual(task);
+    expect(requests[0]?.method).toBe("POST");
+    expect(requests[0]?.url).toContain(`/tasks/${TASK_ID}/relations?workspaceId=`);
+    await expect(requests[0]?.json()).resolves.toEqual({
+      type: "blocks",
+      targetTaskId: PROJECT_ID,
+    });
+
+    await client.removeTaskRelation(TASK_ID, STATUS_ID);
+    expect(requests[1]?.method).toBe("DELETE");
+    expect(requests[1]?.url).toContain(`/tasks/${TASK_ID}/relations/${STATUS_ID}?`);
+
+    await client.setTaskBlocked(TASK_ID, { reason: "vendor", expectedVersion: 2 });
+    expect(requests[2]?.method).toBe("POST");
+    expect(requests[2]?.url).toContain(`/tasks/${TASK_ID}/blocked?workspaceId=`);
+    await expect(requests[2]?.json()).resolves.toEqual({
+      reason: "vendor",
+      expectedVersion: 2,
+    });
+
+    await client.clearTaskBlocked(TASK_ID, 3);
+    expect(requests[3]?.method).toBe("DELETE");
+    expect(requests[3]?.url).toContain(`/tasks/${TASK_ID}/blocked?workspaceId=`);
+    expect(requests[3]?.url).toContain("expectedVersion=3");
+
+    await client.completeTask(TASK_ID, {
+      expectedVersion: 3,
+      acknowledgeBlocked: true,
+    });
+    await expect(requests[4]?.json()).resolves.toEqual({
+      expectedVersion: 3,
+      acknowledgeBlocked: true,
+    });
+  });
+});
+
 describe("tag requests", () => {
   const TAG_ID = "0198f0a0-0000-7000-8000-000000000004";
 

@@ -1,6 +1,7 @@
 import {
   activityListResponseSchema,
   activityQuerySchema,
+  addTaskRelationRequestSchema,
   addTaskToDayRequestSchema,
   archiveStatusRequestSchema,
   completeTaskRequestSchema,
@@ -21,7 +22,9 @@ import {
   projectSchema,
   projectVersionRequestSchema,
   reorderStatusRequestSchema,
+  reopenTaskRequestSchema,
   reorderTaskRequestSchema,
+  setTaskBlockedRequestSchema,
   setTaskParentRequestSchema,
   tagListResponseSchema,
   tagResponseSchema,
@@ -75,6 +78,9 @@ const registry = {
   MoveTaskRequest: moveTaskRequestSchema,
   ReorderTaskRequest: reorderTaskRequestSchema,
   CompleteTaskRequest: completeTaskRequestSchema,
+  ReopenTaskRequest: reopenTaskRequestSchema,
+  AddTaskRelationRequest: addTaskRelationRequestSchema,
+  SetTaskBlockedRequest: setTaskBlockedRequestSchema,
   AddTaskToDayRequest: addTaskToDayRequestSchema,
   TodayView: todayViewResponseSchema,
   UpcomingView: upcomingViewResponseSchema,
@@ -615,10 +621,93 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
       "/tasks/{id}/complete": {
         post: {
           summary: "Complete a task",
+          description:
+            "A blocked task (an open blocks predecessor, or the blocker flag) completes only with `acknowledgeBlocked: true`; otherwise the command answers TASK_BLOCKED and changes nothing.",
           parameters: [taskIdParam, workspaceIdParam],
           requestBody: { required: false, ...jsonContent(ref("CompleteTaskRequest")) },
           responses: {
             "200": { description: "The completed task", ...jsonContent(ref("Task")) },
+            "409": {
+              description: "Version conflict, or the task is blocked",
+              ...jsonContent(ref("ErrorResponse")),
+            },
+            ...commonErrors,
+          },
+        },
+      },
+      "/tasks/{id}/relations": {
+        post: {
+          summary: "Relate this task to another",
+          description:
+            "`blocks` reads source (this task) → target; `related_to` is symmetric and stored once. Neither task's version changes. A blocks edge that would close a loop is rejected with TASK_RELATION_CYCLE; an edge that already exists is a no-op.",
+          parameters: [taskIdParam, workspaceIdParam],
+          requestBody: {
+            required: true,
+            ...jsonContent(ref("AddTaskRelationRequest")),
+          },
+          responses: {
+            "201": {
+              description: "This task with its relations",
+              ...jsonContent(ref("Task")),
+            },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/tasks/{id}/relations/{relationId}": {
+        delete: {
+          summary: "Remove a relation from either endpoint",
+          parameters: [
+            taskIdParam,
+            {
+              name: "relationId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            workspaceIdParam,
+          ],
+          responses: {
+            "200": {
+              description: "This task with its remaining relations",
+              ...jsonContent(ref("Task")),
+            },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/tasks/{id}/blocked": {
+        post: {
+          summary: "Flag a task as blocked with a reason",
+          description:
+            "The task stays in its workflow status; the flag is the signal. Flagging again replaces the reason and keeps the original start time.",
+          parameters: [taskIdParam, workspaceIdParam],
+          requestBody: { required: true, ...jsonContent(ref("SetTaskBlockedRequest")) },
+          responses: {
+            "200": { description: "The flagged task", ...jsonContent(ref("Task")) },
+            "409": {
+              description: "Version conflict",
+              ...jsonContent(ref("ErrorResponse")),
+            },
+            ...commonErrors,
+          },
+        },
+        delete: {
+          summary: "Clear the blocked flag",
+          parameters: [
+            taskIdParam,
+            workspaceIdParam,
+            {
+              name: "expectedVersion",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1 },
+            },
+          ],
+          responses: {
+            "200": { description: "The unflagged task", ...jsonContent(ref("Task")) },
             "409": {
               description: "Version conflict",
               ...jsonContent(ref("ErrorResponse")),
@@ -671,7 +760,7 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
         post: {
           summary: "Reopen a completed task",
           parameters: [taskIdParam, workspaceIdParam],
-          requestBody: { required: false, ...jsonContent(ref("CompleteTaskRequest")) },
+          requestBody: { required: false, ...jsonContent(ref("ReopenTaskRequest")) },
           responses: {
             "200": { description: "The reopened task", ...jsonContent(ref("Task")) },
             ...commonErrors,
