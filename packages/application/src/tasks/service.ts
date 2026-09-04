@@ -60,6 +60,10 @@ import {
 } from "@morrowlist/domain";
 
 import { openInterval, syncIntervals } from "../flow/intervals.js";
+import {
+  defaultReminderOffset,
+  recomputeReminder,
+} from "../notifications/scheduler.js";
 import type {
   Page,
   RankScope,
@@ -162,6 +166,14 @@ export class TaskService {
         deferUntil: (request.deferUntil ?? null) as PlainDate | null,
         deadline: (request.deadline ?? null) as PlainDate | null,
         deadlineTime: (request.deadlineTime ?? null) as PlainTime | null,
+        ...(request.reminderOffsetMinutes !== undefined
+          ? { reminderOffsetMinutes: request.reminderOffsetMinutes }
+          : {}),
+        defaultReminderOffsetMinutes: await defaultReminderOffset(
+          tx,
+          context,
+          request.workspaceId,
+        ),
         parentTaskId: parent?.id ?? null,
         recurrence: request.recurrence ?? null,
         project: destination,
@@ -322,7 +334,7 @@ export class TaskService {
     return this.mutate(context, workspaceId, taskId, request.expectedVersion, {
       eventType: TASK_EVENTS.updated,
       summarize: () => "Updated task fields",
-      apply: (task) =>
+      apply: async (task, tx) =>
         updateTaskFields(
           task,
           {
@@ -352,6 +364,14 @@ export class TaskService {
             ...(request.deadlineTime !== undefined
               ? { deadlineTime: request.deadlineTime as PlainTime | null }
               : {}),
+            ...(request.reminderOffsetMinutes !== undefined
+              ? { reminderOffsetMinutes: request.reminderOffsetMinutes }
+              : {}),
+            defaultReminderOffsetMinutes: await defaultReminderOffset(
+              tx,
+              context,
+              workspaceId,
+            ),
           },
           { actor: actorRef(context), clock: this.clock },
         ),
@@ -1036,6 +1056,9 @@ export class TaskService {
           ? step.payload(next, previous)
           : { taskId, changes: materialChanges(next, previous) },
       });
+      // The reminder follows the task in the same transaction: a new due instant
+      // reschedules it; completion or trashing cancels it; restore or reopen brings it back.
+      await recomputeReminder(tx, next, workspace.timezone, this.clock.now());
 
       return {
         task: await this.toDto(tx, workspace, next),
@@ -1116,6 +1139,9 @@ export class TaskService {
     );
 
     await tx.tasks.insert(task);
+    // The reminder schedule is derived in the same transaction as the row, for a
+    // captured task and for the next occurrence a completion spawns alike (GAP-13).
+    await recomputeReminder(tx, task, workspace.timezone, this.clock.now());
     for (const tag of origin?.tags ?? []) {
       await tx.tasks.addTag(task.id, tag.id, this.clock.now());
     }
