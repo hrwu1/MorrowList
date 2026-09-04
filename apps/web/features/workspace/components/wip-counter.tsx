@@ -26,9 +26,8 @@ export function WipCounter({
       className="workspace-nav__link workspace-wip"
       href="/settings/workspace"
       aria-current={current ? "page" : undefined}
-      aria-label={
-        summary ? `${summary.label}. Workspace settings` : "Workspace settings"
-      }
+      // Distinct from the utilities' "Workspace settings" link while /me is loading.
+      aria-label={`${summary?.label ?? "In progress"}. Workspace settings`}
       data-tone={summary?.tone}
       {...(onNavigate ? { onClick: onNavigate } : {})}
     >
