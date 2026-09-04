@@ -286,6 +286,8 @@ export function spawnNextOccurrence(
     dueTime: task.dueTime,
     dueTimezone: task.dueTimezone,
     ...window,
+    // The next occurrence reminds the way this one did (GAP-13).
+    reminderOffsetMinutes: task.reminderOffsetMinutes,
     recurrence: next.recurrence,
     seriesId: task.seriesId ?? task.id,
   };

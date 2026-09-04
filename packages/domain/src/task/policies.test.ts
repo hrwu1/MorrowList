@@ -734,6 +734,7 @@ describe("recurrence", () => {
       dueDate: toPlainDate("2026-09-03"),
       dueTime: toPlainTime("09:00"),
       dueTimezone: "Europe/Berlin",
+      reminderOffsetMinutes: 30,
       parentTaskId: "parent-1",
       recurrence: {
         ...createTask(
@@ -757,6 +758,7 @@ describe("recurrence", () => {
       deferUntil: null,
       deadline: null,
       deadlineTime: null,
+      reminderOffsetMinutes: 30,
       recurrence: { ...task.recurrence, count: 1 },
       seriesId: "series-1",
     });

@@ -108,8 +108,8 @@ async function taskWithFullHistory(): Promise<TaskDto> {
     reason: "waiting on vendor",
   });
   task = await tasks.clearBlocked(seeded.context, workspaceId, task.id);
+  // The due date is already set above; the rule alone is the readable change here.
   task = await tasks.update(seeded.context, workspaceId, task.id, {
-    dueDate: "2026-08-29",
     recurrence: {
       freq: "daily",
       interval: 1,
@@ -124,8 +124,9 @@ async function taskWithFullHistory(): Promise<TaskDto> {
   task = await tasks.skipOccurrence(seeded.context, workspaceId, task.id);
   task = await tasks.delete(seeded.context, workspaceId, task.id);
   task = await tasks.restore(seeded.context, workspaceId, task.id);
-  // The reminder (11:30Z) fires as the system actor, then the user snoozes it.
-  await notifications.deliverDue(new Date("2026-08-29T11:30:00.000Z"));
+  // Skipping moved the due date to 08-30, so the reminder (11:30Z that day) fires as
+  // the system actor, then the user snoozes it.
+  await notifications.deliverDue(new Date("2026-08-30T11:30:00.000Z"));
   const inbox = await notifications.list(seeded.context, workspaceId, { limit: 1 });
   await notifications.snooze(seeded.context, workspaceId, inbox.data[0]!.id);
   return task;
@@ -226,10 +227,7 @@ describe("ActivityService.listForTask", () => {
     expect(
       data.find((entry) => "recurrence" in ((entry.payload.changes ?? {}) as object))
         ?.changes,
-    ).toEqual([
-      { field: "dueDate", from: null, to: "2026-08-29" },
-      { field: "recurrence", from: null, to: "Every day" },
-    ]);
+    ).toEqual([{ field: "recurrence", from: null, to: "Every day" }]);
     expect(byType.get(TASK_EVENTS.occurrenceSkipped)?.changes).toEqual([
       { field: "dueDate", from: "2026-08-29", to: "2026-08-30" },
     ]);
@@ -264,8 +262,8 @@ describe("ActivityService.listForTask", () => {
       seen.push(...next.data);
       cursor = next.page.nextCursor;
     }
-    expect(seen).toHaveLength(20);
-    expect(new Set(seen.map((entry) => entry.id)).size).toBe(20);
+    expect(seen).toHaveLength(22);
+    expect(new Set(seen.map((entry) => entry.id)).size).toBe(22);
 
     const [body] = (first.page.nextCursor as string).split(".");
     await expect(

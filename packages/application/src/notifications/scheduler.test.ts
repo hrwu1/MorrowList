@@ -165,6 +165,41 @@ describe("reminder scheduling through the task commands", () => {
     expect(reminderOf(task.id)?.deliveredAt).toEqual(NOW);
   });
 
+  it("schedules the next occurrence's reminder when completing a repeating task", async () => {
+    const workspaceId = seeded.workspace.id;
+    const task = await timed({
+      reminderOffsetMinutes: 15,
+      recurrence: {
+        freq: "daily",
+        interval: 1,
+        mode: "schedule",
+        weekdays: null,
+        monthDay: null,
+        nthWeekday: null,
+        until: null,
+        count: null,
+      },
+    });
+    expect(reminderOf(task.id)?.remindAt).toEqual(new Date("2026-09-03T09:45:00.000Z"));
+
+    await tasks.complete(seeded.context, workspaceId, task.id);
+
+    expect(reminderOf(task.id)).toBeNull();
+    const next = [...unitOfWork.data.tasks.values()].find((t) => t.id !== task.id);
+    expect(next).toMatchObject({
+      dueDate: "2026-09-04",
+      dueTime: "12:00",
+      reminderOffsetMinutes: 15,
+      seriesId: task.id,
+    });
+    expect(reminderOf(next!.id)).toMatchObject({
+      workspaceId,
+      remindAt: new Date("2026-09-04T09:45:00.000Z"),
+      offsetMinutes: 15,
+      deliveredAt: null,
+    });
+  });
+
   it("rolls the reminder back with the task and its events when the commit fails", async () => {
     unitOfWork.failNextCommit();
 
