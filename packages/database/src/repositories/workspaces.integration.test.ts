@@ -70,11 +70,11 @@ beforeEach(async () => {
   });
 });
 
-describe("migration 0005_workspace_wip_limit", () => {
+describe("migration 0007_workspace_wip_limit", () => {
   it("is recorded and adds a nullable in_progress_limit column", async () => {
     const applied = await handle.pool.query(
       "select name from __morrowlist_migrations where name = $1",
-      ["0005_workspace_wip_limit.sql"],
+      ["0007_workspace_wip_limit.sql"],
     );
     expect(applied.rowCount).toBe(1);
 
