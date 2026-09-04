@@ -1,7 +1,7 @@
 "use client";
 
 import { useDndMonitor, type DragEndEvent } from "@dnd-kit/core";
-import type { TaskDto, WorkflowStatusDto } from "@morrowlist/contracts";
+import type { TaskDto, WipWarningDto, WorkflowStatusDto } from "@morrowlist/contracts";
 import { Alert, Button, Select, Spinner } from "@morrowlist/ui";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -32,6 +32,7 @@ import {
 } from "@/features/projects/hooks/use-workflow";
 import { QuickAdd } from "@/features/tasks/components/quick-add";
 import { TaskPanel } from "@/features/tasks/components/task-panel";
+import { WipWarning } from "@/features/workspace/components/wip-warning";
 
 const SORT_LABELS: Record<BoardSort, string> = {
   manual: "Manual order",
@@ -57,6 +58,7 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
   const [announcement, setAnnouncement] = useState("");
+  const [wipWarning, setWipWarning] = useState<WipWarningDto | null>(null);
   const lastOpenTask = useRef<string | null>(selectedTaskKey);
 
   const closeTaskPanel = useCallback(() => {
@@ -135,8 +137,19 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   ) {
     moveTask.reset();
     try {
-      await moveTask.mutateAsync({ task, projectId, destination, placement });
-      setAnnouncement(`Moved ${task.key} to ${destination.name}.`);
+      const result = await moveTask.mutateAsync({
+        task,
+        projectId,
+        destination,
+        placement,
+      });
+      // The move went through; the limit only warns (GAP-20).
+      setWipWarning(result.warnings[0] ?? null);
+      setAnnouncement(
+        result.warnings[0]
+          ? `Moved ${task.key} to ${destination.name}. ${result.warnings[0].message}`
+          : `Moved ${task.key} to ${destination.name}.`,
+      );
     } catch {
       setAnnouncement(
         `Could not move ${task.key}. Its previous position was restored.`,
@@ -366,6 +379,10 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
         <Alert tone="info" title="Showing the first 500 cards">
           Narrow this board before moving work that is outside the current projection.
         </Alert>
+      ) : null}
+
+      {wipWarning ? (
+        <WipWarning warning={wipWarning} onDismiss={() => setWipWarning(null)} />
       ) : null}
 
       {moveTask.isError ? (

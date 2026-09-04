@@ -41,6 +41,7 @@ import { useTodayView } from "@/features/today/hooks/use-today";
 import { countTodayTasks } from "@/features/today/lib/today-view";
 import { useUpcomingView } from "@/features/upcoming/hooks/use-upcoming";
 import { countUpcomingTasks } from "@/features/upcoming/lib/upcoming-view";
+import { WipCounter } from "@/features/workspace/components/wip-counter";
 import { authClient } from "@/lib/auth-client";
 
 export interface WorkspaceUser {
@@ -244,6 +245,8 @@ export function WorkspaceShell({
               <Icon name="history" />
               <span>History</span>
             </Link>
+
+            <WipCounter current={pathname === "/settings/workspace"} />
           </nav>
 
           <div className="workspace-sidebar__utilities">
@@ -262,6 +265,14 @@ export function WorkspaceShell({
             >
               <Icon name="tag" />
               <span>Manage tags</span>
+            </Link>
+            <Link
+              className="workspace-nav__link workspace-nav__link--quiet"
+              href="/settings/workspace"
+              aria-current={pathname === "/settings/workspace" ? "page" : undefined}
+            >
+              <Icon name="settings" />
+              <span>Workspace settings</span>
             </Link>
 
             <details className="workspace-account" key={`account-${pathname}`}>
@@ -814,6 +825,10 @@ function MobileHeader({
               <Icon name="history" />
               History
             </Link>
+            <WipCounter
+              current={pathname === "/settings/workspace"}
+              onNavigate={closeMenu}
+            />
             <Link
               className="workspace-nav__link workspace-nav__link--quiet"
               href="/projects"

@@ -26,6 +26,7 @@ import { projectKeys } from "./use-projects";
 
 import { activityKeys } from "@/features/activity/hooks/use-activity";
 import { taskKeys } from "@/features/tasks/hooks/use-tasks";
+import { workspaceKeys } from "@/features/workspace/hooks/use-workspace";
 import { apiClient } from "@/lib/api-client";
 
 /**
@@ -163,10 +164,12 @@ export function useUpdateStatus(projectId: string) {
     onSuccess: (status) => patchStatusEverywhere(queryClient, projectId, status),
     onSettled: (_status, _error, { patch }) => {
       invalidateStatuses(queryClient, projectId);
-      // A category change may have completed or reopened the column's tasks.
+      // A category change may have completed or reopened the column's tasks, and it
+      // changes what counts as in progress (GAP-20).
       if (patch.category !== undefined) {
         void queryClient.invalidateQueries({ queryKey: taskKeys.all });
         void queryClient.invalidateQueries({ queryKey: activityKeys.all });
+        void queryClient.invalidateQueries({ queryKey: workspaceKeys.me() });
       }
     },
   });
@@ -226,6 +229,7 @@ export function useArchiveStatus(projectId: string) {
       // The moved tasks each recorded a task.moved event (spec 19.5).
       void queryClient.invalidateQueries({ queryKey: taskKeys.all });
       void queryClient.invalidateQueries({ queryKey: activityKeys.all });
+      void queryClient.invalidateQueries({ queryKey: workspaceKeys.me() });
     },
   });
 }

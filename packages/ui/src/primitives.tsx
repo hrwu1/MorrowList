@@ -133,7 +133,7 @@ export function EmptyState({ title, description, action }: EmptyStateProps) {
 }
 
 export interface AlertProps {
-  readonly tone: "error" | "success" | "info";
+  readonly tone: "error" | "success" | "info" | "warning";
   readonly title?: string | undefined;
   readonly children: ReactNode;
 }

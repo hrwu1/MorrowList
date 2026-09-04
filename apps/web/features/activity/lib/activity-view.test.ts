@@ -70,6 +70,10 @@ const CATALOGUE: Record<string, Partial<ActivityEntryDto>> = {
     aggregateType: "workspace",
     summary: "Created workspace Alex's Workspace",
   },
+  [WORKSPACE_EVENTS.updated]: {
+    aggregateType: "workspace",
+    summary: "Updated workspace Alex's Workspace",
+  },
 };
 
 describe("describeEntry", () => {

@@ -205,6 +205,10 @@
     background: var(--accent-subtle);
     border-color: var(--accent);
   }
+  .ml-alert--warning {
+    background: color-mix(in oklch, var(--warning) 14%, var(--surface-base));
+    border-color: var(--warning);
+  }
   .ml-alert__title {
     display: block;
     margin-bottom: 0.15rem;
@@ -545,6 +549,59 @@
     font-size: 0.68rem;
     font-variant-numeric: tabular-nums;
     text-align: center;
+  }
+  .workspace-wip {
+    margin-top: 0.35rem;
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+  }
+  .workspace-wip__mark {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 99px;
+    background: var(--text-muted);
+  }
+  .workspace-wip[data-tone="at"] {
+    color: var(--warning);
+  }
+  .workspace-wip[data-tone="at"] .workspace-wip__mark {
+    background: var(--warning);
+  }
+  .workspace-wip[data-tone="over"] {
+    color: var(--danger);
+    font-weight: 600;
+  }
+  .workspace-wip[data-tone="over"] .workspace-wip__mark {
+    background: var(--danger);
+  }
+  .workspace-settings__count {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+  }
+  .workspace-settings__count[data-tone="over"] {
+    color: var(--danger);
+  }
+  .wip-warning__tasks {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0.5rem 0;
+    padding: 0;
+    list-style: none;
+  }
+  .wip-warning__tasks li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .wip-warning__tasks li > span:nth-child(2) {
+    flex: 1;
+    min-width: 0;
+  }
+  .wip-warning__error {
+    margin: 0 0 0.5rem;
+    color: var(--danger);
+    font-size: 0.8125rem;
   }
   .workspace-inbox-link {
     display: grid;
@@ -2204,10 +2261,39 @@
     font-size: 0.8125rem;
   }
   .kanban-column__policy {
-    margin: 0.3rem 0 0 0.93rem;
+    margin: 0.35rem 0 0 0.93rem;
+    padding: 0.45rem 0.6rem;
+    border-radius: var(--radius-md);
+    background: var(--surface-base);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+  .kanban-column__policy .markdown p {
+    margin: 0;
+  }
+  .kanban-column__policy-toggle {
+    display: grid;
+    width: 1.15rem;
+    height: 1.15rem;
+    place-items: center;
+    border: 1px solid var(--border-subtle);
+    border-radius: 99px;
+    background: transparent;
     color: var(--text-muted);
-    font-size: 0.6875rem;
-    line-height: 1.35;
+    font: inherit;
+    font-size: 0.65rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .kanban-column__policy-toggle[aria-expanded="true"],
+  .kanban-column__policy-toggle:hover {
+    border-color: var(--board-status);
+    color: var(--text-primary);
+  }
+  .kanban-column__menu-panel .ml-input--multiline {
+    min-height: 4.2rem;
+    font-size: 0.8125rem;
   }
   .kanban-column__error {
     margin-top: 0.5rem;

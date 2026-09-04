@@ -33,6 +33,7 @@ import { matchesFilters } from "../lib/task-view";
 
 import { todayKeys } from "@/features/today/hooks/use-today";
 import { upcomingKeys } from "@/features/upcoming/hooks/use-upcoming";
+import { workspaceKeys } from "@/features/workspace/hooks/use-workspace";
 import { apiClient } from "@/lib/api-client";
 
 /**
@@ -204,6 +205,8 @@ function invalidateTaskProjections(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: activityKeys.all });
   void queryClient.invalidateQueries({ queryKey: todayKeys.all });
   void queryClient.invalidateQueries({ queryKey: upcomingKeys.all });
+  // The shell's in-progress counter follows every move, complete, and reopen (GAP-20).
+  void queryClient.invalidateQueries({ queryKey: workspaceKeys.me() });
 }
 
 async function cancelTaskProjections(queryClient: QueryClient): Promise<void> {
@@ -291,6 +294,44 @@ export function useMoveTaskToProject() {
       const result = await apiClient.moveTask(task.id, {
         projectId,
         statusId: destination.id,
+        expectedVersion: task.version,
+      });
+      return result.task;
+    },
+    onSuccess: (moved) => patchTaskEverywhere(queryClient, moved),
+    onSettled: () => invalidateTaskProjections(queryClient),
+  });
+}
+
+export interface MoveTaskToReadyInput {
+  readonly taskId: string;
+  readonly projectId: string;
+}
+
+/**
+ * Put a started task back into its project's Ready column, from the in-progress limit
+ * warning (GAP-20). Falls back to the project's default column when no Ready-category
+ * column exists.
+ */
+export function useMoveTaskToReady() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, projectId }: MoveTaskToReadyInput) => {
+      const [task, detail] = await Promise.all([
+        apiClient.getTask(taskId),
+        queryClient.fetchQuery({
+          queryKey: projectKeys.detail(projectId),
+          queryFn: () => apiClient.getProject(projectId),
+        }),
+      ]);
+      const ready =
+        detail.statuses.find(
+          (status) => status.category === "ready" && status.archivedAt === null,
+        ) ?? selectInboxDestination(detail.statuses);
+      if (!ready) throw new Error("This project has no Ready column.");
+      const result = await apiClient.moveTask(taskId, {
+        projectId,
+        statusId: ready.id,
         expectedVersion: task.version,
       });
       return result.task;

@@ -8,12 +8,13 @@ import type {
   UpdateStatusRequest,
   WorkflowStatusDto,
 } from "@morrowlist/contracts";
-import { Alert, Button, Select, TextInput } from "@morrowlist/ui";
+import { Alert, Button, Select, TextArea, TextInput } from "@morrowlist/ui";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { KanbanCard } from "./kanban-card";
 
 import { STATUS_COLOR_TOKENS } from "@/features/projects/lib/workflow-view";
+import { Markdown } from "@/features/tasks/components/markdown";
 
 /** Column edits the board can make in place; the settings page owns the rest. */
 export interface ColumnEditing {
@@ -69,6 +70,7 @@ export function KanbanColumn({
     data: { type: "status", statusId: status.id },
   });
   const [renaming, setRenaming] = useState(false);
+  const [policyOpen, setPolicyOpen] = useState(false);
   const overLimit = status.wipLimit !== null && tasks.length > status.wipLimit;
   const atLimit = status.wipLimit !== null && tasks.length === status.wipLimit;
   const exceptionStage = status.category === "blocked" || status.category === "review";
@@ -132,6 +134,19 @@ export function KanbanColumn({
             <span className="kanban-column__count" aria-label={`${tasks.length} tasks`}>
               {tasks.length}
             </span>
+            {status.policyMd ? (
+              <button
+                type="button"
+                className="kanban-column__policy-toggle"
+                aria-label={`Show policy for ${status.name}`}
+                aria-expanded={policyOpen}
+                aria-controls={`board-policy-${status.id}`}
+                title={status.policyMd}
+                onClick={() => setPolicyOpen((open) => !open)}
+              >
+                <span aria-hidden="true">i</span>
+              </button>
+            ) : null}
             <ColumnMenu
               status={status}
               statuses={statuses}
@@ -157,8 +172,14 @@ export function KanbanColumn({
               {overLimit ? " · over limit" : atLimit ? " · at limit" : ""}
             </span>
           ) : null}
-          {status.policyMd ? (
-            <p className="kanban-column__policy">{status.policyMd}</p>
+          {status.policyMd && policyOpen ? (
+            <div
+              id={`board-policy-${status.id}`}
+              className="kanban-column__policy"
+              aria-label={`Policy for ${status.name}`}
+            >
+              <Markdown source={status.policyMd} />
+            </div>
           ) : null}
           {error ? (
             <div className="kanban-column__error">
@@ -275,6 +296,7 @@ function ColumnMenu({
 }) {
   const menuRef = useRef<HTMLDetailsElement>(null);
   const [wipLimit, setWipLimit] = useState(status.wipLimit?.toString() ?? "");
+  const [policyMd, setPolicyMd] = useState(status.policyMd ?? "");
   const others = statuses.filter((candidate) => candidate.id !== status.id);
   const [destinationId, setDestinationId] = useState(others[0]?.id ?? "");
   const nonTerminalOthers = others.filter((candidate) => !candidate.isTerminal);
@@ -283,6 +305,9 @@ function ColumnMenu({
   useEffect(() => {
     setWipLimit(status.wipLimit?.toString() ?? "");
   }, [status.wipLimit]);
+  useEffect(() => {
+    setPolicyMd(status.policyMd ?? "");
+  }, [status.policyMd]);
 
   function close() {
     menuRef.current?.removeAttribute("open");
@@ -292,6 +317,15 @@ function ColumnMenu({
     event.preventDefault();
     const trimmed = wipLimit.trim();
     editing.onUpdate(status, { wipLimit: trimmed ? Number(trimmed) : null });
+  }
+
+  function submitPolicy(event: FormEvent) {
+    event.preventDefault();
+    const trimmed = policyMd.trim();
+    if (trimmed === (status.policyMd ?? "")) return;
+    editing.onUpdate(status, { policyMd: trimmed ? trimmed : null });
+    // The policy is read from the header glyph, so the menu gets out of its way.
+    close();
   }
 
   function submitArchive(event: FormEvent) {
@@ -373,6 +407,27 @@ function ColumnMenu({
           </label>
           <Button type="submit" disabled={editing.busy}>
             Set limit
+          </Button>
+        </form>
+
+        <form
+          className="kanban-column__menu-form"
+          aria-label={`Edit policy for ${status.name}`}
+          onSubmit={submitPolicy}
+        >
+          <label className="filters__control">
+            <span className="ml-field__label">Policy</span>
+            <TextArea
+              rows={3}
+              maxLength={10_000}
+              placeholder="Definition of done, or the rule for entering. Markdown."
+              value={policyMd}
+              disabled={editing.busy}
+              onChange={(event) => setPolicyMd(event.target.value)}
+            />
+          </label>
+          <Button type="submit" disabled={editing.busy}>
+            Save policy
           </Button>
         </form>
 

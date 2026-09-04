@@ -12,7 +12,15 @@ import type {
   TaskDto,
   WorkflowStatusDto,
 } from "@morrowlist/contracts";
-import { Alert, Button, Field, Select, Spinner, TextInput } from "@morrowlist/ui";
+import {
+  Alert,
+  Button,
+  Field,
+  Select,
+  Spinner,
+  TextArea,
+  TextInput,
+} from "@morrowlist/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -470,10 +478,11 @@ function WorkflowRow({
             <Field
               label="Policy"
               htmlFor={`${id}-policy`}
-              hint="Shown under the column"
+              hint="Definition of done or the rule for entering, in Markdown; shown from the column header"
             >
-              <TextInput
+              <TextArea
                 id={`${id}-policy`}
+                rows={3}
                 value={policyMd}
                 maxLength={10_000}
                 onChange={(event) => setPolicyMd(event.target.value)}
