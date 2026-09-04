@@ -48,6 +48,15 @@ export default defineConfig({
     // against DATABASE_URL, which would put the suite's rows back in development data.
     reuseExistingServer: false,
     timeout: 120_000,
-    env: { PORT: String(PORT), DATABASE_URL: databaseUrl },
+    env: {
+      PORT: String(PORT),
+      DATABASE_URL: databaseUrl,
+      // The suite signs up and out repeatedly from its own origin, so that origin must be
+      // the one auth trusts, whatever the developer's `.env` says (CI sets the same).
+      APP_URL: baseURL,
+      AUTH_TRUSTED_ORIGINS: [process.env.AUTH_TRUSTED_ORIGINS, baseURL]
+        .filter(Boolean)
+        .join(","),
+    },
   },
 });
