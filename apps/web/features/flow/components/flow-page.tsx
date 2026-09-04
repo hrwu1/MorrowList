@@ -100,28 +100,30 @@ export function FlowPage({ projectId }: { readonly projectId: string }) {
         </label>
       </header>
 
-      <dl className="flow-stats" aria-label="Flow summary">
-        <Stat
-          label="Work in progress"
-          value={String(summary.wip)}
-          hint="started, not done"
-        />
-        <Stat
-          label="Completed"
-          value={String(summary.completed)}
-          hint={FLOW_RANGE_LABELS[range].toLowerCase()}
-        />
-        <Stat
-          label="Cycle time, 85th percentile"
-          value={formatDays(summary.cycleTimeDays.p85)}
-          hint={`50th ${formatDays(summary.cycleTimeDays.p50)} · 95th ${formatDays(summary.cycleTimeDays.p95)} · ${summary.cycleTimeDays.samples} started ${summary.cycleTimeDays.samples === 1 ? "task" : "tasks"}`}
-        />
-        <Stat
-          label="Lead time, 85th percentile"
-          value={formatDays(summary.leadTimeDays.p85)}
-          hint={`50th ${formatDays(summary.leadTimeDays.p50)} · 95th ${formatDays(summary.leadTimeDays.p95)} · ${summary.leadTimeDays.samples} ${summary.leadTimeDays.samples === 1 ? "task" : "tasks"}`}
-        />
-      </dl>
+      <section aria-label="Flow summary">
+        <dl className="flow-stats">
+          <Stat
+            label="Work in progress"
+            value={String(summary.wip)}
+            hint="started, not done"
+          />
+          <Stat
+            label="Completed"
+            value={String(summary.completed)}
+            hint={FLOW_RANGE_LABELS[range].toLowerCase()}
+          />
+          <Stat
+            label="Cycle time, 85th percentile"
+            value={formatDays(summary.cycleTimeDays.p85)}
+            hint={`50th ${formatDays(summary.cycleTimeDays.p50)} · 95th ${formatDays(summary.cycleTimeDays.p95)} · ${summary.cycleTimeDays.samples} started ${summary.cycleTimeDays.samples === 1 ? "task" : "tasks"}`}
+          />
+          <Stat
+            label="Lead time, 85th percentile"
+            value={formatDays(summary.leadTimeDays.p85)}
+            hint={`50th ${formatDays(summary.leadTimeDays.p50)} · 95th ${formatDays(summary.leadTimeDays.p95)} · ${summary.leadTimeDays.samples} ${summary.leadTimeDays.samples === 1 ? "task" : "tasks"}`}
+          />
+        </dl>
+      </section>
 
       <ThroughputChart summary={summary} />
       <CumulativeFlowChart summary={summary} />

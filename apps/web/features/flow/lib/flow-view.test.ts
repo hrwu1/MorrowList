@@ -123,6 +123,21 @@ describe("agingChart", () => {
     expect(chart.dots[0]?.cy).toBe(chart.dots[1]?.cy);
   });
 
+  it("merges percentiles that coincide into one labelled line", () => {
+    const chart = agingChart(
+      [item({})],
+      { p50: 2, p85: 2, p95: 5 },
+      {
+        width: 300,
+        height: 120,
+      },
+    );
+    expect(chart.lines.map((line) => [line.label, line.days])).toEqual([
+      ["50th/85th", 2],
+      ["95th", 5],
+    ]);
+  });
+
   it("draws no reference lines without completed work", () => {
     const chart = agingChart(
       [item({})],

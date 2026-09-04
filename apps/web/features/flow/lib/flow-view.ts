@@ -199,13 +199,17 @@ export function agingChart(
   },
   size: ChartSize,
 ): AgingChart {
-  const references: { readonly label: string; readonly days: number }[] = [];
+  // Percentiles that coincide share one line, so their labels never overprint.
+  const references: { label: string; readonly days: number }[] = [];
   for (const [label, days] of [
     ["50th", percentiles.p50],
     ["85th", percentiles.p85],
     ["95th", percentiles.p95],
   ] as const) {
-    if (days !== null) references.push({ label, days });
+    if (days === null) continue;
+    const same = references.find((reference) => reference.days === days);
+    if (same) same.label = `${same.label}/${label}`;
+    else references.push({ label, days });
   }
   const maxDays = Math.max(
     1,
