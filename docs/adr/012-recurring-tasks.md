@@ -1,6 +1,6 @@
-# ADR-pending — Recurring tasks are in scope, created on completion
+# ADR-012 — Recurring tasks are in scope, created on completion
 
-**Status:** Proposed (numbered at merge; GAP-12)
+**Status:** Accepted
 
 **Date:** 2026-09-04
 

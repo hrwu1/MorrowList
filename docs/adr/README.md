@@ -17,6 +17,7 @@ it costs, so a future change is a deliberate reversal rather than an accident.
 | [ADR-009](009-manual-ordering-is-authoritative.md)   | Manual ordering is authoritative   | Accepted |
 | [ADR-010](010-personal-first-workspace-model.md)     | Personal-first workspace model     | Accepted |
 | [ADR-011](011-blocked-is-a-relation-or-a-flag.md)    | Blocked is a relation or a flag    | Accepted |
+| [ADR-012](012-recurring-tasks.md)                    | Recurring tasks                    | Accepted |
 
 ## Adding a record
 
