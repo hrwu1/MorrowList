@@ -1,6 +1,6 @@
-# ADR-NNN — Start/defer dates and deadlines are in scope
+# ADR-013 — Start/defer dates and deadlines are in scope
 
-**Status:** Proposed (numbered at merge)
+**Status:** Accepted
 
 **Date:** 2026-09-04 (GAP-16)
 
