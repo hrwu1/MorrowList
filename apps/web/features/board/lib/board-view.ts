@@ -35,6 +35,11 @@ export function readBoardSubtasks(params: URLSearchParams): boolean {
   return params.get("subtasks") === "show";
 }
 
+/** Deferred tasks stay off the board until their day unless the user asks (GAP-16). */
+export function readBoardDeferred(params: URLSearchParams): boolean {
+  return params.get("deferred") === "show";
+}
+
 /** Empty exception lanes stay out of the way unless the user explicitly asks for them. */
 export function readBoardStageView(params: URLSearchParams): BoardStageView {
   return params.get("show") === "all" ? "all" : "focus";

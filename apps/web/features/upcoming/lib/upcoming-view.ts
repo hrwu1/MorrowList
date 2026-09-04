@@ -61,6 +61,7 @@ export function patchTaskInUpcoming(
     task.deletedAt === null &&
     task.dueDate !== null &&
     task.dueDate > from &&
+    (task.deferUntil === null || task.deferUntil <= from) &&
     (last === null || task.dueDate <= last);
 
   const without: UpcomingGroupDto[] = view.data.groups

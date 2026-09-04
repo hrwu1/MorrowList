@@ -9,7 +9,7 @@ import type {
 } from "@morrowlist/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { projectKeys } from "../../projects/hooks/use-projects";
+import { projectKeys, type BoardViewOptions } from "../../projects/hooks/use-projects";
 import { moveTaskInBoard, type BoardPlacement } from "../lib/board-view";
 
 import { activityKeys } from "@/features/activity/hooks/use-activity";
@@ -18,11 +18,13 @@ import { taskKeys } from "@/features/tasks/hooks/use-tasks";
 import { workspaceKeys } from "@/features/workspace/hooks/use-workspace";
 import { apiClient } from "@/lib/api-client";
 
-export function useProjectBoard(projectId: string, includeSubtasks = false) {
+export function useProjectBoard(
+  projectId: string,
+  view: BoardViewOptions = { includeSubtasks: false, includeDeferred: false },
+) {
   return useQuery({
-    queryKey: projectKeys.board(projectId, includeSubtasks),
-    queryFn: () =>
-      apiClient.getProjectBoard(projectId, { limit: 500, includeSubtasks }),
+    queryKey: projectKeys.board(projectId, view),
+    queryFn: () => apiClient.getProjectBoard(projectId, { limit: 500, ...view }),
   });
 }
 

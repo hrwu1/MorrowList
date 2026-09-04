@@ -19,6 +19,8 @@ import type { TaskDragData } from "../lib/task-dnd";
 import { hasOpenSubtasks } from "../lib/task-projections";
 
 import {
+  DeadlineBadge,
+  DeferBadge,
   DueBadge,
   DueDateInput,
   MyDayBadge,
@@ -124,6 +126,13 @@ export function TaskRow({ task, detailHref, selected, today }: TaskRowProps) {
               today={today}
             />
             <RepeatBadge recurrence={task.recurrence} />
+            <DeadlineBadge
+              deadline={task.deadline}
+              deadlineTime={task.deadlineTime}
+              isCompleted={task.isCompleted}
+              today={today}
+            />
+            <DeferBadge deferUntil={task.deferUntil} today={today} />
             <MyDayBadge dayPlans={task.dayPlans} />
             <BlockedBadge task={task} />
             <SubtaskProgressBadge progress={task.subtaskProgress} />
@@ -197,7 +206,7 @@ function RowActions({
 
       <div className="task-row__action">
         <label className="ml-field__label" htmlFor={`${id}-due`}>
-          Due date
+          Planned
         </label>
         <DueDateInput
           id={`${id}-due`}
@@ -207,6 +216,36 @@ function RowActions({
               task,
               // Clearing the date clears the time with it (spec 8.2 invariant 3).
               patch: dueDate === null ? { dueDate: null, dueTime: null } : { dueDate },
+            })
+          }
+        />
+      </div>
+
+      <div className="task-row__action">
+        <label className="ml-field__label" htmlFor={`${id}-defer`}>
+          Defer until
+        </label>
+        <DueDateInput
+          id={`${id}-defer`}
+          value={task.deferUntil}
+          onChange={(deferUntil) => update.mutate({ task, patch: { deferUntil } })}
+        />
+      </div>
+
+      <div className="task-row__action">
+        <label className="ml-field__label" htmlFor={`${id}-deadline`}>
+          Deadline
+        </label>
+        <DueDateInput
+          id={`${id}-deadline`}
+          value={task.deadline}
+          onChange={(deadline) =>
+            update.mutate({
+              task,
+              patch:
+                deadline === null
+                  ? { deadline: null, deadlineTime: null }
+                  : { deadline },
             })
           }
         />

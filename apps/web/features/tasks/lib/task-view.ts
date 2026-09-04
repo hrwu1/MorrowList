@@ -105,7 +105,8 @@ export function toListQuery(scope: TaskScope, view: TaskView): Partial<ListTasks
     view.completion === "any" ? {} : { isCompleted: view.completion === "done" };
 
   return {
-    ...(scope === "inbox" ? { inbox: true, ...completion } : {}),
+    // The Inbox hides deferred tasks; the page lists them in a collapsed section (GAP-16).
+    ...(scope === "inbox" ? { inbox: true, deferred: false, ...completion } : {}),
     ...(scope === "completed" ? { isCompleted: true } : {}),
     ...(scope === "trash" ? { deleted: true } : {}),
     ...(view.priority === "any" ? {} : { priority: view.priority }),
@@ -122,8 +123,8 @@ export function toListQuery(scope: TaskScope, view: TaskView): Partial<ListTasks
  *
  * Used to keep every cached projection consistent after one optimistic patch (spec 23.3)
  * rather than duplicating removal logic per view. It is deliberately conservative: `due`
- * is evaluated against the workspace timezone on the server, which the browser does not
- * know, so a due-filtered list is left to the refetch that follows the mutation.
+ * and `deferred` are evaluated against the workspace timezone on the server, which the
+ * browser does not know, so those lists are left to the refetch that follows the mutation.
  */
 export function matchesFilters(
   task: TaskDto,

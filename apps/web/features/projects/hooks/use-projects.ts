@@ -17,6 +17,12 @@ import {
 
 import { apiClient } from "@/lib/api-client";
 
+/** The board variants a project can be cached as: subtasks and deferred tasks shown or hidden. */
+export interface BoardViewOptions {
+  readonly includeSubtasks: boolean;
+  readonly includeDeferred: boolean;
+}
+
 export const projectKeys = {
   all: ["projects"] as const,
   lists: () => [...projectKeys.all, "list"] as const,
@@ -27,8 +33,8 @@ export const projectKeys = {
   /** Every cached variant of one project's board, whichever subtask view it shows. */
   projectBoards: (projectId: string) =>
     [...projectKeys.all, "board", projectId] as const,
-  board: (projectId: string, includeSubtasks: boolean) =>
-    [...projectKeys.projectBoards(projectId), { includeSubtasks }] as const,
+  board: (projectId: string, view: BoardViewOptions) =>
+    [...projectKeys.projectBoards(projectId), view] as const,
 };
 
 export function useProjects(filters: Partial<ListProjectsQuery> = {}) {

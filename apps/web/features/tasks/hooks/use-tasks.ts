@@ -22,6 +22,7 @@ import {
 import { activityKeys } from "../../activity/hooks/use-activity";
 import { flowKeys } from "../../flow/hooks/use-flow";
 import { projectKeys } from "../../projects/hooks/use-projects";
+import { projectKeys, type BoardViewOptions } from "../../projects/hooks/use-projects";
 import { localToday, patchTaskInToday } from "../../today/lib/today-view";
 import { patchTaskInUpcoming } from "../../upcoming/lib/upcoming-view";
 import {
@@ -70,10 +71,9 @@ function filtersOf(key: QueryKey): Partial<ListTasksQuery> {
   return (key[2] ?? {}) as Partial<ListTasksQuery>;
 }
 
-function boardIncludesSubtasks(key: QueryKey): boolean {
-  return (
-    (key[3] as { includeSubtasks?: boolean } | undefined)?.includeSubtasks ?? false
-  );
+/** The variant a cached board shows: subtasks and deferred tasks hidden or shown. */
+function boardViewOf(key: QueryKey): Partial<BoardViewOptions> {
+  return (key[3] ?? {}) as Partial<BoardViewOptions>;
 }
 
 /**
@@ -127,7 +127,10 @@ function replaceTaskInCaches(queryClient: QueryClient, task: TaskDto): void {
     if (current) {
       queryClient.setQueryData<ProjectBoardResponse>(
         key,
-        patchTaskInBoard(current, task, boardIncludesSubtasks(key)),
+        patchTaskInBoard(current, task, {
+          ...boardViewOf(key),
+          today: workspaceToday(queryClient),
+        }),
       );
     }
   }

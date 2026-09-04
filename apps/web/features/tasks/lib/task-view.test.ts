@@ -107,6 +107,7 @@ describe("toListQuery", () => {
   it("scopes the Inbox to open, project-less tasks", () => {
     expect(toListQuery("inbox", DEFAULT_VIEW)).toEqual({
       inbox: true,
+      deferred: false,
       isCompleted: false,
       sort: "rank",
       order: "asc",

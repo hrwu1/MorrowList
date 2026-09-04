@@ -98,7 +98,7 @@ test("a task due tomorrow appears in Upcoming and can be rescheduled there", asy
   const tomorrow = addDays(today, 1);
 
   await page.getByRole("button", { name: "Edit Due tomorrow" }).click();
-  await row(page, "Due tomorrow").getByLabel("Due date").fill(tomorrow);
+  await row(page, "Due tomorrow").getByLabel("Planned", { exact: true }).fill(tomorrow);
 
   const upcomingLink = page.getByRole("link", { name: "Upcoming", exact: true });
   await expect(upcomingLink).toContainText("1");
@@ -112,7 +112,7 @@ test("a task due tomorrow appears in Upcoming and can be rescheduled there", asy
   // Reschedule inline: three weeks out leaves the default horizon but not the open one.
   const later = addDays(today, 21);
   await page.getByRole("button", { name: "Edit Due tomorrow" }).click();
-  await row(page, "Due tomorrow").getByLabel("Due date").fill(later);
+  await row(page, "Due tomorrow").getByLabel("Planned", { exact: true }).fill(later);
   await expect(page.getByRole("heading", { name: "Nothing scheduled" })).toBeVisible();
 
   await page.getByLabel("Horizon").selectOption("all");

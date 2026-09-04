@@ -109,7 +109,7 @@ test("edits priority, due date, and description, and they survive a reload", asy
   await expect(panel).toBeVisible();
 
   await panel.getByLabel("Priority").selectOption("urgent");
-  await panel.getByLabel("Due date").fill("2026-09-15");
+  await panel.getByLabel("Planned", { exact: true }).fill("2026-09-15");
   await panel.locator("summary").filter({ hasText: "Description" }).click();
   await panel
     .getByLabel("Markdown")
@@ -125,7 +125,7 @@ test("edits priority, due date, and description, and they survive a reload", asy
 
   await page.reload();
   await expect(panel.getByLabel("Priority")).toHaveValue("urgent");
-  await expect(panel.getByLabel("Due date")).toHaveValue("2026-09-15");
+  await expect(panel.getByLabel("Planned", { exact: true })).toHaveValue("2026-09-15");
   await panel.locator("summary").filter({ hasText: "Description" }).click();
   await expect(panel.getByLabel("Markdown")).toHaveValue(/\*\*one\*\* thing/);
 });
@@ -280,7 +280,7 @@ test("quick add can capture a priority and a due date in one go", async ({ page 
   const quickAdd = page.getByRole("form", { name: "Quick add" });
   await quickAdd.getByRole("button", { name: "Details" }).click();
   await quickAdd.getByLabel("Priority").selectOption("high");
-  await quickAdd.getByLabel("Due date").fill("2026-10-01");
+  await quickAdd.getByLabel("Planned", { exact: true }).fill("2026-10-01");
   const field = page.getByPlaceholder("Add a task and press Enter");
   await field.fill("Scheduled on capture");
   await field.press("Enter");

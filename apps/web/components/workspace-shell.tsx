@@ -66,6 +66,7 @@ export function WorkspaceShell({
   const inbox = useTaskList({
     inbox: true,
     isCompleted: false,
+    deferred: false,
     sort: "rank",
     order: "asc",
     limit: 200,

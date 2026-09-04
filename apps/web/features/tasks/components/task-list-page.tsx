@@ -60,6 +60,12 @@ export function TaskListPage({
   const openTaskKey = params.get("task");
   const filters = toListQuery(scope, view);
   const { data, isPending, isError, error, refetch } = useTaskList(filters);
+  // Deferred tasks stay out of the main list and wait in a collapsed section (GAP-16).
+  const deferred = useTaskList(
+    { ...filters, deferred: true },
+    { enabled: scope === "inbox" },
+  );
+  const deferredTasks = scope === "inbox" ? (deferred.data?.data ?? []) : [];
 
   const navigate = useCallback(
     (next: URLSearchParams) => {
@@ -148,6 +154,26 @@ export function TaskListPage({
             )}
           </ul>
         )}
+
+        {scope === "inbox" && deferredTasks.length > 0 ? (
+          <details className="task-list__deferred">
+            <summary className="task-list__deferred-summary">
+              Deferred
+              <span className="today-section__count">{deferredTasks.length}</span>
+              <span className="task-detail__hint">Hidden until their defer date</span>
+            </summary>
+            <ul className="task-list" aria-label="Deferred tasks">
+              {deferredTasks.map((task) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  detailHref={hrefFor(task.key)}
+                  selected={task.key === openTaskKey}
+                />
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </div>
 
       {openTaskKey ? <TaskPanel idOrKey={openTaskKey} onClose={closePanel} /> : null}

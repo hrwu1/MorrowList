@@ -5,6 +5,8 @@ import type {
   WorkflowStatusDto,
 } from "@morrowlist/contracts";
 
+import { isDeferred } from "./task-dates";
+
 /** Pick the project's intended Inbox destination without ever targeting an archived lane. */
 export function selectInboxDestination(
   statuses: readonly WorkflowStatusDto[],
@@ -18,19 +20,32 @@ export function selectInboxDestination(
  * the board are removed; newly assigned/restored tasks are appended when the cached
  * projection is complete. A truncated board is never widened speculatively.
  */
+export interface BoardPatchOptions {
+  /** Boards hide subtasks unless asked (spec 8.3). */
+  readonly includeSubtasks?: boolean | undefined;
+  /** Boards hide deferred tasks unless asked (GAP-16); `today` decides deferral. */
+  readonly includeDeferred?: boolean | undefined;
+  readonly today?: string | undefined;
+}
+
 export function patchTaskInBoard(
   response: ProjectBoardResponse,
   task: TaskDto,
-  includeSubtasks = false,
+  options: BoardPatchOptions = {},
 ): ProjectBoardResponse {
   const currentIndex = response.data.tasks.findIndex(
     (candidate) => candidate.id === task.id,
   );
+  const deferred =
+    options.today !== undefined && !options.includeDeferred
+      ? isDeferred(task, options.today)
+      : false;
   const belongs =
     task.deletedAt === null &&
     task.projectId === response.data.project.id &&
     task.statusId !== null &&
-    (includeSubtasks || task.parentTaskId === null) &&
+    (options.includeSubtasks || task.parentTaskId === null) &&
+    !deferred &&
     response.data.statuses.some(
       (status) => status.id === task.statusId && status.archivedAt === null,
     );

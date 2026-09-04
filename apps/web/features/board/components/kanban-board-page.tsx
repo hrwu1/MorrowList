@@ -12,6 +12,7 @@ import { useCollapsedColumns } from "../hooks/use-collapsed-columns";
 import {
   placementChangesTask,
   placementForDrop,
+  readBoardDeferred,
   readBoardStageView,
   readBoardSort,
   readBoardSubtasks,
@@ -54,7 +55,11 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   const stageView = readBoardStageView(new URLSearchParams(searchParams.toString()));
   const showSubtasks = readBoardSubtasks(new URLSearchParams(searchParams.toString()));
   const showAge = readBoardAge(new URLSearchParams(searchParams.toString()));
-  const board = useProjectBoard(projectId, showSubtasks);
+  const showDeferred = readBoardDeferred(new URLSearchParams(searchParams.toString()));
+  const board = useProjectBoard(projectId, {
+    includeSubtasks: showSubtasks,
+    includeDeferred: showDeferred,
+  });
   const flow = useProjectFlow(projectId);
   const doneHint = usuallyDoneLabel(flow.data?.cycleTimeDays.p85 ?? null);
   const moveTask = useMoveBoardTask(projectId);
@@ -133,6 +138,14 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
     const params = new URLSearchParams(searchParams.toString());
     if (show) params.set("subtasks", "show");
     else params.delete("subtasks");
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
+  function changeDeferred(show: boolean) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (show) params.set("deferred", "show");
+    else params.delete("deferred");
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
@@ -344,6 +357,12 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
               >
                 {showAge ? "Card age shown" : "Card age hidden"}
               </span>
+              <span
+                className="view-disclosure__chip"
+                data-active={showDeferred || undefined}
+              >
+                {showDeferred ? "Deferred shown" : "Deferred hidden"}
+              </span>
             </span>
           </summary>
           <div className="view-disclosure__panel board-toolbar__view-panel">
@@ -394,6 +413,17 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
               >
                 <option value="show">Days in column, fading after 7 and 14</option>
                 <option value="hide">Hidden</option>
+              </Select>
+            </label>
+            <label className="filters__control">
+              <span className="ml-field__label">Deferred</span>
+              <Select
+                value={showDeferred ? "show" : "hide"}
+                aria-label="Deferred shown"
+                onChange={(event) => changeDeferred(event.target.value === "show")}
+              >
+                <option value="hide">Hidden until their defer date</option>
+                <option value="show">Shown</option>
               </Select>
             </label>
             <p className="board-toolbar__hint" id="board-drag-hint">

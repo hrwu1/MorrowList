@@ -137,3 +137,40 @@ describe("patchTaskInToday", () => {
     expect(patched.data.review?.tasks).toEqual([other]);
   });
 });
+
+describe("patchTaskInToday with deferred tasks (GAP-16)", () => {
+  it("drops a task that becomes deferred unless it is in My Day, and then keeps only My Day", () => {
+    const overdue = task({
+      id: "0198f0a0-0000-7000-8000-000000000002",
+      dueDate: "2026-09-01",
+    });
+    const listed = view({
+      sections: [
+        { id: "overdue", tasks: [{ task: overdue, reasons: ["overdue"] }] },
+        { id: "due_today", tasks: [] },
+        { id: "my_day", tasks: [] },
+      ],
+    });
+
+    const deferred = patchTaskInToday(listed, { ...overdue, deferUntil: "2026-09-10" });
+    expect(countTodayTasks(deferred)).toBe(0);
+
+    const chosen = patchTaskInToday(listed, {
+      ...overdue,
+      deferUntil: "2026-09-10",
+      dayPlans: [DATE],
+    });
+    expect(chosen.data.sections[0]?.tasks.map((entry) => entry.reasons)).toEqual([
+      ["my_day"],
+    ]);
+
+    const fresh = patchTaskInToday(view(), {
+      ...overdue,
+      deferUntil: "2026-09-10",
+      dayPlans: [DATE],
+    });
+    expect(fresh.data.sections[2]?.tasks.map((entry) => entry.reasons)).toEqual([
+      ["my_day"],
+    ]);
+  });
+});

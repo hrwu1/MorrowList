@@ -41,6 +41,8 @@ const CATALOGUE: Record<string, Partial<ActivityEntryDto>> = {
       { field: "title", from: "Draft brief", to: "Draft the brief" },
       { field: "priority", from: "none", to: "high" },
       { field: "dueDate", from: null, to: "2026-09-15" },
+      { field: "deferUntil", from: null, to: "2026-09-10" },
+      { field: "deadline", from: "2026-09-20", to: null },
       { field: "descriptionMd", from: null, to: "## Notes" },
     ],
   },

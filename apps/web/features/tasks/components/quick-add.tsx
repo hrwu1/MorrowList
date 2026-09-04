@@ -117,7 +117,7 @@ export function QuickAdd({
           </div>
           <div className="quick-add__field">
             <label className="ml-field__label" htmlFor={dueId}>
-              Due date
+              Planned
             </label>
             <DueDateInput id={dueId} value={dueDate} onChange={setDueDate} />
           </div>

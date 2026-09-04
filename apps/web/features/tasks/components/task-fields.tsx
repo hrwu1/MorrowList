@@ -8,6 +8,7 @@ import type {
 import { Select, TextInput } from "@morrowlist/ui";
 
 import { describeRecurrence } from "../lib/recurrence";
+import { deadlineTone, isDeferred } from "../lib/task-dates";
 import { PRIORITIES } from "../lib/task-view";
 
 /**
@@ -140,6 +141,53 @@ export function DueBadge({
       {overdue ? "Overdue: " : dueToday ? "Due today" : "Due "}
       {dueToday ? "" : dueDate}
       {dueTime ? ` at ${dueTime}` : ""}
+    </time>
+  );
+}
+
+/**
+ * The deadline marker (GAP-16): its own line beside the planned day, and loud — the
+ * urgent hue plus the word — only when it is past or within the next two days.
+ */
+export function DeadlineBadge({
+  deadline,
+  deadlineTime,
+  isCompleted,
+  today = new Date().toISOString().slice(0, 10),
+}: {
+  readonly deadline: string | null;
+  readonly deadlineTime: string | null;
+  readonly isCompleted: boolean;
+  readonly today?: string | undefined;
+}) {
+  if (!deadline) return null;
+  const tone = isCompleted ? "later" : deadlineTone(deadline, today);
+
+  return (
+    <time
+      className="task-row__deadline"
+      dateTime={deadlineTime ? `${deadline}T${deadlineTime}` : deadline}
+      data-tone={tone}
+    >
+      {tone === "past" ? "Past deadline: " : "Deadline "}
+      {deadline}
+      {deadlineTime ? ` at ${deadlineTime}` : ""}
+    </time>
+  );
+}
+
+/** Shown while a task is deferred, so a view that includes it says why it is greyed. */
+export function DeferBadge({
+  deferUntil,
+  today = new Date().toISOString().slice(0, 10),
+}: {
+  readonly deferUntil: string | null;
+  readonly today?: string | undefined;
+}) {
+  if (!isDeferred({ deferUntil }, today)) return null;
+  return (
+    <time className="task-row__defer" dateTime={deferUntil ?? undefined}>
+      Deferred until {deferUntil}
     </time>
   );
 }

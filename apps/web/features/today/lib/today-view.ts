@@ -6,6 +6,8 @@ import type {
   TodayViewResponse,
 } from "@morrowlist/contracts";
 
+import { isDeferred } from "../../tasks/lib/task-dates";
+
 /** Labels for the three Today sections and their badges (spec 9.2). */
 export const TODAY_SECTION_LABELS: Record<TodayReason, string> = {
   overdue: "Overdue",
@@ -42,6 +44,8 @@ function plannedFor(task: TaskDto, date: string): boolean {
 
 function belongsToday(task: TaskDto, date: string): TodayReason | null {
   if (task.isCompleted || task.deletedAt !== null) return null;
+  // A deferred task is out of Today until its date; only My Day brings it in (GAP-16).
+  if (isDeferred(task, date)) return plannedFor(task, date) ? "my_day" : null;
   if (task.dueDate !== null && task.dueDate < date) return "overdue";
   if (task.dueDate === date) return "due_today";
   if (plannedFor(task, date)) return "my_day";
@@ -67,7 +71,9 @@ export function patchTaskInToday(
     const kept = candidate.tasks.flatMap((entry): TodayEntryDto[] => {
       if (entry.task.id !== task.id) return [entry];
       if (section === null) return [];
-      const reasons: TodayReason[] = entry.reasons.filter((r) => r !== "my_day");
+      const reasons: TodayReason[] = isDeferred(task, date)
+        ? []
+        : entry.reasons.filter((r) => r !== "my_day");
       if (plannedFor(task, date)) reasons.push("my_day");
       // A task that lost every reason is dropped; the refetch settles any re-homing.
       return reasons.length === 0 ? [] : [{ task, reasons }];

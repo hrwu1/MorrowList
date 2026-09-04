@@ -161,7 +161,9 @@ describe("patchTaskInBoard with subtasks", () => {
     });
 
     expect(patchTaskInBoard(board(), subtask).data.tasks).toEqual([]);
-    expect(patchTaskInBoard(board(), subtask, true).data.tasks).toEqual([subtask]);
+    expect(
+      patchTaskInBoard(board(), subtask, { includeSubtasks: true }).data.tasks,
+    ).toEqual([subtask]);
   });
 
   it("removes a task that just became a subtask from a hiding board", () => {
@@ -261,5 +263,23 @@ describe("parent progress projections", () => {
         total: -1,
       }).subtaskProgress,
     ).toBeNull();
+  });
+});
+
+describe("patchTaskInBoard with deferred tasks (GAP-16)", () => {
+  it("keeps a deferred task off a hiding board and on a showing one", () => {
+    const deferred = task({ deferUntil: "2026-09-10" });
+    const today = "2026-09-03";
+
+    expect(patchTaskInBoard(board(), deferred, { today }).data.tasks).toEqual([]);
+    expect(
+      patchTaskInBoard(board(), deferred, { today, includeDeferred: true }).data.tasks,
+    ).toEqual([deferred]);
+    expect(
+      patchTaskInBoard(board(), deferred, { today: "2026-09-10" }).data.tasks,
+    ).toEqual([deferred]);
+    expect(patchTaskInBoard(board([deferred]), deferred, { today }).data.tasks).toEqual(
+      [],
+    );
   });
 });

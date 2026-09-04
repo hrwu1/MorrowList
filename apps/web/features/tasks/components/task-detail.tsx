@@ -34,6 +34,7 @@ import {
   useUpdateTask,
 } from "../hooks/use-tasks";
 import { describeRecurrence } from "../lib/recurrence";
+import { DATE_WARNING_LABELS } from "../lib/task-dates";
 import { allSubtasksDone, hasOpenSubtasks } from "../lib/task-projections";
 
 import { Markdown } from "./markdown";
@@ -109,6 +110,9 @@ interface Draft {
   dueDate: string | null;
   dueTime: string | null;
   recurrence: RecurrenceRuleDto | null;
+  deferUntil: string | null;
+  deadline: string | null;
+  deadlineTime: string | null;
 }
 
 function toDraft(task: TaskDto): Draft {
@@ -119,6 +123,9 @@ function toDraft(task: TaskDto): Draft {
     dueDate: task.dueDate,
     dueTime: task.dueTime,
     recurrence: task.recurrence,
+    deferUntil: task.deferUntil,
+    deadline: task.deadline,
+    deadlineTime: task.deadlineTime,
   };
 }
 
@@ -540,7 +547,11 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
           />
         </Field>
 
-        <Field label="Due date" htmlFor={fieldId("due-date")}>
+        <Field
+          label="Planned"
+          htmlFor={fieldId("due-date")}
+          hint="The day you plan to do it."
+        >
           <DueDateInput
             id={fieldId("due-date")}
             value={draft.dueDate}
@@ -557,9 +568,9 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
         </Field>
 
         <Field
-          label="Due time"
+          label="Planned time"
           htmlFor={fieldId("due-time")}
-          hint={draft.dueDate ? undefined : "Set a due date first."}
+          hint={draft.dueDate ? undefined : "Set a planned day first."}
         >
           <DueTimeInput
             id={fieldId("due-time")}
@@ -588,6 +599,68 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
           onChange={(recurrence) => edit({ recurrence }, { recurrence }, true)}
         />
       </Field>
+      <div className="task-detail__row">
+        <Field
+          label="Defer until"
+          htmlFor={fieldId("defer-until")}
+          hint="Hidden from Today, Upcoming, the Inbox and the board until then."
+        >
+          <DueDateInput
+            id={fieldId("defer-until")}
+            value={draft.deferUntil}
+            disabled={!editable}
+            onChange={(deferUntil) => edit({ deferUntil }, { deferUntil }, true)}
+          />
+        </Field>
+
+        <Field
+          label="Deadline"
+          htmlFor={fieldId("deadline")}
+          hint="The hard limit, separate from the planned day."
+        >
+          <DueDateInput
+            id={fieldId("deadline")}
+            value={draft.deadline}
+            disabled={!editable}
+            onChange={(deadline) =>
+              edit(
+                {
+                  deadline,
+                  deadlineTime: deadline === null ? null : draft.deadlineTime,
+                },
+                deadline === null
+                  ? { deadline: null, deadlineTime: null }
+                  : { deadline },
+                true,
+              )
+            }
+          />
+        </Field>
+
+        <Field
+          label="Deadline time"
+          htmlFor={fieldId("deadline-time")}
+          hint={draft.deadline ? undefined : "Set a deadline first."}
+        >
+          <DueTimeInput
+            id={fieldId("deadline-time")}
+            value={draft.deadlineTime}
+            hasDueDate={draft.deadline !== null}
+            disabled={!editable}
+            onChange={(deadlineTime) => edit({ deadlineTime }, { deadlineTime }, true)}
+          />
+        </Field>
+      </div>
+
+      {task.dateWarnings.length > 0 ? (
+        <Alert tone="info" title="These dates are in an unusual order">
+          <ul className="task-detail__warnings">
+            {task.dateWarnings.map((warning) => (
+              <li key={warning}>{DATE_WARNING_LABELS[warning]}</li>
+            ))}
+          </ul>
+        </Alert>
+      ) : null}
 
       <TagPicker task={task} disabled={!editable} />
 

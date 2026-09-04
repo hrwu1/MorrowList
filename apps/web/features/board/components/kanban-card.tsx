@@ -9,6 +9,8 @@ import { ageBand, daysInStatus } from "@/features/flow/lib/flow-view";
 import { BlockedBadge } from "@/features/relations/components/blocked-badge";
 import { TagChips } from "@/features/tags/components/tag-chip";
 import {
+  DeadlineBadge,
+  DeferBadge,
   DueBadge,
   MyDayBadge,
   PriorityBadge,
@@ -152,6 +154,12 @@ export function KanbanCard({
           isCompleted={task.isCompleted}
         />
         <RepeatBadge recurrence={task.recurrence} />
+        <DeadlineBadge
+          deadline={task.deadline}
+          deadlineTime={task.deadlineTime}
+          isCompleted={task.isCompleted}
+        />
+        <DeferBadge deferUntil={task.deferUntil} />
         <MyDayBadge dayPlans={task.dayPlans} />
         <BlockedBadge task={task} />
         <SubtaskProgressBadge progress={task.subtaskProgress} />
