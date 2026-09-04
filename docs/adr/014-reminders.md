@@ -1,6 +1,6 @@
-# ADR-pending — Reminders and notifications in scope
+# ADR-014 — Reminders and notifications in scope
 
-**Status:** Proposed (to be numbered when GAP-13 merges)
+**Status:** Accepted
 
 **Date:** 2026-09-04
 
