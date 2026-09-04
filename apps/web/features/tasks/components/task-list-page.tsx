@@ -1,8 +1,9 @@
 "use client";
 
+import type { SavedViewDto } from "@morrowlist/contracts";
 import { Alert, Button, EmptyState, Spinner } from "@morrowlist/ui";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
 
 import { useTaskList } from "../hooks/use-tasks";
 import {
@@ -15,14 +16,16 @@ import {
 } from "../lib/task-view";
 
 import { QuickAdd } from "./quick-add";
-import { TaskFilters } from "./task-filters";
 import { TaskPanel } from "./task-panel";
 import { TaskRow, TrashRow } from "./task-row";
 
+import { FilterPanel } from "@/features/views/components/filter-panel";
+
 /**
- * The shared list screen behind Inbox, Completed, and Trash (spec 9.1, 9.6, 9.7).
+ * The shared list screen behind Inbox, Completed, Trash, and every saved view (spec
+ * 9.1, 9.6, 9.7, 9.8).
  *
- * All three are the same list with a different scope, so they are one component: a new
+ * All of them are the same list with a different scope, so they are one component: a new
  * view is a route and a description, not another copy of this logic.
  *
  * Every piece of view state lives in the URL — the filters, the sort, and which task is
@@ -39,6 +42,10 @@ export interface TaskListPageProps {
   readonly showQuickAdd?: boolean | undefined;
   /** Per-view defaults, which stay out of the URL until the user changes them. */
   readonly defaults?: Partial<TaskView> | undefined;
+  /** The saved view this list renders, so the panel can update, rename, or delete it. */
+  readonly savedView?: SavedViewDto | undefined;
+  /** Extra controls under the header, such as a saved view's layout toggle. */
+  readonly toolbar?: ReactNode | undefined;
 }
 
 export function TaskListPage({
@@ -49,6 +56,8 @@ export function TaskListPage({
   emptyDescription,
   showQuickAdd = false,
   defaults,
+  savedView,
+  toolbar,
 }: TaskListPageProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -118,12 +127,16 @@ export function TaskListPage({
         </header>
 
         {showQuickAdd ? <QuickAdd /> : null}
+        {toolbar}
 
-        <TaskFilters
+        <FilterPanel
+          scope={scope}
           view={view}
           base={base}
           onChange={changeView}
-          showCompletion={scope === "inbox"}
+          showCompletion={scope === "inbox" || scope === "all"}
+          allowSave={scope !== "trash"}
+          savedView={savedView}
           resultCount={tasks.length}
         />
 

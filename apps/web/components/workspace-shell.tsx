@@ -28,6 +28,7 @@ import {
 } from "react";
 
 import { useCreateProject, useProjects } from "@/features/projects/hooks/use-projects";
+import { SearchBox } from "@/features/search/components/search-box";
 import { QuickAdd } from "@/features/tasks/components/quick-add";
 import { useMoveTaskToProject, useTaskList } from "@/features/tasks/hooks/use-tasks";
 import {
@@ -42,6 +43,7 @@ import { countTodayTasks } from "@/features/today/lib/today-view";
 import { useUpcomingView } from "@/features/upcoming/hooks/use-upcoming";
 import { countUpcomingTasks } from "@/features/upcoming/lib/upcoming-view";
 import { WipCounter } from "@/features/workspace/components/wip-counter";
+import { SavedViewNav } from "@/features/views/components/saved-view-nav";
 import { authClient } from "@/lib/auth-client";
 
 export interface WorkspaceUser {
@@ -74,6 +76,7 @@ export function WorkspaceShell({
   const today = useTodayView();
   const upcoming = useUpcomingView("14");
   const [inboxOpen, setInboxOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const restoreFocusTo = useRef<HTMLElement | null>(null);
   const dnd = useWorkspaceDragAndDrop();
 
@@ -94,7 +97,19 @@ export function WorkspaceShell({
     window.requestAnimationFrame(() => restoreFocusTo.current?.focus());
   }
 
+  function openSearch() {
+    restoreFocusTo.current = document.activeElement as HTMLElement | null;
+    setSearchOpen(true);
+  }
+
+  function closeSearch() {
+    setSearchOpen(false);
+    window.requestAnimationFrame(() => restoreFocusTo.current?.focus());
+  }
+
   useEffect(() => {
+    // Single-key shortcuts: N captures, / searches (spec 9.8). Neither fires while
+    // typing or while a dialog is already open.
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       const typing =
@@ -102,21 +117,18 @@ export function WorkspaceShell({
         target?.tagName === "TEXTAREA" ||
         target?.tagName === "SELECT" ||
         target?.isContentEditable;
-      if (
-        inboxOpen ||
-        event.key.toLowerCase() !== "n" ||
-        typing ||
-        event.metaKey ||
-        event.ctrlKey
-      ) {
-        return;
+      if (inboxOpen || searchOpen || typing || event.metaKey || event.ctrlKey) return;
+      if (event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        openInbox();
+      } else if (event.key === "/") {
+        event.preventDefault();
+        openSearch();
       }
-      event.preventDefault();
-      openInbox();
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [inboxOpen]);
+  }, [inboxOpen, searchOpen]);
 
   async function signOut() {
     await authClient.signOut();
@@ -170,6 +182,17 @@ export function WorkspaceShell({
             <Icon name="plus" />
             <span>New task</span>
             <kbd aria-hidden="true">N</kbd>
+          </button>
+
+          <button
+            type="button"
+            className="workspace-search"
+            aria-label="Search tasks and projects"
+            onClick={openSearch}
+          >
+            <Icon name="search" />
+            <span>Search</span>
+            <kbd aria-hidden="true">/</kbd>
           </button>
 
           <nav className="workspace-nav" aria-label="Primary">
@@ -235,6 +258,7 @@ export function WorkspaceShell({
                   {dnd.error}
                 </p>
               ) : null}
+              <SavedViewNav pathname={pathname} reorderable />
             </div>
 
             <Link
@@ -305,6 +329,7 @@ export function WorkspaceShell({
           projectsError={projectsUnavailable}
           user={user}
           onCapture={openInbox}
+          onSearch={openSearch}
           onProjectsRetry={() => void projects.refetch()}
           onSignOut={() => void signOut()}
         />
@@ -325,6 +350,8 @@ export function WorkspaceShell({
             </div>
           ) : null}
         </DragOverlay>
+
+        {searchOpen ? <SearchBox onDismiss={closeSearch} /> : null}
 
         {inboxOpen ? (
           <InboxTray
@@ -702,6 +729,7 @@ function MobileHeader({
   projectsError,
   user,
   onCapture,
+  onSearch,
   onProjectsRetry,
   onSignOut,
 }: {
@@ -714,6 +742,7 @@ function MobileHeader({
   readonly projectsError: boolean;
   readonly user: WorkspaceUser;
   readonly onCapture: () => void;
+  readonly onSearch: () => void;
   readonly onProjectsRetry: () => void;
   readonly onSignOut: () => void;
 }) {
@@ -735,6 +764,14 @@ function MobileHeader({
   return (
     <header className="workspace-mobile-header">
       <Brand />
+      <button
+        type="button"
+        className="workspace-mobile-header__capture"
+        aria-label="Search tasks and projects"
+        onClick={onSearch}
+      >
+        <Icon name="search" />
+      </button>
       <button
         type="button"
         className="workspace-mobile-header__capture"
@@ -814,6 +851,7 @@ function MobileHeader({
               onNavigate={closeMenu}
               onRetry={onProjectsRetry}
             />
+            <SavedViewNav pathname={pathname} onNavigate={closeMenu} />
             <Link
               className="workspace-nav__link"
               href="/completed"
@@ -1107,6 +1145,7 @@ type IconName =
   | "inbox"
   | "menu"
   | "plus"
+  | "search"
   | "settings"
   | "sign-out"
   | "sun"
@@ -1141,6 +1180,12 @@ function Icon({
     ),
     menu: <path d="M4 7h16M4 12h16M4 17h16" />,
     plus: <path d="M12 5v14M5 12h14" />,
+    search: (
+      <>
+        <circle cx="11" cy="11" r="6" />
+        <path d="m20 20-4.2-4.2" />
+      </>
+    ),
     settings: (
       <>
         <circle cx="12" cy="12" r="3" />

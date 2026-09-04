@@ -1,11 +1,14 @@
 import type { TaskDto } from "@morrowlist/contracts";
+import { SEARCH_GRAMMAR_EXAMPLES } from "@morrowlist/domain";
 import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_VIEW,
+  filtersFromView,
   matchesFilters,
   readTaskView,
   toListQuery,
+  viewFromFilters,
   writeTaskView,
 } from "./task-view";
 
@@ -64,6 +67,7 @@ describe("readTaskView", () => {
         ),
       ),
     ).toEqual({
+      project: "any",
       priority: "high",
       due: "overdue",
       tag: "any",
@@ -72,6 +76,23 @@ describe("readTaskView", () => {
       sort: "dueDate",
       order: "desc",
     });
+  });
+});
+
+describe("readTaskView with a saved view as the base", () => {
+  it("lets an explicit any widen a narrower saved filter", () => {
+    const base = {
+      ...DEFAULT_VIEW,
+      priority: "urgent" as const,
+      due: "overdue" as const,
+    };
+
+    expect(readTaskView(new URLSearchParams("priority=any&due=any"), base)).toEqual({
+      ...base,
+      priority: "any",
+      due: "any",
+    });
+    expect(writeTaskView({ ...base, priority: "any" }, base)).toBe("priority=any");
   });
 });
 
@@ -196,4 +217,61 @@ describe("matchesFilters for subtasks", () => {
     expect(matchesFilters(subtask, { includeSubtasks: false })).toBe(false);
     expect(matchesFilters(subtask, { inbox: true })).toBe(true);
   });
+});
+
+describe("saved view filters", () => {
+  const TAG_ID = "0198f0a0-0000-7000-8000-000000000009";
+
+  it("round-trips a view through the stored filter shape", () => {
+    const view = {
+      ...DEFAULT_VIEW,
+      project: "0198f0a0-0000-7000-8000-000000000001",
+      due: "overdue" as const,
+      blocked: "yes" as const,
+      completion: "any" as const,
+      sort: "dueDate" as const,
+    };
+
+    const filters = filtersFromView("all", view);
+    expect(filters).toEqual({
+      projectId: "0198f0a0-0000-7000-8000-000000000001",
+      due: "overdue",
+      isBlocked: true,
+      sort: "dueDate",
+      order: "asc",
+    });
+    expect(viewFromFilters(filters)).toEqual({ scope: "all", view });
+  });
+
+  it("keeps the Inbox scope and fixes Completed to done", () => {
+    expect(filtersFromView("inbox", DEFAULT_VIEW)).toMatchObject({
+      inbox: true,
+      isCompleted: false,
+    });
+    expect(viewFromFilters({ inbox: true }).scope).toBe("inbox");
+    expect(filtersFromView("completed", DEFAULT_VIEW)).toMatchObject({
+      isCompleted: true,
+    });
+    expect(filtersFromView("completed", DEFAULT_VIEW)).not.toHaveProperty("deleted");
+  });
+
+  /**
+   * The completion criterion shared with the CLI (`apps/cli/src/commands/where.test.ts`):
+   * the panel's controls and `--where` produce identical list queries for the same
+   * grammar rows. `tag` names resolve to the same id on both sides.
+   */
+  it.each(SEARCH_GRAMMAR_EXAMPLES.filter((row) => row.text === ""))(
+    "produces the same query as --where $query",
+    ({ filters }) => {
+      const { tag, ...rest } = filters;
+      const expected = { ...rest, ...(tag ? { tagId: TAG_ID } : {}) };
+      const view = viewFromFilters(expected);
+      const {
+        sort: _sort,
+        order: _order,
+        ...query
+      } = toListQuery(view.scope, view.view);
+      expect(query).toEqual(expected);
+    },
+  );
 });

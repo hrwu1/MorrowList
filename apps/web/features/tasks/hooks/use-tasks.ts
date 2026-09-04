@@ -32,6 +32,7 @@ import {
 } from "../lib/task-projections";
 import { matchesFilters } from "../lib/task-view";
 
+import { searchKeys } from "@/features/search/hooks/use-search";
 import { todayKeys } from "@/features/today/hooks/use-today";
 import { upcomingKeys } from "@/features/upcoming/hooks/use-upcoming";
 import { workspaceKeys } from "@/features/workspace/hooks/use-workspace";
@@ -211,6 +212,7 @@ function invalidateTaskProjections(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: upcomingKeys.all });
   // The shell's in-progress counter follows every move, complete, and reopen (GAP-20).
   void queryClient.invalidateQueries({ queryKey: workspaceKeys.me() });
+  void queryClient.invalidateQueries({ queryKey: searchKeys.all });
 }
 
 async function cancelTaskProjections(queryClient: QueryClient): Promise<void> {
