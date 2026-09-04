@@ -1150,6 +1150,9 @@
     display: grid;
     gap: 0.4rem;
   }
+  .blocked-flag .task-detail__section-header {
+    flex-wrap: wrap;
+  }
   .blocked-flag__reason {
     margin: 0;
     font-size: 0.875rem;
