@@ -5,8 +5,8 @@ import type { TaskDto, WorkflowStatusDto } from "@morrowlist/contracts";
 import Link from "next/link";
 import type { CSSProperties, KeyboardEventHandler } from "react";
 
-import { BlockedBadge } from "@/features/relations/components/blocked-badge";
 import { ageBand, daysInStatus } from "@/features/flow/lib/flow-view";
+import { BlockedBadge } from "@/features/relations/components/blocked-badge";
 import { TagChips } from "@/features/tags/components/tag-chip";
 import {
   DueBadge,

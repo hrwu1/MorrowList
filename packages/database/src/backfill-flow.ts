@@ -15,7 +15,11 @@ import {
  * It replays, per task, the events that place a task on a board or take it off one, and
  * reads the payloads exactly as they were recorded: `task.created` carries the initial
  * `projectId` and `statusId`; a move, completion or reopen carries `changes.statusId` and
- * `changes.projectId` as `{ from, to }`; trash and restore carry `changes.deletedAt`.
+ * `changes.projectId` as `{ from, to }`; trash and restore carry `changes.deletedAt`. A
+ * completion or reopen that changes neither is a column whose category crossed the Done
+ * boundary under the task (GAP-05): the live writer ends the stay and starts a new one,
+ * and so does the replay. A stay's category is the column's category at the time it was
+ * entered, read from `workflow_status.updated` events, not the column's category today.
  * Tasks that already have intervals are left alone, so re-running is safe.
  */
 
@@ -33,6 +37,7 @@ const TASK_EVENTS = {
 } as const;
 
 const REPLAYED_EVENTS = Object.values(TASK_EVENTS);
+const STATUS_UPDATED_EVENT = "workflow_status.updated";
 
 interface Change {
   readonly to?: unknown;
@@ -42,6 +47,19 @@ interface ReplayedPayload {
   readonly projectId?: unknown;
   readonly statusId?: unknown;
   readonly changes?: Record<string, Change | undefined>;
+}
+
+const CATEGORIES: readonly StatusCategory[] = [
+  "backlog",
+  "ready",
+  "in_progress",
+  "blocked",
+  "review",
+  "done",
+];
+
+function categoryOf(value: unknown): StatusCategory | null {
+  return CATEGORIES.find((category) => category === value) ?? null;
 }
 
 interface Placement {
@@ -69,6 +87,7 @@ export async function backfillStatusIntervals(
         .from(workflowStatuses)
     ).map((status) => [status.id, status.category]),
   );
+  const categoryAt = await categoryHistory(db, statuses);
   const covered = new Set(
     (
       await db
@@ -114,7 +133,7 @@ export async function backfillStatusIntervals(
   };
   const open = (workspaceId: string, placement: Placement, at: Date) => {
     if (!current) return;
-    const category = statuses.get(placement.statusId);
+    const category = categoryAt(placement.statusId, at);
     // A status that no longer exists cannot be categorised; its stay is skipped.
     if (!category) return;
     current.open = {
@@ -154,11 +173,19 @@ export async function backfillStatusIntervals(
     }
 
     const changes = payload.changes ?? {};
-    if (!("statusId" in changes) && !("projectId" in changes)) continue;
-    const next = placementOf(
-      "projectId" in changes ? changes.projectId?.to : current.placement?.projectId,
-      "statusId" in changes ? changes.statusId?.to : current.placement?.statusId,
-    );
+    const relocated = "statusId" in changes || "projectId" in changes;
+    const reentered =
+      !relocated &&
+      (event.eventType === TASK_EVENTS.completed ||
+        event.eventType === TASK_EVENTS.reopened) &&
+      current.placement !== null;
+    if (!relocated && !reentered) continue;
+    const next = relocated
+      ? placementOf(
+          "projectId" in changes ? changes.projectId?.to : current.placement?.projectId,
+          "statusId" in changes ? changes.statusId?.to : current.placement?.statusId,
+        )
+      : current.placement;
     close(at);
     current.placement = next;
     if (next) open(event.workspaceId, next, at);
@@ -169,6 +196,58 @@ export async function backfillStatusIntervals(
   }
   log(`backfilled ${rows.length} intervals for ${tasks} tasks`);
   return { tasks, intervals: rows.length };
+}
+
+/**
+ * A column's category as of an instant. Category edits are replayed forward from the
+ * `from` of the earliest one, so a stay that began before an edit keeps the category the
+ * column had then, exactly as the live writer recorded it.
+ */
+async function categoryHistory(
+  db: Database,
+  current: ReadonlyMap<string, StatusCategory>,
+): Promise<(statusId: string, at: Date) => StatusCategory | null> {
+  const edits = await db
+    .select({
+      statusId: activityEvents.aggregateId,
+      payload: activityEvents.payload,
+      createdAt: activityEvents.createdAt,
+    })
+    .from(activityEvents)
+    .where(
+      and(
+        eq(activityEvents.aggregateType, "status"),
+        eq(activityEvents.eventType, STATUS_UPDATED_EVENT),
+      ),
+    )
+    .orderBy(asc(activityEvents.createdAt), asc(activityEvents.id));
+
+  const timelines = new Map<
+    string,
+    { initial: StatusCategory; changes: { at: Date; to: StatusCategory }[] }
+  >();
+  for (const edit of edits) {
+    const change = (edit.payload as ReplayedPayload).changes?.category as
+      | { from?: unknown; to?: unknown }
+      | undefined;
+    const from = categoryOf(change?.from);
+    const to = categoryOf(change?.to);
+    if (!from || !to) continue;
+    const timeline = timelines.get(edit.statusId) ?? { initial: from, changes: [] };
+    timeline.changes.push({ at: edit.createdAt, to });
+    timelines.set(edit.statusId, timeline);
+  }
+
+  return (statusId, at) => {
+    const timeline = timelines.get(statusId);
+    if (!timeline) return current.get(statusId) ?? null;
+    let category = timeline.initial;
+    for (const change of timeline.changes) {
+      if (change.at.getTime() > at.getTime()) break;
+      category = change.to;
+    }
+    return category;
+  };
 }
 
 function placementOf(projectId: unknown, statusId: unknown): Placement | null {

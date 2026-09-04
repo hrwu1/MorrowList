@@ -1,4 +1,4 @@
-import { fixedClock, rankBetween } from "@morrowlist/domain";
+import { fixedClock, rankBetween, uuidv7, type Task } from "@morrowlist/domain";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { SCOPES, type ActorContext } from "../shared/actor-context.js";
@@ -378,6 +378,109 @@ describe("WorkflowService.archive", () => {
     expect(stored(backlog.id)).toMatchObject({ isDefault: false, version: 1 });
     expect(unitOfWork.data.activity).toHaveLength(before.activity);
     expect(unitOfWork.data.outbox).toHaveLength(before.outbox);
+  });
+});
+
+describe("WorkflowService status intervals", () => {
+  const ENTERED = new Date("2026-08-29T08:00:00.000Z");
+
+  /** The open interval the task would have if it had arrived through TaskService. */
+  function openInterval(task: Task) {
+    const status = stored(task.statusId as string);
+    unitOfWork.data.intervals.push({
+      id: uuidv7(),
+      taskId: task.id,
+      workspaceId: task.workspaceId,
+      projectId: task.projectId as string,
+      statusId: status.id,
+      category: status.category,
+      enteredAt: ENTERED,
+      leftAt: null,
+    });
+  }
+  const intervalsOf = (taskId: string) =>
+    unitOfWork.data.intervals
+      .filter((row) => row.taskId === taskId)
+      .map((row) => ({
+        statusId: row.statusId,
+        category: row.category,
+        enteredAt: row.enteredAt,
+        leftAt: row.leftAt,
+      }));
+
+  it("closes each moved task's stay and opens one in the destination on archive", async () => {
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const backlog = statusByCategory(seeded.statuses, "backlog");
+    const progress = statusByCategory(seeded.statuses, "in_progress");
+    const live = buildTask(seeded, unitOfWork.data, {
+      statusId: ready.id,
+      title: "Live",
+    });
+    openInterval(live);
+    // Trashed work has no open interval and must not gain one from the move.
+    const trashed = buildTask(seeded, unitOfWork.data, {
+      statusId: ready.id,
+      title: "Trashed",
+      rank: rankBetween("a0", null),
+      deletedAt: ENTERED,
+      deletedBy: { kind: "user", id: seeded.userId },
+    });
+
+    await service.archive(seeded.context, seeded.workspace.id, ready.id, {
+      destinationStatusId: progress.id,
+      newDefaultStatusId: backlog.id,
+    });
+
+    expect(intervalsOf(live.id)).toEqual([
+      { statusId: ready.id, category: "ready", enteredAt: ENTERED, leftAt: NOW },
+      { statusId: progress.id, category: "in_progress", enteredAt: NOW, leftAt: null },
+    ]);
+    expect(intervalsOf(trashed.id)).toEqual([]);
+  });
+
+  it("re-enters the column when its category crosses the Done boundary either way", async () => {
+    const review = statusByCategory(seeded.statuses, "review");
+    const task = buildTask(seeded, unitOfWork.data, {
+      statusId: review.id,
+      title: "Under review",
+    });
+    openInterval(task);
+
+    await service.update(seeded.context, seeded.workspace.id, review.id, {
+      category: "done",
+    });
+    expect(intervalsOf(task.id)).toEqual([
+      { statusId: review.id, category: "review", enteredAt: ENTERED, leftAt: NOW },
+      { statusId: review.id, category: "done", enteredAt: NOW, leftAt: null },
+    ]);
+
+    await service.update(seeded.context, seeded.workspace.id, review.id, {
+      category: "review",
+    });
+    expect(intervalsOf(task.id).map((row) => [row.category, row.leftAt])).toEqual([
+      ["review", NOW],
+      ["done", NOW],
+      ["review", null],
+    ]);
+    expect(unitOfWork.data.tasks.get(task.id)?.completedAt).toBeNull();
+  });
+
+  it("leaves intervals alone when a column edit does not change its category", async () => {
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const task = buildTask(seeded, unitOfWork.data, {
+      statusId: ready.id,
+      title: "Stays",
+    });
+    openInterval(task);
+
+    await service.update(seeded.context, seeded.workspace.id, ready.id, {
+      name: "Next up",
+      wipLimit: 2,
+    });
+
+    expect(intervalsOf(task.id)).toEqual([
+      { statusId: ready.id, category: "ready", enteredAt: ENTERED, leftAt: null },
+    ]);
   });
 });
 

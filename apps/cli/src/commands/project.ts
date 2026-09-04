@@ -2,7 +2,11 @@ import type { ApiClient } from "@morrowlist/api-client";
 import type { ProjectDto, UpdateProjectRequest } from "@morrowlist/contracts";
 import { Command } from "commander";
 
-import { formatFlowSummary, formatProjectTable, printJson } from "../formatters/output.js";
+import {
+  formatFlowSummary,
+  formatProjectTable,
+  printJson,
+} from "../formatters/output.js";
 
 import { fail, globalsOf, idempotency, usageFailure, withClient } from "./shared.js";
 

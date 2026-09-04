@@ -23,6 +23,7 @@ import {
   type WorkflowStatus,
 } from "@morrowlist/domain";
 
+import { reenterInterval, syncIntervals } from "../flow/intervals.js";
 import type { TransactionContext, UnitOfWork } from "../ports/index.js";
 import {
   SCOPES,
@@ -275,6 +276,8 @@ export class WorkflowService {
             eventType: TASK_EVENTS.moved,
             summary: `Moved task to ${destination.name} when ${previous.name} was archived`,
           });
+          // The flow read model follows the move like any other (GAP-17).
+          await syncIntervals(tx, task, moved, destination);
           movedTaskIds.push(task.id);
         }
       }
@@ -375,6 +378,9 @@ export class WorkflowService {
           ? `Completed task because ${status.name} became a Done column`
           : `Reopened task because ${status.name} is no longer a Done column`,
       });
+      // The task did not move, but its column's category did: the flow read model
+      // records that as leaving one stay and starting another (GAP-17).
+      if (next !== task) await reenterInterval(tx, next, status);
     }
   }
 }

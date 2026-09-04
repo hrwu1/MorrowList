@@ -25,13 +25,13 @@ import {
 import { KanbanColumn, type ColumnEditing } from "./kanban-column";
 
 import { ActivityList } from "@/features/activity/components/activity-list";
+import { useProjectFlow } from "@/features/flow/hooks/use-flow";
+import { readBoardAge, usuallyDoneLabel } from "@/features/flow/lib/flow-view";
 import {
   describeWorkflowError,
   useArchiveStatus,
   useUpdateStatus,
 } from "@/features/projects/hooks/use-workflow";
-import { useProjectFlow } from "@/features/flow/hooks/use-flow";
-import { readBoardAge, usuallyDoneLabel } from "@/features/flow/lib/flow-view";
 import { QuickAdd } from "@/features/tasks/components/quick-add";
 import { TaskPanel } from "@/features/tasks/components/task-panel";
 import { WipWarning } from "@/features/workspace/components/wip-warning";

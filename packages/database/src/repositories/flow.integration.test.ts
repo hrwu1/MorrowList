@@ -2,6 +2,7 @@ import {
   FlowService,
   ProjectService,
   TaskService,
+  WorkflowService,
   bootstrapUser,
   type ActorContext,
   type UnitOfWork,
@@ -51,6 +52,7 @@ let workspaceId: string;
 let clock: ReturnType<typeof manualClock>;
 let tasks: TaskService;
 let projects: ProjectService;
+let workflow: WorkflowService;
 
 beforeAll(async () => {
   handle = await setupTestDatabase();
@@ -86,6 +88,7 @@ beforeEach(async () => {
   };
   tasks = new TaskService({ unitOfWork, clock, cursorSecret: "flow-cursor-secret" });
   projects = new ProjectService({ unitOfWork, clock });
+  workflow = new WorkflowService({ unitOfWork, clock });
 });
 
 function listForTask(taskId: string): Promise<readonly StatusInterval[]> {
@@ -228,6 +231,117 @@ describe("status intervals", () => {
   });
 });
 
+describe("workflow editing", () => {
+  async function seedProject(name: string) {
+    clock.tick();
+    const detail = await projects.create(context, { workspaceId, name });
+    const byCategory = (category: string) => {
+      const status = detail.statuses.find((s) => s.category === category);
+      if (!status) throw new Error(`no ${category}`);
+      return status;
+    };
+    return { detail, byCategory };
+  }
+  const shape = (intervals: readonly StatusInterval[]) =>
+    intervals.map((interval) => ({
+      statusId: interval.statusId,
+      category: interval.category,
+      enteredAt: interval.enteredAt.toISOString(),
+      leftAt: interval.leftAt?.toISOString() ?? null,
+    }));
+  const summary = (projectId: string) =>
+    new FlowService({ unitOfWork, clock }).project(context, workspaceId, projectId, {
+      range: "30",
+    });
+
+  it("archiving a column with a move closes each stay and opens one in the destination", async () => {
+    const { detail, byCategory } = await seedProject("Archive");
+    const ready = byCategory("ready");
+    const progress = byCategory("in_progress");
+    clock.tick();
+    const live = await tasks.create(context, {
+      workspaceId,
+      projectId: detail.project.id,
+      statusId: ready.id,
+      title: "Live",
+    });
+    const trashed = await tasks.create(context, {
+      workspaceId,
+      projectId: detail.project.id,
+      statusId: ready.id,
+      title: "Trashed",
+    });
+    clock.tick();
+    const trashedAt = clock.now().toISOString();
+    await tasks.delete(context, workspaceId, trashed.id);
+    clock.tick(5);
+    const archivedAt = clock.now().toISOString();
+
+    await workflow.archive(context, workspaceId, ready.id, {
+      destinationStatusId: progress.id,
+      newDefaultStatusId: byCategory("backlog").id,
+    });
+
+    const entered = live.updatedAt;
+    expect(shape(await listForTask(live.id))).toEqual([
+      { statusId: ready.id, category: "ready", enteredAt: entered, leftAt: archivedAt },
+      {
+        statusId: progress.id,
+        category: "in_progress",
+        enteredAt: archivedAt,
+        leftAt: null,
+      },
+    ]);
+    // Trashed work moved with the column but never ages: its stay stays closed.
+    expect(shape(await listForTask(trashed.id))).toEqual([
+      { statusId: ready.id, category: "ready", enteredAt: entered, leftAt: trashedAt },
+    ]);
+    const flow = await summary(detail.project.id);
+    expect(flow.wip).toBe(1);
+    expect(flow.aging.map((item) => item.taskId)).toEqual([live.id]);
+  });
+
+  it("a category change across the Done boundary re-enters the column, so the summary sees the completion", async () => {
+    const { detail, byCategory } = await seedProject("Recategorise");
+    const review = byCategory("review");
+    clock.tick();
+    const task = await tasks.create(context, {
+      workspaceId,
+      projectId: detail.project.id,
+      statusId: review.id,
+      title: "Under review",
+    });
+    clock.tick(60);
+    const completedAt = clock.now().toISOString();
+
+    await workflow.update(context, workspaceId, review.id, { category: "done" });
+
+    expect(shape(await listForTask(task.id))).toEqual([
+      {
+        statusId: review.id,
+        category: "review",
+        enteredAt: task.updatedAt,
+        leftAt: completedAt,
+      },
+      { statusId: review.id, category: "done", enteredAt: completedAt, leftAt: null },
+    ]);
+    const done = await summary(detail.project.id);
+    expect(done).toMatchObject({ wip: 0, completed: 1 });
+    expect(done.cycleTimeDays.samples).toBe(1);
+
+    clock.tick();
+    await workflow.update(context, workspaceId, review.id, { category: "review" });
+    const reopened = await listForTask(task.id);
+    expect(reopened.map((interval) => interval.category)).toEqual([
+      "review",
+      "done",
+      "review",
+    ]);
+    expect(reopened.filter((interval) => interval.leftAt === null)).toHaveLength(1);
+    expect(await summary(detail.project.id)).toMatchObject({ wip: 1, completed: 0 });
+  });
+});
+
 describe("backfill", () => {
   it("rebuilds the same intervals from the activity log and skips covered tasks", async () => {
     clock.tick();
@@ -309,6 +423,84 @@ describe("backfill", () => {
       tasks: 0,
       intervals: 0,
     });
+  });
+
+  it("reproduces the rows written around an archive and a category change", async () => {
+    clock.tick();
+    const detail = await projects.create(context, { workspaceId, name: "Edited" });
+    const byCategory = (category: string) => {
+      const status = detail.statuses.find((s) => s.category === category);
+      if (!status) throw new Error(`no ${category}`);
+      return status;
+    };
+    clock.tick();
+    const reviewed = await tasks.create(context, {
+      workspaceId,
+      projectId: detail.project.id,
+      statusId: byCategory("review").id,
+      title: "Reviewed",
+    });
+    const queued = await tasks.create(context, {
+      workspaceId,
+      projectId: detail.project.id,
+      statusId: byCategory("ready").id,
+      title: "Queued",
+    });
+    clock.tick();
+    // Review becomes a Done column and stays one: the first stay must still read
+    // "review" although the column's category today is "done".
+    await workflow.update(context, workspaceId, byCategory("review").id, {
+      category: "done",
+    });
+    clock.tick();
+    // A task cannot start in a Done column, so this one arrives there by a move.
+    const late = await tasks.create(context, {
+      workspaceId,
+      projectId: detail.project.id,
+      statusId: byCategory("in_progress").id,
+      title: "Finished after the flip",
+    });
+    clock.tick();
+    await tasks.move(context, workspaceId, late.id, {
+      projectId: detail.project.id,
+      statusId: byCategory("review").id,
+    });
+    clock.tick();
+    await workflow.archive(context, workspaceId, byCategory("ready").id, {
+      destinationStatusId: byCategory("in_progress").id,
+      newDefaultStatusId: byCategory("backlog").id,
+    });
+
+    const before = await handle.db
+      .select()
+      .from(taskStatusIntervals)
+      .orderBy(taskStatusIntervals.taskId, taskStatusIntervals.enteredAt);
+    const shape = (rows: (typeof before)[number][]) =>
+      rows.map(({ id: _id, ...row }) => ({
+        ...row,
+        enteredAt: row.enteredAt.toISOString(),
+        leftAt: row.leftAt?.toISOString() ?? null,
+      }));
+    expect(
+      before.filter((row) => row.taskId === reviewed.id).map((row) => row.category),
+    ).toEqual(["review", "done"]);
+    expect(
+      before.filter((row) => row.taskId === late.id).map((r) => r.category),
+    ).toEqual(["in_progress", "done"]);
+    expect(
+      before.filter((row) => row.taskId === queued.id).map((r) => r.category),
+    ).toEqual(["ready", "in_progress"]);
+
+    await handle.db.execute(sql`delete from task_status_intervals`);
+    expect(await backfillStatusIntervals(handle.db)).toEqual({
+      tasks: 3,
+      intervals: before.length,
+    });
+    const after = await handle.db
+      .select()
+      .from(taskStatusIntervals)
+      .orderBy(taskStatusIntervals.taskId, taskStatusIntervals.enteredAt);
+    expect(shape(after)).toEqual(shape(before));
   });
 });
 
