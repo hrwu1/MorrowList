@@ -29,6 +29,7 @@ describe("parseSearchQuery", () => {
     expect(() => parseSearchQuery("priority:asap")).toThrow(/Unknown priority/);
     expect(() => parseSearchQuery("is:stuck")).toThrow(/open, done, blocked/);
     expect(() => parseSearchQuery("in:project")).toThrow(/Use inbox/);
+    expect(() => parseSearchQuery("deadline:soon")).toThrow(/overdue, week, none/);
     expect(() => parseSearchQuery('tag:""')).toThrow(/Unknown tag/);
   });
 

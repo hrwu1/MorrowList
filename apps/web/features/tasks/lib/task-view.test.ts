@@ -73,9 +73,38 @@ describe("readTaskView", () => {
       tag: "any",
       completion: "any",
       blocked: "any",
+      deferred: "any",
+      deadline: "any",
       sort: "dueDate",
       order: "desc",
     });
+  });
+});
+
+describe("deferred and deadline filters (GAP-16)", () => {
+  it("travel through the URL and the query, and override the Inbox default", () => {
+    const view = readTaskView(new URLSearchParams("deferred=yes&deadline=week"));
+    expect(view).toMatchObject({ deferred: "yes", deadline: "week" });
+    expect(writeTaskView(view)).toBe("deferred=yes&deadline=week");
+    expect(toListQuery("inbox", view)).toMatchObject({
+      deferred: true,
+      deadline: "week",
+    });
+    expect(toListQuery("all", DEFAULT_VIEW)).not.toHaveProperty("deferred");
+  });
+
+  it("round-trip a saved view, reading the Inbox rule back as any", () => {
+    const view = {
+      ...DEFAULT_VIEW,
+      deferred: "no" as const,
+      deadline: "overdue" as const,
+    };
+    const filters = filtersFromView("all", view);
+    expect(filters).toMatchObject({ deferred: false, deadline: "overdue" });
+    expect(viewFromFilters(filters).view).toEqual(view);
+    expect(viewFromFilters(filtersFromView("inbox", DEFAULT_VIEW)).view).toEqual(
+      DEFAULT_VIEW,
+    );
   });
 });
 
@@ -271,7 +300,12 @@ describe("saved view filters", () => {
         order: _order,
         ...query
       } = toListQuery(view.scope, view.view);
-      expect(query).toEqual(expected);
+      // The Inbox page hides deferred tasks behind its collapsed section (GAP-16); that
+      // is the scope's rule, not a control, so `--where in:inbox` does not carry it.
+      expect(query).toEqual({
+        ...expected,
+        ...(expected.inbox ? { deferred: false } : {}),
+      });
     },
   );
 });

@@ -90,6 +90,8 @@ export class SearchService {
         isBlocked: parsed.filters.isBlocked ?? request.isBlocked,
         includeSubtasks: request.includeSubtasks,
         due: parsed.filters.due ?? request.due,
+        deferred: parsed.filters.deferred ?? request.deferred,
+        deadline: parsed.filters.deadline ?? request.deadline,
         today,
       };
 

@@ -7,7 +7,7 @@ import {
   uuidSchema,
 } from "./common.js";
 import { projectSchema } from "./project.js";
-import { dueFilterSchema, taskSchema } from "./task.js";
+import { deadlineFilterSchema, dueFilterSchema, taskSchema } from "./task.js";
 
 /**
  * Search (spec 9.8, 20.3 `GET /search`). `q` is free text plus the operator grammar
@@ -24,6 +24,8 @@ export const searchQuerySchema = paginationQuerySchema.extend({
   isCompleted: z.stringbool().optional(),
   isBlocked: z.stringbool().optional(),
   due: dueFilterSchema.optional(),
+  deferred: z.stringbool().optional(),
+  deadline: deadlineFilterSchema.optional(),
   inbox: z.stringbool().optional(),
   includeSubtasks: z.stringbool().default(true),
 });

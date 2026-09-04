@@ -69,12 +69,14 @@ export function TaskListPage({
   const openTaskKey = params.get("task");
   const filters = toListQuery(scope, view);
   const { data, isPending, isError, error, refetch } = useTaskList(filters);
-  // Deferred tasks stay out of the main list and wait in a collapsed section (GAP-16).
+  // Deferred tasks stay out of the main list and wait in a collapsed section (GAP-16),
+  // unless the panel asked for a deferral state explicitly.
+  const showDeferredSection = scope === "inbox" && view.deferred === "any";
   const deferred = useTaskList(
     { ...filters, deferred: true },
-    { enabled: scope === "inbox" },
+    { enabled: showDeferredSection },
   );
-  const deferredTasks = scope === "inbox" ? (deferred.data?.data ?? []) : [];
+  const deferredTasks = showDeferredSection ? (deferred.data?.data ?? []) : [];
 
   const navigate = useCallback(
     (next: URLSearchParams) => {
@@ -168,7 +170,7 @@ export function TaskListPage({
           </ul>
         )}
 
-        {scope === "inbox" && deferredTasks.length > 0 ? (
+        {showDeferredSection && deferredTasks.length > 0 ? (
           <details className="task-list__deferred">
             <summary className="task-list__deferred-summary">
               Deferred

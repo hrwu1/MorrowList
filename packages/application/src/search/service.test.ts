@@ -180,6 +180,29 @@ describe("SearchService.search", () => {
     expect(data.tasks).toEqual([]);
   });
 
+  it("filters deferred work and deadlines through the grammar (GAP-16)", async () => {
+    await tasks.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Plan later",
+      deferUntil: "2026-12-01",
+    });
+    await tasks.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Plan soon",
+      deadline: "2026-09-05",
+    });
+    await tasks.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Plan",
+    });
+
+    const titles = async (q: string) =>
+      (await query(q)).data.tasks.map((hit) => hit.task.title).sort();
+    expect(await titles("plan is:deferred")).toEqual(["Plan later"]);
+    expect(await titles("plan deadline:week")).toEqual(["Plan soon"]);
+    expect(await titles("plan deadline:none")).toEqual(["Plan", "Plan later"]);
+  });
+
   it("carries tags and subtask progress on every hit", async () => {
     const parent = await tasks.create(seeded.context, {
       workspaceId: seeded.workspace.id,

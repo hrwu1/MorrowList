@@ -20,12 +20,16 @@ export const SORTS = ["rank", "createdAt", "dueDate", "priority", "updatedAt"] a
 export const ORDERS = ["asc", "desc"] as const;
 export const COMPLETIONS = ["open", "done", "any"] as const;
 export const BLOCKED_FILTERS = ["yes", "no"] as const;
+export const DEFERRED_FILTERS = ["yes", "no"] as const;
+export const DEADLINE_FILTERS = ["overdue", "week", "none"] as const;
 
 export type DueFilter = (typeof DUE_FILTERS)[number];
 export type TaskSort = (typeof SORTS)[number];
 export type TaskOrder = (typeof ORDERS)[number];
 export type Completion = (typeof COMPLETIONS)[number];
 export type BlockedFilter = (typeof BLOCKED_FILTERS)[number];
+export type DeferredFilter = (typeof DEFERRED_FILTERS)[number];
+export type DeadlineFilter = (typeof DEADLINE_FILTERS)[number];
 
 export interface TaskView {
   /** A project id, or "any". Ids are opaque, so anything non-empty is accepted. */
@@ -37,6 +41,12 @@ export interface TaskView {
   readonly completion: Completion;
   /** Blocked state (spec 8.4): flagged or waiting on an open blocker. */
   readonly blocked: BlockedFilter | "any";
+  /**
+   * Deferral (GAP-16). "any" is the scope's own rule: the Inbox hides deferred tasks
+   * behind its collapsed section, every other scope shows both.
+   */
+  readonly deferred: DeferredFilter | "any";
+  readonly deadline: DeadlineFilter | "any";
   readonly sort: TaskSort;
   readonly order: TaskOrder;
 }
@@ -54,6 +64,8 @@ export const DEFAULT_VIEW: TaskView = {
   tag: "any",
   completion: "open",
   blocked: "any",
+  deferred: "any",
+  deadline: "any",
   sort: "rank",
   order: "asc",
 };
@@ -85,6 +97,8 @@ export function readTaskView(
     tag: params.get("tag")?.trim() || base.tag,
     completion: oneOf(COMPLETIONS, params.get("completed")) ?? base.completion,
     blocked: oneOf(BLOCKED_FILTERS, params.get("blocked")) ?? base.blocked,
+    deferred: oneOfOrAny(DEFERRED_FILTERS, params.get("deferred")) ?? base.deferred,
+    deadline: oneOfOrAny(DEADLINE_FILTERS, params.get("deadline")) ?? base.deadline,
     sort: oneOf(SORTS, params.get("sort")) ?? base.sort,
     order: oneOf(ORDERS, params.get("order")) ?? base.order,
   };
@@ -111,6 +125,8 @@ export function writeTaskView(
   set("tag", view.tag, base.tag);
   set("completed", view.completion, base.completion);
   set("blocked", view.blocked, base.blocked);
+  set("deferred", view.deferred, base.deferred);
+  set("deadline", view.deadline, base.deadline);
   set("sort", view.sort, base.sort);
   set("order", view.order, base.order);
 
@@ -136,6 +152,9 @@ export function toListQuery(scope: TaskScope, view: TaskView): Partial<ListTasks
     ...(view.due === "any" ? {} : { due: view.due }),
     ...(view.tag === "any" ? {} : { tagId: view.tag }),
     ...(view.blocked === "any" ? {} : { isBlocked: view.blocked === "yes" }),
+    // An explicit choice overrides the Inbox's default of hiding deferred tasks.
+    ...(view.deferred === "any" ? {} : { deferred: view.deferred === "yes" }),
+    ...(view.deadline === "any" ? {} : { deadline: view.deadline }),
     sort: view.sort,
     order: view.order,
   };
@@ -169,6 +188,14 @@ export function viewFromFilters(filters: SavedViewFilters): {
       tag: filters.tagId ?? "any",
       blocked:
         filters.isBlocked === undefined ? "any" : filters.isBlocked ? "yes" : "no",
+      // `deferred: false` on an Inbox view is the scope's own rule, not a choice.
+      deferred:
+        filters.deferred === undefined || (filters.inbox && !filters.deferred)
+          ? "any"
+          : filters.deferred
+            ? "yes"
+            : "no",
+      deadline: filters.deadline ?? "any",
       completion:
         filters.isCompleted === undefined
           ? "any"

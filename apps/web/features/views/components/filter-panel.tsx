@@ -17,6 +17,8 @@ import { PRIORITY_LABELS } from "@/features/tasks/components/task-fields";
 import {
   BLOCKED_FILTERS,
   COMPLETIONS,
+  DEADLINE_FILTERS,
+  DEFERRED_FILTERS,
   DEFAULT_VIEW,
   DUE_FILTERS,
   ORDERS,
@@ -25,6 +27,8 @@ import {
   filtersFromView,
   type BlockedFilter,
   type Completion,
+  type DeadlineFilter,
+  type DeferredFilter,
   type DueFilter,
   type TaskOrder,
   type TaskScope,
@@ -62,6 +66,17 @@ const ORDER_LABELS: Record<TaskOrder, string> = {
 const BLOCKED_LABELS: Record<BlockedFilter, string> = {
   yes: "Blocked only",
   no: "Not blocked",
+};
+
+const DEFERRED_LABELS: Record<DeferredFilter, string> = {
+  yes: "Deferred only",
+  no: "Not deferred",
+};
+
+const DEADLINE_LABELS: Record<DeadlineFilter, string> = {
+  overdue: "Past deadline",
+  week: "Deadline within a week",
+  none: "No deadline",
 };
 
 const COMPLETION_LABELS: Record<Completion, string> = {
@@ -111,6 +126,8 @@ export function FilterPanel({
     view.due === base.due &&
     view.tag === base.tag &&
     view.blocked === base.blocked &&
+    view.deferred === base.deferred &&
+    view.deadline === base.deadline &&
     (!showSort || (view.sort === base.sort && view.order === base.order)) &&
     (!showCompletion || view.completion === base.completion);
   const activeChoices = [
@@ -137,6 +154,12 @@ export function FilterPanel({
     ...(view.blocked === base.blocked
       ? []
       : [view.blocked === "any" ? "Any blocked state" : BLOCKED_LABELS[view.blocked]]),
+    ...(view.deferred === base.deferred
+      ? []
+      : [view.deferred === "any" ? "Any deferral" : DEFERRED_LABELS[view.deferred]]),
+    ...(view.deadline === base.deadline
+      ? []
+      : [view.deadline === "any" ? "Any deadline" : DEADLINE_LABELS[view.deadline]]),
     ...(!showCompletion || view.completion === base.completion
       ? []
       : [COMPLETION_LABELS[view.completion]]),
@@ -291,6 +314,52 @@ export function FilterPanel({
               {BLOCKED_FILTERS.map((blocked) => (
                 <option key={blocked} value={blocked}>
                   {BLOCKED_LABELS[blocked]}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="filters__control">
+            <label className="ml-field__label" htmlFor={`${id}-deferred`}>
+              Deferred
+            </label>
+            <Select
+              id={`${id}-deferred`}
+              value={view.deferred}
+              onChange={(event) =>
+                onChange({
+                  ...view,
+                  deferred: event.target.value as DeferredFilter | "any",
+                })
+              }
+            >
+              <option value="any">Any deferral</option>
+              {DEFERRED_FILTERS.map((deferred) => (
+                <option key={deferred} value={deferred}>
+                  {DEFERRED_LABELS[deferred]}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="filters__control">
+            <label className="ml-field__label" htmlFor={`${id}-deadline`}>
+              Deadline
+            </label>
+            <Select
+              id={`${id}-deadline`}
+              value={view.deadline}
+              onChange={(event) =>
+                onChange({
+                  ...view,
+                  deadline: event.target.value as DeadlineFilter | "any",
+                })
+              }
+            >
+              <option value="any">Any deadline</option>
+              {DEADLINE_FILTERS.map((deadline) => (
+                <option key={deadline} value={deadline}>
+                  {DEADLINE_LABELS[deadline]}
                 </option>
               ))}
             </Select>

@@ -7925,6 +7925,50 @@
                             }
                           ]
                         },
+                        "deferUntil": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "deadline": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "deadlineTime": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "dateWarnings": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "defer_after_due",
+                              "due_after_deadline",
+                              "defer_after_deadline"
+                            ]
+                          }
+                        },
                         "parentTaskId": {
                           "anyOf": [
                             {
@@ -8457,6 +8501,10 @@
                         "dueDate",
                         "dueTime",
                         "dueTimezone",
+                        "deferUntil",
+                        "deadline",
+                        "deadlineTime",
+                        "dateWarnings",
                         "parentTaskId",
                         "recurrence",
                         "seriesId",
@@ -8768,6 +8816,17 @@
                       "none"
                     ]
                   },
+                  "deferred": {
+                    "type": "boolean"
+                  },
+                  "deadline": {
+                    "type": "string",
+                    "enum": [
+                      "overdue",
+                      "week",
+                      "none"
+                    ]
+                  },
                   "inbox": {
                     "type": "boolean"
                   },
@@ -8901,6 +8960,17 @@
                         "none"
                       ]
                     },
+                    "deferred": {
+                      "type": "boolean"
+                    },
+                    "deadline": {
+                      "type": "string",
+                      "enum": [
+                        "overdue",
+                        "week",
+                        "none"
+                      ]
+                    },
                     "inbox": {
                       "type": "boolean"
                     },
@@ -9018,6 +9088,17 @@
                   "none"
                 ]
               },
+              "deferred": {
+                "type": "boolean"
+              },
+              "deadline": {
+                "type": "string",
+                "enum": [
+                  "overdue",
+                  "week",
+                  "none"
+                ]
+              },
               "inbox": {
                 "type": "boolean"
               },
@@ -9106,6 +9187,17 @@
                   "overdue",
                   "today",
                   "future",
+                  "none"
+                ]
+              },
+              "deferred": {
+                "type": "boolean"
+              },
+              "deadline": {
+                "type": "string",
+                "enum": [
+                  "overdue",
+                  "week",
                   "none"
                 ]
               },
@@ -13945,6 +14037,27 @@
                 "overdue",
                 "today",
                 "future",
+                "none"
+              ]
+            }
+          },
+          {
+            "name": "deferred",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deadline",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "overdue",
+                "week",
                 "none"
               ]
             }

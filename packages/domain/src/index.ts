@@ -213,6 +213,7 @@ export {
 } from "./flow/metrics.js";
 
 export {
+  DEADLINE_STATES,
   DUE_STATES,
   MAX_MATCH_RANGES,
   MAX_SEARCH_TERMS,
@@ -221,6 +222,7 @@ export {
   matchRanges,
   parseSearchQuery,
   searchTerms,
+  type DeadlineState,
   type DueState,
   type MatchRange,
   type SearchFilters,

@@ -11,8 +11,9 @@ import { PRIORITIES, isPriority, type Priority } from "../task/values.js";
  *   due:overdue|today|future|none
  *   priority:none|low|medium|high|urgent
  *   tag:research  tag:"deep work"   tasks carrying the tag (quotes for spaces)
- *   is:open|done|blocked
+ *   is:open|done|blocked|deferred
  *   in:inbox
+ *   deadline:overdue|week|none
  *
  * Keys are case-insensitive. An unknown key is ordinary text (`12:30` is a time, not an
  * operator); a known key with an unknown value is a validation error, so a typo never
@@ -21,6 +22,8 @@ import { PRIORITIES, isPriority, type Priority } from "../task/values.js";
 
 export const DUE_STATES = ["overdue", "today", "future", "none"] as const;
 export type DueState = (typeof DUE_STATES)[number];
+export const DEADLINE_STATES = ["overdue", "week", "none"] as const;
+export type DeadlineState = (typeof DEADLINE_STATES)[number];
 
 /**
  * Parsed operators. The field names match the task list query on purpose, so every
@@ -33,6 +36,9 @@ export interface SearchFilters {
   readonly isCompleted?: boolean;
   readonly isBlocked?: boolean;
   readonly inbox?: boolean;
+  /** `is:deferred`: hidden until a later day (GAP-16). */
+  readonly deferred?: boolean;
+  readonly deadline?: DeadlineState;
 }
 
 export interface SearchQuery {
@@ -46,11 +52,12 @@ export const SEARCH_OPERATORS = [
   { key: "due", values: DUE_STATES, description: "due-date state" },
   { key: "priority", values: PRIORITIES, description: "priority" },
   { key: "tag", values: null, description: 'tag name; quote spaces: tag:"deep work"' },
-  { key: "is", values: ["open", "done", "blocked"], description: "state" },
+  { key: "is", values: ["open", "done", "blocked", "deferred"], description: "state" },
   { key: "in", values: ["inbox"], description: "location" },
+  { key: "deadline", values: DEADLINE_STATES, description: "deadline state" },
 ] as const;
 
-const IS_STATES = ["open", "done", "blocked"] as const;
+const IS_STATES = ["open", "done", "blocked", "deferred"] as const;
 
 /** One token per run of non-blank characters, where a double-quoted span counts as one. */
 const TOKEN = /(?:[^\s"]+|"[^"]*"?)+/g;
@@ -105,7 +112,17 @@ export function parseSearchQuery(raw: string): SearchQuery {
         filters =
           state === "blocked"
             ? { ...filters, isBlocked: true }
-            : { ...filters, isCompleted: state === "done" };
+            : state === "deferred"
+              ? { ...filters, deferred: true }
+              : { ...filters, isCompleted: state === "done" };
+        break;
+      }
+      case "deadline": {
+        const deadline = value.toLocaleLowerCase("en-US");
+        if (!(DEADLINE_STATES as readonly string[]).includes(deadline)) {
+          unknownValue(key, value, DEADLINE_STATES);
+        }
+        filters = { ...filters, deadline: deadline as DeadlineState };
         break;
       }
       case "in": {
@@ -216,6 +233,11 @@ export const SEARCH_GRAMMAR_EXAMPLES: readonly {
     filters: { isCompleted: true, due: "today" },
   },
   { query: "is:open", text: "", filters: { isCompleted: false } },
+  {
+    query: "is:deferred deadline:week",
+    text: "",
+    filters: { deferred: true, deadline: "week" },
+  },
   {
     query: 'meeting 12:30 foo:bar "quoted words"',
     text: "meeting 12:30 foo:bar quoted words",

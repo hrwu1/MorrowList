@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { prioritySchema, uuidSchema } from "./common.js";
-import { dueFilterSchema } from "./task.js";
+import { deadlineFilterSchema, dueFilterSchema } from "./task.js";
 
 /**
  * Personal saved views (spec 9.8, 18.4, GAP-02): a named filter set rendered as a list
@@ -25,6 +25,8 @@ export const savedViewFiltersSchema = z
     isCompleted: z.boolean().optional(),
     isBlocked: z.boolean().optional(),
     due: dueFilterSchema.optional(),
+    deferred: z.boolean().optional(),
+    deadline: deadlineFilterSchema.optional(),
     inbox: z.boolean().optional(),
     sort: z.enum(["rank", "createdAt", "dueDate", "priority", "updatedAt"]).optional(),
     order: z.enum(["asc", "desc"]).optional(),
