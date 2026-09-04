@@ -139,6 +139,9 @@ importers:
       '@types/react-dom':
         specifier: 19.1.7
         version: 19.1.7(@types/react@19.1.10)
+      esbuild:
+        specifier: 0.25.12
+        version: 0.25.12
       tailwindcss:
         specifier: 4.1.12
         version: 4.1.12

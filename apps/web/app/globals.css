@@ -2834,6 +2834,42 @@
     list-style: none;
   }
 
+  /* Connectivity and update notices (spec 25). Fixed at the bottom so they never fight
+     the sticky headers, and above the mobile sheet so they stay readable. */
+  .offline-banner,
+  .update-prompt {
+    position: fixed;
+    left: 50%;
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    max-width: calc(100vw - 1.5rem);
+    padding: 0.55rem 0.9rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: var(--surface-overlay);
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-50%);
+  }
+  .offline-banner__dot {
+    flex: none;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--warning);
+  }
+  .update-prompt {
+    bottom: max(3.6rem, calc(env(safe-area-inset-bottom) + 2.85rem));
+  }
+  .update-prompt .ml-button {
+    min-height: 2rem;
+    padding-inline: 0.7rem;
+  }
+
   @media (min-width: 60rem) {
     .board-page__layout[data-panel-open] {
       grid-template-columns: minmax(0, 1fr) minmax(19rem, 22rem);

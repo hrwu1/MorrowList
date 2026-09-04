@@ -15,3 +15,6 @@ coverage/
 *.log
 playwright-report/
 test-results/
+
+# Bundled by apps/web/scripts/build-sw.mjs before `next dev` and `next build`.
+apps/web/public/sw.js

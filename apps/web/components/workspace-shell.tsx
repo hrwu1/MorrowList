@@ -14,6 +14,7 @@ import {
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import type { ProjectDto, TaskDto } from "@morrowlist/contracts";
 import { Alert, Button, Spinner } from "@morrowlist/ui";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -27,6 +28,11 @@ import {
   type SVGProps,
 } from "react";
 
+import {
+  clearCacheScope,
+  useSyncCacheScope,
+} from "@/features/offline/hooks/use-cache-scope";
+import { purgeOfflineCaches } from "@/features/offline/lib/service-worker";
 import { useCreateProject, useProjects } from "@/features/projects/hooks/use-projects";
 import { SearchBox } from "@/features/search/components/search-box";
 import { QuickAdd } from "@/features/tasks/components/quick-add";
@@ -64,7 +70,9 @@ export function WorkspaceShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const projects = useProjects();
+  useSyncCacheScope();
   const inbox = useTaskList({
     inbox: true,
     isCompleted: false,
@@ -131,7 +139,12 @@ export function WorkspaceShell({
   }, [inboxOpen, searchOpen]);
 
   async function signOut() {
+    // Nothing private may outlive the session on this device (spec 25.3): the worker's
+    // partitioned caches, unsent drafts, and the in-memory query cache all go.
+    await purgeOfflineCaches();
+    clearCacheScope();
     await authClient.signOut();
+    queryClient.clear();
     router.push("/sign-in");
     router.refresh();
   }
