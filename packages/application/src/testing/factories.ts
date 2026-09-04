@@ -147,6 +147,7 @@ export function buildTask(
     deferUntil: null,
     deadline: null,
     deadlineTime: null,
+    reminderOffsetMinutes: null,
     parentTaskId: null,
     rank: INITIAL_RANK,
     lastActiveStatusId: null,

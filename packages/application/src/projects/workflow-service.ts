@@ -24,7 +24,8 @@ import {
 } from "@morrowlist/domain";
 
 import { reenterInterval, syncIntervals } from "../flow/intervals.js";
-import type { TransactionContext, UnitOfWork } from "../ports/index.js";
+import { recomputeReminder } from "../notifications/scheduler.js";
+import type { TransactionContext, UnitOfWork, Workspace } from "../ports/index.js";
 import {
   SCOPES,
   actorRef,
@@ -145,7 +146,7 @@ export class WorkflowService {
     assertScope(context, SCOPES.projectsWrite);
 
     return this.unitOfWork.execute(async (tx) => {
-      await requireWorkspace(tx, workspaceId);
+      const workspace = await requireWorkspace(tx, workspaceId);
       const {
         project,
         status: previous,
@@ -181,7 +182,7 @@ export class WorkflowService {
 
       const next = changed[0] as WorkflowStatus;
       if (isTerminal(next) !== isTerminal(previous)) {
-        await this.applyCompletionChange(tx, context, workspaceId, project.id, next);
+        await this.applyCompletionChange(tx, context, workspace, project.id, next);
       }
       return toWorkflowStatusDto(next);
     });
@@ -234,7 +235,7 @@ export class WorkflowService {
     assertScope(context, SCOPES.projectsWrite);
 
     return this.unitOfWork.execute(async (tx) => {
-      await requireWorkspace(tx, workspaceId);
+      const workspace = await requireWorkspace(tx, workspaceId);
       const {
         project,
         status: previous,
@@ -272,7 +273,7 @@ export class WorkflowService {
             },
             { actor: actorRef(context), clock: this.clock },
           );
-          await this.persistTask(tx, context, moved, task, {
+          await this.persistTask(tx, context, workspace, moved, task, {
             eventType: TASK_EVENTS.moved,
             summary: `Moved task to ${destination.name} when ${previous.name} was archived`,
           });
@@ -335,9 +336,16 @@ export class WorkflowService {
     });
   }
 
+  /**
+   * Write a task the workflow change carried along. The reminder schedule follows the
+   * task in the same transaction, exactly as it does for `TaskService`'s own commands
+   * (GAP-13): a task completed by a column becoming Done loses its pending reminder, and
+   * one reopened by the reverse change gets it back.
+   */
   private async persistTask(
     tx: TransactionContext,
     context: ActorContext,
+    workspace: Workspace,
     next: Task,
     previous: Task,
     event: { readonly eventType: string; readonly summary: string },
@@ -355,24 +363,25 @@ export class WorkflowService {
       summary: event.summary,
       payload: { taskId: next.id, changes: materialChanges(next, previous) },
     });
+    await recomputeReminder(tx, next, workspace.timezone, this.clock.now());
   }
 
   /** Re-enter every task of the column so its completion follows the new category. */
   private async applyCompletionChange(
     tx: TransactionContext,
     context: ActorContext,
-    workspaceId: string,
+    workspace: Workspace,
     projectId: string,
     status: WorkflowStatus,
   ): Promise<void> {
     const entering = isTerminal(status);
-    for (const task of await tx.tasks.listInStatus(workspaceId, status.id)) {
+    for (const task of await tx.tasks.listInStatus(workspace.id, status.id)) {
       const next = relocateTask(
         task,
         { destination: { projectId, status }, rank: task.rank },
         { actor: actorRef(context), clock: this.clock },
       );
-      await this.persistTask(tx, context, next, task, {
+      await this.persistTask(tx, context, workspace, next, task, {
         eventType: entering ? TASK_EVENTS.completed : TASK_EVENTS.reopened,
         summary: entering
           ? `Completed task because ${status.name} became a Done column`

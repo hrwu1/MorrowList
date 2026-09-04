@@ -45,6 +45,7 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     deadline: null,
     deadlineTime: null,
     dateWarnings: [],
+    reminderOffsetMinutes: null,
     parentTaskId: null,
     rank: "a0",
     isCompleted: false,

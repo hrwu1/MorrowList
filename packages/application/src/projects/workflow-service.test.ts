@@ -1,4 +1,11 @@
-import { fixedClock, rankBetween, uuidv7, type Task } from "@morrowlist/domain";
+import {
+  fixedClock,
+  rankBetween,
+  uuidv7,
+  type PlainDate,
+  type PlainTime,
+  type Task,
+} from "@morrowlist/domain";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { SCOPES, type ActorContext } from "../shared/actor-context.js";
@@ -163,6 +170,55 @@ describe("WorkflowService.update", () => {
       completedAt: null,
     });
     expect(eventsOfType("task.reopened")).toHaveLength(1);
+  });
+
+  it("cancels a task's pending reminder when its column becomes Done and restores it when the column leaves Done", async () => {
+    const done = statusByCategory(seeded.statuses, "done");
+    const review = statusByCategory(seeded.statuses, "review");
+    // 12:00 Berlin (UTC+2), 30 minutes ahead: 09:30Z.
+    const timed = buildTask(seeded, unitOfWork.data, {
+      statusId: review.id,
+      title: "Timed",
+      dueDate: "2026-09-02" as PlainDate,
+      dueTime: "12:00" as PlainTime,
+      dueTimezone: "Europe/Berlin",
+      reminderOffsetMinutes: 30,
+    });
+    const remindAt = new Date("2026-09-02T09:30:00.000Z");
+    unitOfWork.data.reminders.set(timed.id, {
+      taskId: timed.id,
+      workspaceId: seeded.workspace.id,
+      remindAt,
+      offsetMinutes: 30,
+      deliveredAt: null,
+    });
+
+    await service.update(seeded.context, seeded.workspace.id, review.id, {
+      category: "done",
+    });
+    expect(unitOfWork.data.tasks.get(timed.id)?.completedAt).toEqual(NOW);
+    expect(unitOfWork.data.reminders.has(timed.id)).toBe(false);
+
+    // Leaving Done reopens the task; the reminder comes back in the same transaction.
+    await service.update(seeded.context, seeded.workspace.id, review.id, {
+      category: "review",
+    });
+    expect(unitOfWork.data.tasks.get(timed.id)?.completedAt).toBeNull();
+    expect(unitOfWork.data.reminders.get(timed.id)).toMatchObject({
+      remindAt,
+      offsetMinutes: 30,
+      deliveredAt: null,
+    });
+
+    // Archiving Review into Done completes the task through the move policy too.
+    await service.archive(seeded.context, seeded.workspace.id, review.id, {
+      destinationStatusId: done.id,
+    });
+    expect(unitOfWork.data.tasks.get(timed.id)).toMatchObject({
+      statusId: done.id,
+      completedAt: NOW,
+    });
+    expect(unitOfWork.data.reminders.has(timed.id)).toBe(false);
   });
 
   it("rejects an invariant violation and persists nothing", async () => {
