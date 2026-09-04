@@ -11,6 +11,7 @@ import {
   DueBadge,
   MyDayBadge,
   PriorityBadge,
+  RepeatBadge,
   SubtaskProgressBadge,
 } from "@/features/tasks/components/task-fields";
 import { useAddToDay, useRemoveFromDay } from "@/features/tasks/hooks/use-tasks";
@@ -141,6 +142,7 @@ export function KanbanCard({
           dueTime={task.dueTime}
           isCompleted={task.isCompleted}
         />
+        <RepeatBadge recurrence={task.recurrence} />
         <MyDayBadge dayPlans={task.dayPlans} />
         <BlockedBadge task={task} />
         <SubtaskProgressBadge progress={task.subtaskProgress} />

@@ -155,5 +155,7 @@ export function matchesFilters(
   if (filters.isBlocked !== undefined && task.isBlocked !== filters.isBlocked) {
     return false;
   }
+  if (filters.seriesId !== undefined && task.seriesId !== filters.seriesId)
+    return false;
   return true;
 }

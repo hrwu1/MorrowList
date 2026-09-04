@@ -1,7 +1,12 @@
 "use client";
 
 import { ApiClientError } from "@morrowlist/api-client";
-import type { Priority, TaskDto, UpdateTaskRequest } from "@morrowlist/contracts";
+import type {
+  Priority,
+  RecurrenceRuleDto,
+  TaskDto,
+  UpdateTaskRequest,
+} from "@morrowlist/contracts";
 import {
   Alert,
   Button,
@@ -23,14 +28,18 @@ import {
   useRemoveFromDay,
   useReopenTask,
   useRestoreTask,
+  useSkipOccurrence,
   useTask,
+  useTaskList,
   useUpdateTask,
 } from "../hooks/use-tasks";
+import { describeRecurrence } from "../lib/recurrence";
 import { allSubtasksDone, hasOpenSubtasks } from "../lib/task-projections";
 
 import { Markdown } from "./markdown";
+import { RecurrenceEditor } from "./recurrence-editor";
 import { SubtaskList } from "./subtask-list";
-import { DueDateInput, DueTimeInput, PrioritySelect } from "./task-fields";
+import { DueBadge, DueDateInput, DueTimeInput, PrioritySelect } from "./task-fields";
 
 import { ActivityList } from "@/features/activity/components/activity-list";
 import { useProjects } from "@/features/projects/hooks/use-projects";
@@ -38,6 +47,7 @@ import { BlockedFlag } from "@/features/relations/components/blocked-flag";
 import { RelationList } from "@/features/relations/components/relation-list";
 import { blockedSummary } from "@/features/relations/lib/relations";
 import { TagPicker } from "@/features/tags/components/tag-picker";
+import { localToday } from "@/features/today/lib/today-view";
 
 /**
  * Task detail (TASK-011, spec 10.2).
@@ -98,6 +108,7 @@ interface Draft {
   priority: Priority;
   dueDate: string | null;
   dueTime: string | null;
+  recurrence: RecurrenceRuleDto | null;
 }
 
 function toDraft(task: TaskDto): Draft {
@@ -107,6 +118,7 @@ function toDraft(task: TaskDto): Draft {
     priority: task.priority,
     dueDate: task.dueDate,
     dueTime: task.dueTime,
+    recurrence: task.recurrence,
   };
 }
 
@@ -131,7 +143,12 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
   const projects = useProjects();
   const inMyDay = task.dayPlans.length > 0;
   const detach = useClearTaskParent();
+  const skip = useSkipOccurrence();
   const parent = useTask(task.parentTaskId);
+  const series = useTaskList(
+    { seriesId: task.seriesId ?? "", sort: "dueDate", order: "asc", limit: 50 },
+    { enabled: task.seriesId !== null },
+  );
 
   const [draft, setDraft] = useState(() => toDraft(task));
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -257,6 +274,22 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
     });
   }
 
+  /**
+   * Completion runs on the save queue too: a field edit (a new repeat rule, say) followed
+   * straight away by Mark complete must claim the version that edit produced, not the one
+   * the panel rendered before it was saved.
+   */
+  function completeOnQueue() {
+    const { mutateAsync } = complete;
+    queueTail.current = queueTail.current.then(async () => {
+      try {
+        await mutateAsync({ ...taskRef.current, version: version.current });
+      } catch {
+        // Reported through `complete.isError`; the button falls back to the server's state.
+      }
+    });
+  }
+
   const projectItems = projects.data?.data ?? [];
   const currentProjectKnown =
     task.projectId === null || projectItems.some((item) => item.id === task.projectId);
@@ -344,7 +377,7 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
             // parent with open children needs confirmation (spec 8.3).
             if (task.isBlocked) return setConfirmingComplete("blocked");
             if (hasOpenSubtasks(task)) return setConfirmingComplete("subtasks");
-            complete.mutate(task);
+            completeOnQueue();
           }}
         >
           {task.isCompleted ? "Reopen task" : "Mark complete"}
@@ -374,7 +407,7 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
               variant="primary"
               onClick={() => {
                 setConfirmingComplete(null);
-                complete.mutate(task);
+                completeOnQueue();
               }}
             >
               Complete anyway
@@ -397,7 +430,7 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
               variant="primary"
               onClick={() => {
                 setConfirmingComplete(null);
-                complete.mutate(task);
+                completeOnQueue();
               }}
             >
               Complete anyway
@@ -414,7 +447,7 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
             variant="primary"
             loading={complete.isPending}
             onClick={() =>
-              task.isBlocked ? setConfirmingComplete("blocked") : complete.mutate(task)
+              task.isBlocked ? setConfirmingComplete("blocked") : completeOnQueue()
             }
           >
             Complete parent
@@ -538,11 +571,56 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
         </Field>
       </div>
 
+      <Field
+        label="Repeat"
+        htmlFor={fieldId("repeat")}
+        hint={
+          draft.recurrence
+            ? `${describeRecurrence(draft.recurrence)}. Completing this task creates the next occurrence.`
+            : undefined
+        }
+      >
+        <RecurrenceEditor
+          id={fieldId("repeat")}
+          value={draft.recurrence}
+          anchor={draft.dueDate ?? localToday()}
+          disabled={!editable || task.isCompleted}
+          onChange={(recurrence) => edit({ recurrence }, { recurrence }, true)}
+        />
+      </Field>
+
       <TagPicker task={task} disabled={!editable} />
 
       <BlockedFlag task={task} disabled={!editable} />
 
       <RelationList task={task} disabled={!editable} />
+
+      {task.seriesId && series.data && series.data.data.length > 1 ? (
+        <section className="task-detail__series" aria-labelledby={fieldId("series")}>
+          <h3 className="task-detail__section-title" id={fieldId("series")}>
+            Other occurrences
+          </h3>
+          <ul className="task-detail__series-list" aria-label="Other occurrences">
+            {series.data.data
+              .filter((occurrence) => occurrence.id !== task.id)
+              .map((occurrence) => (
+                <li key={occurrence.id} data-done={occurrence.isCompleted || undefined}>
+                  <Link href={`/tasks/${encodeURIComponent(occurrence.key)}`}>
+                    {occurrence.key}
+                  </Link>{" "}
+                  <DueBadge
+                    dueDate={occurrence.dueDate}
+                    dueTime={occurrence.dueTime}
+                    isCompleted={occurrence.isCompleted}
+                  />
+                  {occurrence.isCompleted ? (
+                    <span className="task-detail__hint">Completed</span>
+                  ) : null}
+                </li>
+              ))}
+          </ul>
+        </section>
+      ) : null}
 
       <details className="task-detail__disclosure">
         <summary className="task-detail__disclosure-summary">
@@ -632,6 +710,25 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
         <details className="task-detail__disclosure task-detail__disclosure--danger">
           <summary className="task-detail__disclosure-summary">More actions</summary>
           <div className="task-detail__disclosure-body">
+            {task.recurrence && !task.isCompleted ? (
+              <div className="button-row">
+                <Button loading={skip.isPending} onClick={() => skip.mutate(task)}>
+                  Skip this occurrence
+                </Button>
+                <span className="task-detail__hint">
+                  Moves this task on to its next date without completing it.
+                </span>
+              </div>
+            ) : null}
+            {skip.isError ? (
+              <Alert tone="error" title="This occurrence could not be skipped">
+                <p>
+                  {skip.error instanceof Error
+                    ? skip.error.message
+                    : "It stayed where it was."}
+                </p>
+              </Alert>
+            ) : null}
             <div className="button-row">
               <Button
                 variant="danger"

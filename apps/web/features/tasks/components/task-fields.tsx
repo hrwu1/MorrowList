@@ -1,8 +1,13 @@
 "use client";
 
-import type { Priority, SubtaskProgress } from "@morrowlist/contracts";
+import type {
+  Priority,
+  RecurrenceRuleDto,
+  SubtaskProgress,
+} from "@morrowlist/contracts";
 import { Select, TextInput } from "@morrowlist/ui";
 
+import { describeRecurrence } from "../lib/recurrence";
 import { PRIORITIES } from "../lib/task-view";
 
 /**
@@ -143,6 +148,26 @@ export function DueBadge({
 export function MyDayBadge({ dayPlans }: { readonly dayPlans: readonly string[] }) {
   if (dayPlans.length === 0) return null;
   return <span className="task-row__my-day">My Day</span>;
+}
+
+/** The repeat glyph (GAP-12); the rule is spelled out for assistive technology and on hover. */
+export function RepeatBadge({
+  recurrence,
+}: {
+  readonly recurrence: RecurrenceRuleDto | null;
+}) {
+  if (!recurrence) return null;
+  const label = describeRecurrence(recurrence);
+  return (
+    <span
+      className="task-row__repeat"
+      role="img"
+      aria-label={`Repeats: ${label}`}
+      title={label}
+    >
+      ↻
+    </span>
+  );
 }
 
 /** "1/2" for a parent's direct children (spec 8.3); nothing for a task without any. */

@@ -228,10 +228,14 @@ function workspaceToday(queryClient: QueryClient): string {
   return cached?.data.date ?? localToday();
 }
 
-export function useTaskList(filters: Partial<ListTasksQuery>) {
+export function useTaskList(
+  filters: Partial<ListTasksQuery>,
+  options: { readonly enabled?: boolean | undefined } = {},
+) {
   return useQuery({
     queryKey: taskKeys.list(filters),
     queryFn: () => apiClient.listTasks(filters),
+    enabled: options.enabled ?? true,
   });
 }
 
@@ -443,6 +447,17 @@ export function useRemoveFromDay() {
       return date ? apiClient.removeTaskFromDay(task.id, date) : Promise.resolve(task);
     },
     (task) => ({ ...task, dayPlans: task.dayPlans.slice(1) }),
+  );
+}
+
+/**
+ * Skip the current occurrence of a repeating task (GAP-12). The next date is the server's
+ * to compute, so the optimistic guess leaves the task as it is; the response replaces it.
+ */
+export function useSkipOccurrence() {
+  return useTaskAction(
+    (task) => apiClient.skipOccurrence(task.id, task.version),
+    (task) => task,
   );
 }
 

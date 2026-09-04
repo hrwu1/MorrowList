@@ -945,6 +945,10 @@
     color: var(--accent);
     font-weight: 550;
   }
+  .task-row__repeat {
+    color: var(--accent);
+    font-weight: 600;
+  }
   .task-row__my-day {
     padding: 0.05rem 0.45rem;
     border-radius: 99px;
@@ -1252,6 +1256,65 @@
   .relation-list__form .ml-input {
     flex: 1;
     min-width: 10rem;
+  }
+  .recurrence-editor {
+    display: grid;
+    gap: 0.5rem;
+  }
+  .recurrence-editor__custom {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius, 8px);
+  }
+  .recurrence-editor__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .recurrence-editor__row .ml-field__label {
+    margin: 0;
+    min-width: 6rem;
+  }
+  .recurrence-editor__number {
+    width: 5rem;
+  }
+  .recurrence-editor__weekdays {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.75rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .recurrence-editor__weekday {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.875rem;
+  }
+  .task-detail__series {
+    display: grid;
+    gap: 0.35rem;
+  }
+  .task-detail__series-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+  }
+  .task-detail__series-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
+  }
+  .task-detail__series-list li[data-done] {
+    color: var(--text-muted);
   }
   .task-row__subtasks {
     font-variant-numeric: tabular-nums;

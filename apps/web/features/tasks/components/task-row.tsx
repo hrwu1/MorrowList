@@ -24,6 +24,7 @@ import {
   MyDayBadge,
   PriorityBadge,
   PrioritySelect,
+  RepeatBadge,
   SubtaskProgressBadge,
 } from "./task-fields";
 
@@ -122,6 +123,7 @@ export function TaskRow({ task, detailHref, selected, today }: TaskRowProps) {
               isCompleted={task.isCompleted}
               today={today}
             />
+            <RepeatBadge recurrence={task.recurrence} />
             <MyDayBadge dayPlans={task.dayPlans} />
             <BlockedBadge task={task} />
             <SubtaskProgressBadge progress={task.subtaskProgress} />
