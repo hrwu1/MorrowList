@@ -53,10 +53,10 @@ async function taskWithFullHistory(): Promise<TaskDto> {
     title: "Renamed",
     priority: "high",
   });
-  task = await tasks.move(seeded.context, workspaceId, task.id, {
+  ({ task } = await tasks.move(seeded.context, workspaceId, task.id, {
     projectId: seeded.project.id,
     statusId: ready.id,
-  });
+  }));
   const sibling = await tasks.create(seeded.context, {
     workspaceId,
     title: "Sibling",
@@ -67,7 +67,7 @@ async function taskWithFullHistory(): Promise<TaskDto> {
     beforeTaskId: sibling.id,
   });
   task = await tasks.complete(seeded.context, workspaceId, task.id);
-  task = await tasks.reopen(seeded.context, workspaceId, task.id);
+  ({ task } = await tasks.reopen(seeded.context, workspaceId, task.id));
   const focus = await tags.create(seeded.context, workspaceId, { name: "Focus" });
   task = await tasks.addTag(seeded.context, workspaceId, task.id, focus.id);
   task = await tasks.removeTag(seeded.context, workspaceId, task.id, focus.id);

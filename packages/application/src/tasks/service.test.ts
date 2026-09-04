@@ -5,6 +5,8 @@ import { SCOPES, type ActorContext } from "../shared/actor-context.js";
 import { TagService } from "../tags/service.js";
 import {
   buildActorContext,
+  buildDefaultWorkflow,
+  buildProject,
   createInMemoryUnitOfWork,
   emptyData,
   seedWorkspace,
@@ -460,20 +462,30 @@ describe("TaskService.move and reorder", () => {
       title: "Ship Dawnflow",
     });
 
-    const completed = await service.move(seeded.context, seeded.workspace.id, task.id, {
-      projectId: seeded.project.id,
-      statusId: done.id,
-      expectedVersion: task.version,
-    });
+    const { task: completed } = await service.move(
+      seeded.context,
+      seeded.workspace.id,
+      task.id,
+      {
+        projectId: seeded.project.id,
+        statusId: done.id,
+        expectedVersion: task.version,
+      },
+    );
     expect(completed.statusId).toBe(done.id);
     expect(completed.isCompleted).toBe(true);
     expect(completed.completedAt).toBe(NOW.toISOString());
 
-    const reopened = await service.move(seeded.context, seeded.workspace.id, task.id, {
-      projectId: seeded.project.id,
-      statusId: ready.id,
-      expectedVersion: completed.version,
-    });
+    const { task: reopened } = await service.move(
+      seeded.context,
+      seeded.workspace.id,
+      task.id,
+      {
+        projectId: seeded.project.id,
+        statusId: ready.id,
+        expectedVersion: completed.version,
+      },
+    );
     expect(reopened.statusId).toBe(ready.id);
     expect(reopened.isCompleted).toBe(false);
     expect(reopened.completedAt).toBeNull();
@@ -502,22 +514,27 @@ describe("TaskService.move and reorder", () => {
       title: "Move me",
     });
 
-    const moved = await service.move(seeded.context, seeded.workspace.id, inbox.id, {
-      projectId: seeded.project.id,
-      statusId: inProgress.id,
-      beforeTaskId: first.id,
-      afterTaskId: last.id,
-      expectedVersion: inbox.version,
-    });
+    const { task: moved } = await service.move(
+      seeded.context,
+      seeded.workspace.id,
+      inbox.id,
+      {
+        projectId: seeded.project.id,
+        statusId: inProgress.id,
+        beforeTaskId: first.id,
+        afterTaskId: last.id,
+        expectedVersion: inbox.version,
+      },
+    );
     expect(moved.rank > first.rank && moved.rank < last.rank).toBe(true);
 
-    const returnedToInbox = await service.move(
+    const { task: returnedToInbox } = await service.move(
       seeded.context,
       seeded.workspace.id,
       moved.id,
       { projectId: null, expectedVersion: moved.version },
     );
-    const defaulted = await service.move(
+    const { task: defaulted } = await service.move(
       seeded.context,
       seeded.workspace.id,
       moved.id,
@@ -628,7 +645,7 @@ describe("TaskService.complete and reopen", () => {
     expect(completed.statusId).toBe(done.id);
     expect(completed.isCompleted).toBe(true);
 
-    const reopened = await service.reopen(
+    const { task: reopened } = await service.reopen(
       seeded.context,
       seeded.workspace.id,
       created.id,
@@ -879,10 +896,15 @@ describe("TaskService tags", () => {
     });
     await service.addTag(seeded.context, seeded.workspace.id, task.id, tag.id);
 
-    const moved = await service.move(seeded.context, seeded.workspace.id, task.id, {
-      projectId: seeded.project.id,
-      statusId: statusByCategory(seeded.statuses, "ready").id,
-    });
+    const { task: moved } = await service.move(
+      seeded.context,
+      seeded.workspace.id,
+      task.id,
+      {
+        projectId: seeded.project.id,
+        statusId: statusByCategory(seeded.statuses, "ready").id,
+      },
+    );
     expect(moved.tags.map((t) => t.name)).toEqual(["Sticky"]);
 
     const completed = await service.complete(
@@ -1271,12 +1293,12 @@ describe("TaskService relations", () => {
       projectId: seeded.project.id,
       statusId: ready.id,
     });
-    expect(moved.relations).toHaveLength(1);
-    expect(moved.isBlocked).toBe(true);
+    expect(moved.task.relations).toHaveLength(1);
+    expect(moved.task.isBlocked).toBe(true);
     const back = await service.move(seeded.context, workspaceId(), b.id, {
       projectId: null,
     });
-    expect(back.relations).toHaveLength(1);
+    expect(back.task.relations).toHaveLength(1);
   });
 
   it("completes a blocked task only with an acknowledgement", async () => {
@@ -1395,5 +1417,165 @@ describe("TaskService blocked flag", () => {
       }),
     ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
     expect(unitOfWork.data.activity).toHaveLength(1);
+  });
+});
+
+describe("cross-project in-progress limit (GAP-20)", () => {
+  function setLimit(limit: number | null) {
+    const workspace = unitOfWork.data.workspaces.get(seeded.workspace.id);
+    if (!workspace) throw new Error("workspace vanished");
+    unitOfWork.data.workspaces.set(seeded.workspace.id, {
+      ...workspace,
+      inProgressLimit: limit,
+    });
+  }
+
+  function seedSecondProject() {
+    const project = buildProject(seeded.workspace.id, {
+      name: "Second",
+      slug: "second",
+    });
+    const statuses = buildDefaultWorkflow(project.id);
+    unitOfWork.data.projects.set(project.id, project);
+    for (const status of statuses) unitOfWork.data.statuses.set(status.id, status);
+    return { project, statuses };
+  }
+
+  it("warns without blocking when a move starts more work than the limit, naming every started task", async () => {
+    setLimit(1);
+    const second = seedSecondProject();
+    const here = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      projectId: seeded.project.id,
+      statusId: statusByCategory(seeded.statuses, "ready").id,
+      title: "Here",
+    });
+    const there = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      projectId: second.project.id,
+      statusId: statusByCategory(second.statuses, "ready").id,
+      title: "There",
+    });
+
+    const first = await service.move(seeded.context, seeded.workspace.id, here.id, {
+      projectId: seeded.project.id,
+      statusId: statusByCategory(seeded.statuses, "in_progress").id,
+    });
+    expect(first.warnings).toEqual([]);
+
+    const crossed = await service.move(seeded.context, seeded.workspace.id, there.id, {
+      projectId: second.project.id,
+      statusId: statusByCategory(second.statuses, "in_progress").id,
+    });
+    expect(crossed.task.statusId).toBe(
+      statusByCategory(second.statuses, "in_progress").id,
+    );
+    expect(crossed.warnings).toEqual([
+      {
+        code: "IN_PROGRESS_LIMIT_EXCEEDED",
+        limit: 1,
+        count: 2,
+        message: "2 tasks are in progress across your projects; the limit is 1.",
+        tasks: [
+          { id: here.id, key: "ML-1", title: "Here", projectId: seeded.project.id },
+          { id: there.id, key: "ML-2", title: "There", projectId: second.project.id },
+        ],
+      },
+    ]);
+    expect(unitOfWork.data.activity.at(-1)?.eventType).toBe("task.moved");
+  });
+
+  it("stays silent without a limit, within it, when reordering, or between two in-progress columns", async () => {
+    const doing = statusByCategory(seeded.statuses, "in_progress");
+    const doingToo = {
+      ...doing,
+      id: "0198f0a0-0000-7000-8000-00000000d0d0",
+      name: "Doing too",
+      rank: `${doing.rank}z`,
+      isDefault: false,
+    };
+    unitOfWork.data.statuses.set(doingToo.id, doingToo);
+    const one = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      projectId: seeded.project.id,
+      statusId: doing.id,
+      title: "One",
+    });
+    const two = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      projectId: seeded.project.id,
+      statusId: statusByCategory(seeded.statuses, "ready").id,
+      title: "Two",
+    });
+
+    const unlimited = await service.move(seeded.context, seeded.workspace.id, two.id, {
+      projectId: seeded.project.id,
+      statusId: doing.id,
+    });
+    expect(unlimited.warnings).toEqual([]);
+
+    setLimit(2);
+    const reordered = await service.reorder(
+      seeded.context,
+      seeded.workspace.id,
+      two.id,
+      {
+        beforeTaskId: one.id,
+      },
+    );
+    expect(reordered.statusId).toBe(doing.id);
+    const sideways = await service.move(seeded.context, seeded.workspace.id, two.id, {
+      projectId: seeded.project.id,
+      statusId: doingToo.id,
+    });
+    expect(sideways.warnings).toEqual([]);
+
+    setLimit(1);
+    const stillSideways = await service.move(
+      seeded.context,
+      seeded.workspace.id,
+      two.id,
+      {
+        projectId: seeded.project.id,
+        statusId: doing.id,
+      },
+    );
+    expect(stillSideways.warnings).toEqual([]);
+    const backOut = await service.move(seeded.context, seeded.workspace.id, two.id, {
+      projectId: seeded.project.id,
+      statusId: statusByCategory(seeded.statuses, "ready").id,
+    });
+    expect(backOut.warnings).toEqual([]);
+  });
+
+  it("warns when reopening lands a task back in progress over the limit", async () => {
+    setLimit(1);
+    const doing = statusByCategory(seeded.statuses, "in_progress");
+    const paused = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      projectId: seeded.project.id,
+      statusId: doing.id,
+      title: "Paused",
+    });
+    await service.complete(seeded.context, seeded.workspace.id, paused.id);
+    await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      projectId: seeded.project.id,
+      statusId: doing.id,
+      title: "Active",
+    });
+
+    const reopened = await service.reopen(
+      seeded.context,
+      seeded.workspace.id,
+      paused.id,
+    );
+    expect(reopened.task.statusId).toBe(doing.id);
+    expect(reopened.warnings).toHaveLength(1);
+    // Reopening appends to the column, so the reopened task lists last.
+    expect(reopened.warnings[0]?.tasks.map((task) => task.title)).toEqual([
+      "Active",
+      "Paused",
+    ]);
   });
 });

@@ -309,7 +309,7 @@ describe("completion", () => {
     expect(completed.isCompleted).toBe(true);
     expect(completed.completedAt).toBe(NOW.toISOString());
 
-    const reopened = await service.reopen(context, workspaceId, created.id);
+    const { task: reopened } = await service.reopen(context, workspaceId, created.id);
     expect(reopened.completedAt).toBeNull();
     expect(reopened.version).toBe(3);
 

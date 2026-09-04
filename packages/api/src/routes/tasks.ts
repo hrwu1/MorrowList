@@ -84,13 +84,13 @@ export function taskRoutes(deps: ApiDependencies) {
     .post("/tasks/:id/move", async (c) => {
       const actor = c.get("actor");
       const body = await parseJsonBody(c, moveTaskRequestSchema);
-      const task = await deps.taskService.move(
+      const result = await deps.taskService.move(
         actor,
         requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
         c.req.param("id"),
         body,
       );
-      return c.json({ data: task });
+      return c.json({ data: result.task, warnings: result.warnings });
     })
 
     .post("/tasks/:id/reorder", async (c) => {
@@ -120,13 +120,13 @@ export function taskRoutes(deps: ApiDependencies) {
     .post("/tasks/:id/reopen", async (c) => {
       const actor = c.get("actor");
       const body = await parseOptionalBody(c, reopenTaskRequestSchema);
-      const task = await deps.taskService.reopen(
+      const result = await deps.taskService.reopen(
         actor,
         requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
         c.req.param("id"),
         body.expectedVersion,
       );
-      return c.json({ data: task });
+      return c.json({ data: result.task, warnings: result.warnings });
     })
 
     .post("/tasks/:id/parent", async (c) => {

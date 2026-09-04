@@ -10,6 +10,7 @@ import type {
   SetTaskParentRequest,
   TaskDto,
   UpdateTaskRequest,
+  WipWarningDto,
 } from "@morrowlist/contracts";
 import { TASK_EVENTS } from "@morrowlist/contracts";
 import {
@@ -26,6 +27,7 @@ import {
   deleteTask,
   flagBlocked,
   isBlocked,
+  entersInProgress,
   isTerminal,
   materialChanges,
   moveTask as applyTaskMove,
@@ -36,10 +38,12 @@ import {
   restoreTask,
   setParent as applyParent,
   systemClock,
+  taskKey,
   toLocalDate,
   toPlainDate,
   updateTaskFields,
   uuidv7,
+  wipWarning,
   type Clock,
   type DayPlanSource,
   type PlainDate,
@@ -85,6 +89,15 @@ export interface TaskServiceOptions {
 
 export interface WorkspaceScopedRequest {
   readonly workspaceId: string;
+}
+
+/**
+ * A command that can start work answers with the task and any warning about the
+ * workspace's cross-project limit (GAP-20). A warning never fails the command.
+ */
+export interface TaskCommandResult {
+  readonly task: TaskDto;
+  readonly warnings: readonly WipWarningDto[];
 }
 
 export class TaskService {
@@ -371,53 +384,59 @@ export class TaskService {
     workspaceId: string,
     taskId: string,
     request: MoveTaskRequest,
-  ): Promise<TaskDto> {
+  ): Promise<TaskCommandResult> {
     assertWorkspaceAccess(context, workspaceId);
     assertScope(context, SCOPES.tasksWrite);
 
-    return this.mutate(context, workspaceId, taskId, request.expectedVersion, {
-      eventType: TASK_EVENTS.moved,
-      summarize: (next) =>
-        next.projectId === null
-          ? "Moved task to Inbox"
-          : "Moved task to another status",
-      apply: async (task, tx) => {
-        if (request.projectId === null && request.statusId != null) {
-          throw new DomainError(
-            "VALIDATION_FAILED",
-            "An Inbox destination cannot have a workflow status.",
-            { projectId: null, statusId: request.statusId },
+    return this.mutateWithWarnings(
+      context,
+      workspaceId,
+      taskId,
+      request.expectedVersion,
+      {
+        eventType: TASK_EVENTS.moved,
+        summarize: (next) =>
+          next.projectId === null
+            ? "Moved task to Inbox"
+            : "Moved task to another status",
+        apply: async (task, tx) => {
+          if (request.projectId === null && request.statusId != null) {
+            throw new DomainError(
+              "VALIDATION_FAILED",
+              "An Inbox destination cannot have a workflow status.",
+              { projectId: null, statusId: request.statusId },
+            );
+          }
+
+          const destination =
+            request.projectId === null
+              ? null
+              : await this.resolveDestination(
+                  tx,
+                  workspaceId,
+                  request.projectId,
+                  request.statusId ?? null,
+                );
+          const scope: RankScope = {
+            workspaceId,
+            projectId: destination?.id ?? null,
+            statusId: destination?.status.id ?? null,
+          };
+          const rank = await this.resolveOrderingRank(tx, task.id, scope, request);
+
+          return applyTaskMove(
+            task,
+            {
+              destination: destination
+                ? { projectId: destination.id, status: destination.status }
+                : null,
+              rank,
+            },
+            { actor: actorRef(context), clock: this.clock },
           );
-        }
-
-        const destination =
-          request.projectId === null
-            ? null
-            : await this.resolveDestination(
-                tx,
-                workspaceId,
-                request.projectId,
-                request.statusId ?? null,
-              );
-        const scope: RankScope = {
-          workspaceId,
-          projectId: destination?.id ?? null,
-          statusId: destination?.status.id ?? null,
-        };
-        const rank = await this.resolveOrderingRank(tx, task.id, scope, request);
-
-        return applyTaskMove(
-          task,
-          {
-            destination: destination
-              ? { projectId: destination.id, status: destination.status }
-              : null,
-            rank,
-          },
-          { actor: actorRef(context), clock: this.clock },
-        );
+        },
       },
-    });
+    );
   }
 
   /** Reorder a task inside its current Inbox or project-status rank scope. */
@@ -543,17 +562,20 @@ export class TaskService {
     });
   }
 
-  /** Reopen a completed task, restoring its prior status where possible (spec 8.5). */
+  /**
+   * Reopen a completed task, restoring its prior status where possible (spec 8.5). That
+   * status may be In Progress, so this can start work again and warn like a move.
+   */
   async reopen(
     context: ActorContext,
     workspaceId: string,
     taskId: string,
     expectedVersion?: number,
-  ): Promise<TaskDto> {
+  ): Promise<TaskCommandResult> {
     assertWorkspaceAccess(context, workspaceId);
     assertScope(context, SCOPES.tasksWrite);
 
-    return this.mutate(context, workspaceId, taskId, expectedVersion, {
+    return this.mutateWithWarnings(context, workspaceId, taskId, expectedVersion, {
       eventType: TASK_EVENTS.reopened,
       summarize: () => "Reopened task",
       apply: async (task, tx) => {
@@ -916,15 +938,29 @@ export class TaskService {
     workspaceId: string,
     taskId: string,
     expectedVersion: number | undefined,
-    step: {
-      eventType: string;
-      summarize: (next: Task, previous: Task) => string;
-      apply: (task: Task, tx: TransactionContext) => Task | Promise<Task>;
-      /** Event payload; defaults to the field-level diff (spec 18.2). */
-      payload?: (next: Task, previous: Task) => Record<string, unknown>;
-    },
+    step: MutationStep,
     options: { allowDeleted?: boolean } = {},
   ): Promise<TaskDto> {
+    const result = await this.mutateWithWarnings(
+      context,
+      workspaceId,
+      taskId,
+      expectedVersion,
+      step,
+      options,
+    );
+    return result.task;
+  }
+
+  /** The mutation pipeline plus the cross-project WIP check on what it produced. */
+  private async mutateWithWarnings(
+    context: ActorContext,
+    workspaceId: string,
+    taskId: string,
+    expectedVersion: number | undefined,
+    step: MutationStep,
+    options: { allowDeleted?: boolean } = {},
+  ): Promise<TaskCommandResult> {
     return this.unitOfWork.execute(async (tx) => {
       const workspace = await this.requireWorkspace(tx, workspaceId);
       const previous = await this.requireTask(tx, workspaceId, taskId, options);
@@ -934,7 +970,7 @@ export class TaskService {
       const next = await step.apply(previous, tx);
       if (next === previous) {
         // The policy decided nothing material changed: no version bump, no event.
-        return this.toDto(tx, workspace, previous);
+        return { task: await this.toDto(tx, workspace, previous), warnings: [] };
       }
 
       const persisted = await tx.tasks.update(next, previous.version);
@@ -963,8 +999,52 @@ export class TaskService {
           : { taskId, changes: materialChanges(next, previous) },
       });
 
-      return this.toDto(tx, workspace, next);
+      return {
+        task: await this.toDto(tx, workspace, next),
+        warnings: await this.wipWarnings(tx, workspace, next, previous),
+      };
     });
+  }
+
+  /**
+   * The workspace's cross-project limit (GAP-20), checked only when the task has just
+   * entered an in-progress column: reordering inside one, or moving between two, starts
+   * nothing new. Exceeding the limit warns and names every started task; it never blocks.
+   */
+  private async wipWarnings(
+    tx: TransactionContext,
+    workspace: Workspace,
+    next: Task,
+    previous: Task,
+  ): Promise<WipWarningDto[]> {
+    if (
+      workspace.inProgressLimit === null ||
+      next.statusId === null ||
+      next.statusId === previous.statusId
+    ) {
+      return [];
+    }
+    const [from, to] = await Promise.all([
+      previous.statusId ? tx.statuses.findById(previous.statusId) : null,
+      tx.statuses.findById(next.statusId),
+    ]);
+    if (!entersInProgress(from, to)) return [];
+
+    const inProgress = await tx.tasks.listInProgress(workspace.id);
+    const warning = wipWarning(inProgress.length, workspace.inProgressLimit);
+    if (!warning) return [];
+    return [
+      {
+        ...warning,
+        message: `${warning.count} tasks are in progress across your projects; the limit is ${warning.limit}.`,
+        tasks: inProgress.map((task) => ({
+          id: task.id,
+          key: taskKey(workspace.taskKeyPrefix, task.taskNumber),
+          title: task.title,
+          projectId: task.projectId,
+        })),
+      },
+    ];
   }
 
   private async insertDayPlan(
@@ -1232,6 +1312,14 @@ export class TaskService {
 function describeRelation(relation: TaskRelation, fromTaskId: string): string {
   if (relation.type === "related_to") return "related to";
   return relation.sourceTaskId === fromTaskId ? "blocks" : "blocked by";
+}
+
+interface MutationStep {
+  readonly eventType: string;
+  readonly summarize: (next: Task, previous: Task) => string;
+  readonly apply: (task: Task, tx: TransactionContext) => Task | Promise<Task>;
+  /** Event payload; defaults to the field-level diff (spec 18.2). */
+  readonly payload?: (next: Task, previous: Task) => Record<string, unknown>;
 }
 
 function parentChangePayload(next: Task, previous: Task): Record<string, unknown> {

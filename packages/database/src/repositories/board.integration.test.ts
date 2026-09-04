@@ -177,7 +177,7 @@ describe("project board persistence", () => {
       title: "Moving",
     });
 
-    const reviewed = await tasks.move(context, workspaceId, moving.id, {
+    const { task: reviewed } = await tasks.move(context, workspaceId, moving.id, {
       projectId: detail.project.id,
       statusId: review.id,
       beforeTaskId: first.id,
@@ -186,7 +186,7 @@ describe("project board persistence", () => {
     });
     expect(reviewed.rank > first.rank && reviewed.rank < last.rank).toBe(true);
 
-    const completed = await tasks.move(context, workspaceId, moving.id, {
+    const { task: completed } = await tasks.move(context, workspaceId, moving.id, {
       projectId: detail.project.id,
       statusId: done.id,
       expectedVersion: reviewed.version,
