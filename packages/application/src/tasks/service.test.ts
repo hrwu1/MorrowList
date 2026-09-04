@@ -2023,6 +2023,46 @@ describe("status intervals (flow read model)", () => {
     }
   });
 
+  it("opens an interval for the occurrence a completed repeating task spawns", async () => {
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const inProgress = statusByCategory(seeded.statuses, "in_progress");
+    const first = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Weekly review",
+      projectId: seeded.project.id,
+      statusId: inProgress.id,
+      dueDate: "2026-08-29",
+      recurrence: {
+        freq: "weekly",
+        weekdays: ["sat"],
+        interval: 1,
+        mode: "schedule",
+        monthDay: null,
+        nthWeekday: null,
+        until: null,
+        count: null,
+      },
+    });
+
+    await service.complete(seeded.context, seeded.workspace.id, first.id);
+
+    const series = await service.list(
+      seeded.context,
+      listQuery({ seriesId: first.id }),
+    );
+    const spawned = series.data.find((task) => task.id !== first.id);
+    if (!spawned) throw new Error("no occurrence was spawned");
+    expect(intervalsOf(first.id)).toEqual([
+      { category: "in_progress", projectId: seeded.project.id, open: false },
+      { category: "done", projectId: seeded.project.id, open: true },
+    ]);
+    // The occurrence is a fresh task in the default column: its own first stay opens.
+    expect(spawned.statusId).toBe(ready.id);
+    expect(intervalsOf(spawned.id)).toEqual([
+      { category: "ready", projectId: seeded.project.id, open: true },
+    ]);
+  });
+
   it("leaves the open interval alone when a change keeps the task in place", async () => {
     const ready = statusByCategory(seeded.statuses, "ready");
     const task = await service.create(seeded.context, {
