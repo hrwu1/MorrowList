@@ -81,6 +81,8 @@ test("every view fits the phone width and the main controls are thumb-sized", as
     "/projects",
     "/settings/tags",
     "/settings/workspace",
+    "/notifications",
+    "/settings/notifications",
     "/search?q=phone",
     `/views/${viewId}`,
     "/completed",

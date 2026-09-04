@@ -59,6 +59,10 @@ describe("cache policy", () => {
     expect(policy("/api/v1/workspaces/w1")).toBe("none");
     // Search results are transient and never make up a view of their own.
     expect(policy("/api/v1/search?q=plan")).toBe("none");
+    // Notifications and their preferences are per user and time-sensitive (GAP-13).
+    expect(policy("/api/v1/notifications?unread=true")).toBe("none");
+    expect(policy("/api/v1/notifications")).toBe("none");
+    expect(policy("/api/v1/me/notification-preferences")).toBe("none");
     expect(policy("/api/v1/health")).toBe("none");
     expect(policy("/sign-in", "navigate")).toBe("none");
     expect(policy("/sign-up", "navigate")).toBe("none");

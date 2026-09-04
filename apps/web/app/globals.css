@@ -3689,6 +3689,54 @@
 
 @layer components {
   /* Notifications (GAP-13) */
+  .workspace-topline__tools {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .workspace-bell {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.25rem;
+    min-height: 2.25rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface-raised);
+    color: var(--text-secondary);
+  }
+  .workspace-bell:hover,
+  .workspace-bell[aria-current="page"] {
+    border-color: var(--border-strong);
+    color: var(--text-primary);
+  }
+  .workspace-bell svg {
+    width: 1.05rem;
+    height: 1.05rem;
+  }
+  .workspace-bell__count {
+    position: absolute;
+    top: -0.4rem;
+    right: -0.4rem;
+    min-width: 1.1rem;
+    padding: 0 0.3rem;
+    border: 1px solid var(--accent);
+    border-radius: 99px;
+    background: var(--accent-subtle);
+    color: var(--accent-text);
+    font-size: 0.65rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1rem;
+    text-align: center;
+  }
+  @media (max-width: 45rem), (pointer: coarse) {
+    .workspace-bell {
+      min-width: 2.75rem;
+      min-height: 2.75rem;
+    }
+  }
   .notifications,
   .notification-settings {
     width: 100%;

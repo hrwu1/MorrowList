@@ -177,14 +177,17 @@ export function WorkspaceShell({
           ? "!"
           : "·",
     },
-    {
-      href: "/notifications",
-      label: "Notifications",
-      icon: "bell" as const,
-      // The bell shows only unread; an empty badge is quieter than a zero.
-      count: unread.data !== undefined ? unreadBadge(unread.data) : "",
-    },
   ];
+  // The bell sits beside the brand on desktop and in the menu on a phone: a nav row of
+  // its own would push the sidebar past a laptop viewport, and a squeezed project list
+  // no longer takes drops. The badge shows only unread; an empty badge is quieter than
+  // a zero.
+  const notificationsLink = {
+    href: "/notifications",
+    label: "Notifications",
+    icon: "bell" as const,
+    count: unread.data !== undefined ? unreadBadge(unread.data) : "",
+  };
 
   return (
     <DndContext
@@ -200,16 +203,32 @@ export function WorkspaceShell({
             <Brand />
             {/* Beside the brand rather than in the nav, so the sidebar's drop targets
                 keep their positions for keyboard drags. */}
-            <button
-              type="button"
-              className="workspace-search"
-              aria-label="Search tasks and projects"
-              title="Search (/)"
-              onClick={openSearch}
-            >
-              <Icon name="search" />
-              <kbd aria-hidden="true">/</kbd>
-            </button>
+            <span className="workspace-topline__tools">
+              <button
+                type="button"
+                className="workspace-search"
+                aria-label="Search tasks and projects"
+                title="Search (/)"
+                onClick={openSearch}
+              >
+                <Icon name="search" />
+                <kbd aria-hidden="true">/</kbd>
+              </button>
+              <Link
+                className="workspace-bell"
+                href={notificationsLink.href}
+                aria-label={notificationsLink.label}
+                title={notificationsLink.label}
+                aria-current={pathname === notificationsLink.href ? "page" : undefined}
+              >
+                <Icon name="bell" />
+                {notificationsLink.count ? (
+                  <span className="workspace-bell__count" aria-hidden="true">
+                    {notificationsLink.count}
+                  </span>
+                ) : null}
+              </Link>
+            </span>
           </div>
 
           <button
@@ -352,7 +371,7 @@ export function WorkspaceShell({
         <MobileHeader
           inboxCount={inboxCountLabel}
           inboxUnavailable={inboxUnavailable}
-          planningLinks={planningLinks}
+          planningLinks={[...planningLinks, notificationsLink]}
           pathname={pathname}
           projects={projectItems}
           projectsPending={projects.isPending}
