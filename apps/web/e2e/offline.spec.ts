@@ -155,7 +155,10 @@ test("recently opened views render offline with the indicator, and an unsent tas
 
     // The write is refused and the text survives a reload (spec 25.1).
     await page.goto("/inbox");
+    await expect(page.getByTestId("offline-banner")).toBeVisible();
     const field = page.getByPlaceholder("Add a task and press Enter");
+    // Hydration of the stored document may client-render once; wait for it to settle.
+    await expect(field).toHaveCount(1);
     await field.fill("Written while offline");
     await field.press("Enter");
     await expect(
