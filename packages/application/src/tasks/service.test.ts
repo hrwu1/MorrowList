@@ -1873,6 +1873,48 @@ describe("TaskService recurrence", () => {
     expect(unitOfWork.data.outbox).toHaveLength(activityBefore);
   });
 
+  it("refuses to complete a blocked occurrence and spawns nothing until acknowledged", async () => {
+    const blocker = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Order seeds",
+    });
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Water plants",
+      dueDate: TODAY,
+      recurrence: {
+        ...weekly,
+        interval: 1,
+        mode: "schedule",
+        monthDay: null,
+        nthWeekday: null,
+        until: null,
+        count: null,
+      },
+    });
+    await service.addRelation(seeded.context, seeded.workspace.id, blocker.id, {
+      type: "blocks",
+      targetTaskId: task.id,
+    });
+    const activityBefore = unitOfWork.data.activity.length;
+
+    await expect(
+      service.complete(seeded.context, seeded.workspace.id, task.id),
+    ).rejects.toMatchObject({ code: "TASK_BLOCKED" });
+    expect(unitOfWork.data.tasks.size).toBe(2);
+    expect(unitOfWork.data.activity).toHaveLength(activityBefore);
+    const open = await service.get(seeded.context, seeded.workspace.id, task.id);
+    expect(open.isCompleted).toBe(false);
+    expect(open.recurrence).not.toBeNull();
+
+    const done = await service.complete(seeded.context, seeded.workspace.id, task.id, {
+      acknowledgeBlocked: true,
+    });
+    expect(done.isCompleted).toBe(true);
+    expect(done.recurrence).toBeNull();
+    expect(unitOfWork.data.tasks.size).toBe(3);
+  });
+
   it("skips an occurrence on the same task and refuses the last one", async () => {
     const task = await service.create(seeded.context, {
       workspaceId: seeded.workspace.id,
