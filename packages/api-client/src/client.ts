@@ -15,11 +15,17 @@ import type {
   FlowQuery,
   FlowResponse,
   FlowSummaryDto,
+  ListNotificationsQuery,
   ListProjectsQuery,
   ListStatusesQuery,
   ListTasksQuery,
   MeResponse,
   MoveTaskRequest,
+  NotificationDto,
+  NotificationListResponse,
+  NotificationPreferencesDto,
+  PushSubscriptionDto,
+  PushSubscriptionRequest,
   ProjectBoardQuery,
   ProjectBoardResponse,
   ProjectDetailDto,
@@ -45,6 +51,7 @@ import type {
   TodayViewResponse,
   UpcomingViewQuery,
   UpcomingViewResponse,
+  UpdateNotificationPreferencesRequest,
   UpdateSavedViewRequest,
   UpdateTagRequest,
   UpdateProjectRequest,
@@ -751,6 +758,96 @@ export class ApiClient {
       options,
     );
     return response.data;
+  }
+
+  async listNotifications(
+    query: Partial<ListNotificationsQuery> = {},
+    options: RequestOptions = {},
+  ): Promise<NotificationListResponse> {
+    return this.send<NotificationListResponse>(
+      "GET",
+      `/notifications${this.queryString(query, options)}`,
+      undefined,
+      options,
+    );
+  }
+
+  async markNotificationRead(
+    id: string,
+    options: RequestOptions = {},
+  ): Promise<NotificationDto> {
+    const response = await this.send<{ data: NotificationDto }>(
+      "POST",
+      `/notifications/${encodeURIComponent(id)}/read${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+    return response.data;
+  }
+
+  /** "Remind me in an hour": reads the notification and re-arms the task's reminder. */
+  async snoozeNotification(
+    id: string,
+    options: RequestOptions = {},
+  ): Promise<NotificationDto> {
+    const response = await this.send<{ data: NotificationDto }>(
+      "POST",
+      `/notifications/${encodeURIComponent(id)}/snooze${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+    return response.data;
+  }
+
+  async getNotificationPreferences(
+    options: RequestOptions = {},
+  ): Promise<NotificationPreferencesDto> {
+    const response = await this.send<{ data: NotificationPreferencesDto }>(
+      "GET",
+      `/me/notification-preferences${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+    return response.data;
+  }
+
+  async updateNotificationPreferences(
+    body: UpdateNotificationPreferencesRequest,
+    options: RequestOptions = {},
+  ): Promise<NotificationPreferencesDto> {
+    const response = await this.send<{ data: NotificationPreferencesDto }>(
+      "PATCH",
+      `/me/notification-preferences${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async addPushSubscription(
+    body: PushSubscriptionRequest,
+    options: RequestOptions = {},
+  ): Promise<PushSubscriptionDto> {
+    const response = await this.send<{ data: PushSubscriptionDto }>(
+      "POST",
+      "/me/push-subscriptions",
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async removePushSubscription(
+    endpoint: string,
+    options: RequestOptions = {},
+  ): Promise<void> {
+    const params = new URLSearchParams({ endpoint });
+    await this.send<void>(
+      "DELETE",
+      `/me/push-subscriptions?${params.toString()}`,
+      undefined,
+      options,
+    );
   }
 
   private queryString(query: Record<string, unknown>, options: RequestOptions): string {

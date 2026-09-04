@@ -28,6 +28,18 @@ import { WHERE_HELP, resolveWhere } from "./where.js";
  * public REST API the web app uses and never touches the database.
  */
 
+/**
+ * Commander maps `--remind 60` to "60", `--no-remind` to false, and neither to undefined
+ * (which leaves the reminder alone, or applies the default when a due time is first set).
+ */
+function reminderOption(
+  remind: string | boolean | undefined,
+): Pick<UpdateTaskRequest, "reminderOffsetMinutes"> {
+  if (remind === undefined || remind === true) return {};
+  if (remind === false) return { reminderOffsetMinutes: null };
+  return { reminderOffsetMinutes: Number(remind) };
+}
+
 export function taskCommand(): Command {
   const task = new Command("task").description("Create and manage tasks");
 
@@ -45,6 +57,11 @@ export function taskCommand(): Command {
     )
     .option("--deadline <date>", "hard deadline as YYYY-MM-DD")
     .option("--deadline-time <time>", "deadline time as HH:mm; requires --deadline")
+    .option(
+      "--remind <minutes>",
+      "remind this many minutes before the due time (default 30 with --due-time)",
+    )
+    .option("--no-remind", "no reminder")
     .option("--project <id>", "project id; omit for the Inbox")
     .option("--status <id>", "workflow status id; requires --project")
     .option(
@@ -95,6 +112,7 @@ export function taskCommand(): Command {
             ...(options.defer ? { deferUntil: options.defer } : {}),
             ...(options.deadline ? { deadline: options.deadline } : {}),
             ...(options.deadlineTime ? { deadlineTime: options.deadlineTime } : {}),
+            ...reminderOption(options.remind),
             ...(options.project ? { projectId: options.project } : {}),
             ...(options.status ? { statusId: options.status } : {}),
             ...(options.parent
@@ -228,12 +246,15 @@ export function taskCommand(): Command {
     .option("--clear-description", "remove the description")
     .option("-p, --priority <priority>", "none | low | medium | high | urgent")
     .option("--due <date>", "due date as YYYY-MM-DD")
+    .option("--due-time <time>", "due time as HH:mm; requires a due date")
     .option("--clear-due", "remove the due date")
     .option("--defer <date>", "hide it until YYYY-MM-DD")
     .option("--clear-defer", "remove the defer date")
     .option("--deadline <date>", "hard deadline as YYYY-MM-DD")
     .option("--deadline-time <time>", "deadline time as HH:mm; requires a deadline")
     .option("--clear-deadline", "remove the deadline and its time")
+    .option("--remind <minutes>", "remind this many minutes before the due time")
+    .option("--no-remind", "remove the reminder")
     .option("--parent <idOrKey>", "make it a subtask of this task")
     .option("--no-parent", "detach it from its parent")
     .option(
@@ -299,6 +320,8 @@ export function taskCommand(): Command {
               : options.due
                 ? { dueDate: options.due }
                 : {}),
+            ...(options.dueTime ? { dueTime: options.dueTime } : {}),
+            ...reminderOption(options.remind),
             ...(recurrence !== undefined ? { recurrence } : {}),
             ...(options.clearDefer
               ? { deferUntil: null }

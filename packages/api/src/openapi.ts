@@ -13,10 +13,17 @@ import {
   errorResponseSchema,
   flowQuerySchema,
   flowResponseSchema,
+  listNotificationsQuerySchema,
   listProjectsQuerySchema,
   listStatusesQuerySchema,
   listTasksQuerySchema,
   meResponseSchema,
+  notificationListResponseSchema,
+  notificationPreferencesResponseSchema,
+  notificationResponseSchema,
+  pushSubscriptionRequestSchema,
+  pushSubscriptionResponseSchema,
+  updateNotificationPreferencesRequestSchema,
   moveTaskRequestSchema,
   projectBoardQuerySchema,
   projectBoardResponseSchema,
@@ -108,6 +115,12 @@ const registry = {
   MeResponse: meResponseSchema,
   Workspace: workspaceResponseSchema,
   UpdateWorkspaceRequest: updateWorkspaceRequestSchema,
+  Notification: notificationResponseSchema,
+  NotificationList: notificationListResponseSchema,
+  NotificationPreferences: notificationPreferencesResponseSchema,
+  UpdateNotificationPreferencesRequest: updateNotificationPreferencesRequestSchema,
+  PushSubscriptionRequest: pushSubscriptionRequestSchema,
+  PushSubscription: pushSubscriptionResponseSchema,
   ErrorResponse: errorResponseSchema,
 } as const;
 
@@ -264,6 +277,119 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
             },
             ...notFound,
             ...conflict,
+            ...commonErrors,
+          },
+        },
+      },
+      "/me/notification-preferences": {
+        get: {
+          summary: "The caller's notification preferences for a workspace",
+          description:
+            "Channels, daily digest time, timezone, and the reminder offset new timed tasks receive. Defaults are returned until the caller changes something.",
+          parameters: [workspaceIdParam],
+          responses: {
+            "200": {
+              description: "The preferences",
+              ...jsonContent(ref("NotificationPreferences")),
+            },
+            ...commonErrors,
+          },
+        },
+        patch: {
+          summary: "Update notification preferences",
+          description:
+            "An omitted field is left unchanged; digestTime and timezone set to null clear them.",
+          parameters: [workspaceIdParam],
+          requestBody: {
+            required: true,
+            ...jsonContent(ref("UpdateNotificationPreferencesRequest")),
+          },
+          responses: {
+            "200": {
+              description: "The updated preferences",
+              ...jsonContent(ref("NotificationPreferences")),
+            },
+            ...commonErrors,
+          },
+        },
+      },
+      "/me/push-subscriptions": {
+        post: {
+          summary: "Register a browser for web push",
+          description:
+            "Accepts the browser's PushSubscription.toJSON() shape. Delivery over push starts once the service worker ships; the keys are never returned.",
+          requestBody: {
+            required: true,
+            ...jsonContent(ref("PushSubscriptionRequest")),
+          },
+          responses: {
+            "201": {
+              description: "The registration",
+              ...jsonContent(ref("PushSubscription")),
+            },
+            ...commonErrors,
+          },
+        },
+        delete: {
+          summary: "Remove a push registration",
+          parameters: [
+            {
+              name: "endpoint",
+              in: "query",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            "204": { description: "Removed, or was never registered" },
+            ...commonErrors,
+          },
+        },
+      },
+      "/notifications": {
+        get: {
+          summary: "The caller's notifications in a workspace",
+          description:
+            "Newest first, with the unread total for the workspace. Reminders and daily digests both land here.",
+          parameters: [
+            workspaceIdParam,
+            ...queryParameters(listNotificationsQuerySchema),
+          ],
+          responses: {
+            "200": {
+              description: "A page of notifications",
+              ...jsonContent(ref("NotificationList")),
+            },
+            ...commonErrors,
+          },
+        },
+      },
+      "/notifications/{id}/read": {
+        post: {
+          summary: "Mark a notification read",
+          parameters: [taskIdParam, workspaceIdParam],
+          responses: {
+            "200": {
+              description: "The notification",
+              ...jsonContent(ref("Notification")),
+            },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/notifications/{id}/snooze": {
+        post: {
+          summary: "Snooze a reminder for an hour",
+          description:
+            "Marks the notification read and arms the task's reminder again one hour from now.",
+          parameters: [taskIdParam, workspaceIdParam],
+          responses: {
+            "200": {
+              description: "The notification",
+              ...jsonContent(ref("Notification")),
+            },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
             ...commonErrors,
           },
         },

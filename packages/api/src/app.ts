@@ -7,6 +7,7 @@ import { requestContext } from "./middleware/request-context.js";
 import { bodyLimit } from "./middleware/validate.js";
 import { healthRoutes } from "./routes/health.js";
 import { meRoutes } from "./routes/me.js";
+import { notificationRoutes } from "./routes/notifications.js";
 import { projectRoutes } from "./routes/projects.js";
 import { searchRoutes } from "./routes/search.js";
 import { statusRoutes } from "./routes/statuses.js";
@@ -40,6 +41,9 @@ export function createApiApp(deps: ApiDependencies) {
   };
 
   app.use("/me", authenticate(deps.auth, listWorkspaceIds));
+  app.use("/me/*", authenticate(deps.auth, listWorkspaceIds));
+  app.use("/notifications", authenticate(deps.auth, listWorkspaceIds));
+  app.use("/notifications/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/tasks", authenticate(deps.auth, listWorkspaceIds));
   app.use("/tasks/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/projects", authenticate(deps.auth, listWorkspaceIds));
@@ -52,6 +56,7 @@ export function createApiApp(deps: ApiDependencies) {
   app.use("/workspaces/*", authenticate(deps.auth, listWorkspaceIds));
 
   app.route("/", meRoutes(deps));
+  app.route("/", notificationRoutes(deps));
   app.route("/", projectRoutes(deps));
   app.route("/", statusRoutes(deps));
   app.route("/", searchRoutes(deps));

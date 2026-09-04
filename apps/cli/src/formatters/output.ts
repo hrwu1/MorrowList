@@ -4,6 +4,7 @@ import type {
   DateWarning,
   SavedViewDto,
   SearchResponse,
+  NotificationDto,
   TagListItemDto,
   ProjectDto,
   TaskDto,
@@ -307,6 +308,19 @@ export function formatSavedViewTable(views: readonly SavedViewDto[]): string {
 }
 
 /** Tags with their colour and how many live tasks carry each. */
+/** One line per notification: unread marker, id, when, title, body (GAP-13). */
+export function formatNotificationTable(
+  notifications: readonly NotificationDto[],
+  unreadCount: number,
+): string {
+  if (notifications.length === 0) return "No notifications.";
+  const lines = notifications.map(
+    (notification) =>
+      `${notification.readAt ? " " : "*"} ${notification.id}  ${notification.createdAt.slice(0, 16).replace("T", " ")}  ${notification.title}  ${notification.body.split("\n")[0] ?? ""}`,
+  );
+  return [...lines, `${unreadCount} unread`].join("\n");
+}
+
 export function formatTagTable(tags: readonly TagListItemDto[]): string {
   if (tags.length === 0) return "No tags.";
 

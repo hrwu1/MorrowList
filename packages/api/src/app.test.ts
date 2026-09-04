@@ -35,6 +35,7 @@ const NOW = new Date("2026-08-29T09:00:00.000Z");
 
 let unitOfWork: InMemoryUnitOfWork;
 let app: ReturnType<typeof createApiApp>;
+let deps: ApiDependencies;
 let currentUser: AuthenticatedUser | null;
 let healthy: boolean;
 
@@ -72,7 +73,7 @@ beforeEach(async () => {
     handleRequest: async () => new Response("not used", { status: 404 }),
   };
 
-  const deps: ApiDependencies = {
+  deps = {
     auth,
     unitOfWork,
     workspaceService: new WorkspaceService({ unitOfWork, clock: fixedClock(NOW) }),
@@ -1444,5 +1445,132 @@ describe("saved view endpoints", () => {
       filters: { q: "text" },
     });
     expect(response.status).toBe(422);
+  });
+});
+
+describe("notifications", () => {
+  async function timedTask() {
+    const created = await jsonRequest("/api/v1/tasks", "POST", {
+      title: "Call the bank",
+      dueDate: "2026-08-29",
+      dueTime: "12:00",
+      dueTimezone: "UTC",
+      reminderOffsetMinutes: 15,
+    });
+    expect(created.status).toBe(201);
+    return (await created.json()).data;
+  }
+
+  it("carries the reminder offset on the task and validates it", async () => {
+    const task = await timedTask();
+    expect(task.reminderOffsetMinutes).toBe(15);
+    expect(unitOfWork.data.reminders.get(task.id)?.remindAt).toEqual(
+      new Date("2026-08-29T11:45:00.000Z"),
+    );
+
+    const cleared = await jsonRequest(`/api/v1/tasks/${task.id}`, "PATCH", {
+      reminderOffsetMinutes: null,
+    });
+    expect((await cleared.json()).data.reminderOffsetMinutes).toBeNull();
+    expect(unitOfWork.data.reminders.has(task.id)).toBe(false);
+
+    const invalid = await jsonRequest(`/api/v1/tasks/${task.id}`, "PATCH", {
+      reminderOffsetMinutes: 99_999,
+    });
+    expect(invalid.status).toBe(422);
+  });
+
+  it("lists, reads, and snoozes the caller's notifications", async () => {
+    const task = await timedTask();
+    // Deliver as the worker would.
+    const delivered = await deps.notificationService.deliverDue(
+      new Date("2026-08-29T11:45:00.000Z"),
+    );
+    expect(delivered).toBe(1);
+
+    const listed = await request("/api/v1/notifications?unread=true");
+    expect(listed.status).toBe(200);
+    const body = await listed.json();
+    expect(body.unreadCount).toBe(1);
+    expect(body.data[0]).toMatchObject({
+      kind: "reminder",
+      taskId: task.id,
+      title: "Reminder: Call the bank",
+      readAt: null,
+    });
+
+    const snoozed = await jsonRequest(
+      `/api/v1/notifications/${body.data[0].id}/snooze`,
+      "POST",
+    );
+    expect(snoozed.status).toBe(200);
+    expect((await snoozed.json()).data.readAt).not.toBeNull();
+    expect(unitOfWork.data.reminders.get(task.id)?.remindAt).toEqual(
+      new Date("2026-08-29T10:00:00.000Z"),
+    );
+
+    const read = await jsonRequest(
+      `/api/v1/notifications/${body.data[0].id}/read`,
+      "POST",
+    );
+    expect(read.status).toBe(200);
+    const missing = await jsonRequest(`/api/v1/notifications/${uuidv7()}/read`, "POST");
+    expect(missing.status).toBe(404);
+    expect((await missing.json()).error.code).toBe("NOTIFICATION_NOT_FOUND");
+  });
+
+  it("reads and updates preferences and requires a signed-in user", async () => {
+    const defaults = await request("/api/v1/me/notification-preferences");
+    expect(defaults.status).toBe(200);
+    expect((await defaults.json()).data).toMatchObject({
+      channels: { inApp: true, email: false, push: false },
+      digestTime: null,
+      defaultOffsetMinutes: 30,
+    });
+
+    const updated = await jsonRequest("/api/v1/me/notification-preferences", "PATCH", {
+      digestTime: "08:00",
+      channels: { email: true },
+    });
+    expect(updated.status).toBe(200);
+    expect((await updated.json()).data).toMatchObject({
+      digestTime: "08:00",
+      channels: { inApp: true, email: true, push: false },
+    });
+
+    const empty = await jsonRequest("/api/v1/me/notification-preferences", "PATCH", {});
+    expect(empty.status).toBe(422);
+
+    currentUser = null;
+    expect((await request("/api/v1/notifications")).status).toBe(401);
+    expect((await request("/api/v1/me/notification-preferences")).status).toBe(401);
+  });
+
+  it("registers and removes a push subscription", async () => {
+    const added = await jsonRequest("/api/v1/me/push-subscriptions", "POST", {
+      endpoint: "https://push.example/abc",
+      keys: { p256dh: "p", auth: "a" },
+    });
+    expect(added.status).toBe(201);
+    expect((await added.json()).data).toEqual({
+      endpoint: "https://push.example/abc",
+      createdAt: NOW.toISOString(),
+    });
+
+    const rejected = await jsonRequest("/api/v1/me/push-subscriptions", "POST", {
+      endpoint: "not a url",
+      keys: { p256dh: "p", auth: "a" },
+    });
+    expect(rejected.status).toBe(422);
+
+    const removed = await request(
+      "/api/v1/me/push-subscriptions?endpoint=https%3A%2F%2Fpush.example%2Fabc",
+      { method: "DELETE" },
+    );
+    expect(removed.status).toBe(204);
+    expect(unitOfWork.data.pushSubscriptions.size).toBe(0);
+    expect(
+      (await request("/api/v1/me/push-subscriptions", { method: "DELETE" })).status,
+    ).toBe(422);
   });
 });
