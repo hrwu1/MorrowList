@@ -763,6 +763,181 @@
                   }
                 ]
               },
+              "recurrence": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "freq": {
+                        "type": "string",
+                        "enum": [
+                          "daily",
+                          "weekly",
+                          "monthly",
+                          "yearly"
+                        ]
+                      },
+                      "interval": {
+                        "default": 1,
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 365
+                      },
+                      "mode": {
+                        "default": "schedule",
+                        "type": "string",
+                        "enum": [
+                          "schedule",
+                          "after_completion"
+                        ]
+                      },
+                      "weekdays": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "minItems": 1,
+                            "maxItems": 7,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "mon",
+                                "tue",
+                                "wed",
+                                "thu",
+                                "fri",
+                                "sat",
+                                "sun"
+                              ]
+                            }
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "monthDay": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 31
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "nthWeekday": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "nth": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "const": 1
+                                  },
+                                  {
+                                    "type": "number",
+                                    "const": 2
+                                  },
+                                  {
+                                    "type": "number",
+                                    "const": 3
+                                  },
+                                  {
+                                    "type": "number",
+                                    "const": 4
+                                  },
+                                  {
+                                    "type": "number",
+                                    "const": -1
+                                  }
+                                ]
+                              },
+                              "weekday": {
+                                "type": "string",
+                                "enum": [
+                                  "mon",
+                                  "tue",
+                                  "wed",
+                                  "thu",
+                                  "fri",
+                                  "sat",
+                                  "sun"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "nth",
+                              "weekday"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "until": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "count": {
+                        "default": null,
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1000
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "freq",
+                      "interval",
+                      "mode",
+                      "weekdays",
+                      "monthDay",
+                      "nthWeekday",
+                      "until",
+                      "count"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "seriesId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "rank": {
                 "type": "string"
               },
@@ -1086,6 +1261,8 @@
               "dueTime",
               "dueTimezone",
               "parentTaskId",
+              "recurrence",
+              "seriesId",
               "rank",
               "isCompleted",
               "completedAt",
