@@ -40,8 +40,8 @@ test("a task due in a minute reminds at its due time, and settings persist", asy
 
   // Due 60–120 seconds from now, on the minute; "At the due time" fires at that minute.
   const due = utcDateAndTime(new Date(Date.now() + 120_000));
-  await panel.getByLabel("Due date").fill(due.date);
-  await panel.getByLabel("Due time").fill(due.time);
+  await panel.getByLabel("Planned", { exact: true }).fill(due.date);
+  await panel.getByLabel("Planned time").fill(due.time);
   const reminder = panel.getByLabel("Reminder");
   await expect(reminder).toBeVisible();
   // The default arrives with the save; then it is changed to fire at the due time.
