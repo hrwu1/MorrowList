@@ -329,14 +329,6 @@ export function WorkspaceShell({
               <Icon name="settings" />
               <span>Workspace settings</span>
             </Link>
-            <Link
-              className="workspace-nav__link workspace-nav__link--quiet"
-              href="/settings/notifications"
-              aria-current={pathname === "/settings/notifications" ? "page" : undefined}
-            >
-              <Icon name="bell" />
-              <span>Notification settings</span>
-            </Link>
 
             <details className="workspace-account" key={`account-${pathname}`}>
               <summary>
@@ -925,15 +917,6 @@ function MobileHeader({
             >
               <Icon name="tag" />
               Manage tags
-            </Link>
-            <Link
-              className="workspace-nav__link workspace-nav__link--quiet"
-              href="/settings/notifications"
-              aria-current={pathname === "/settings/notifications" ? "page" : undefined}
-              onClick={closeMenu}
-            >
-              <Icon name="bell" />
-              Notification settings
             </Link>
           </nav>
           <button

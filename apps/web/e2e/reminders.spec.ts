@@ -77,8 +77,10 @@ test("a task due in a minute reminds at its due time, and settings persist", asy
   await expect(page.getByLabel("Title")).toHaveValue("Call the bank");
   await expect(page.getByText("Sent reminder for")).toBeVisible();
 
-  // Preferences: turn email on and set a digest time; both survive a reload.
-  await page.getByRole("link", { name: "Notification settings" }).first().click();
+  // Preferences live behind the inbox, not in the sidebar, which stays short enough for
+  // a laptop viewport: turn email on and set a digest time; both survive a reload.
+  await page.getByRole("link", { name: "Notifications", exact: true }).first().click();
+  await page.getByRole("link", { name: "Change what you receive" }).click();
   const form = page.getByRole("form", { name: "Notification settings" });
   await form.getByLabel("Email").check();
   await form.getByLabel("Send a summary of Today each morning").check();
