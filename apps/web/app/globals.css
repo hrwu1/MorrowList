@@ -4165,6 +4165,100 @@
     margin-bottom: 0.25rem;
     font-weight: 600;
   }
+
+  /* Webhook settings (GAP-18) */
+  .webhook-settings {
+    width: 100%;
+    max-width: var(--content-max);
+    margin: 0 auto;
+  }
+  .webhook-settings__create {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface-raised);
+  }
+  .webhook-settings__field {
+    display: flex;
+    flex: 1 1 12rem;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+  .webhook-settings__field--wide {
+    flex: 2 1 20rem;
+  }
+  .webhook-settings__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .webhook-settings__error {
+    flex: 1 1 100%;
+  }
+  .webhook-settings__secret {
+    display: inline-block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    padding: 0.2rem 0.4rem;
+    border-radius: var(--radius-sm);
+    background: var(--surface-sunken, var(--surface-raised));
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.8125rem;
+  }
+  .webhook-settings__list {
+    display: grid;
+    gap: 0.65rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .webhook-settings__item {
+    display: grid;
+    gap: 0.6rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface-raised);
+  }
+  .webhook-settings__summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .webhook-settings__identity {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  /* Wide on a narrow screen: the log scrolls itself rather than the page. */
+  .webhook-settings__deliveries {
+    display: block;
+    overflow-x: auto;
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+  }
+  .webhook-settings__deliveries th,
+  .webhook-settings__deliveries td {
+    padding: 0.35rem 0.6rem 0.35rem 0;
+    text-align: left;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .webhook-settings__deliveries tr[data-tone="error"] td:nth-child(2) {
+    color: var(--danger, var(--text-primary));
+  }
+  .webhook-settings__deliveries tr[data-tone="success"] td:nth-child(2) {
+    color: var(--success, var(--text-primary));
+  }
 }
 
 /* Command palette and keyboard cheat sheet (GAP-10). The palette borrows the search

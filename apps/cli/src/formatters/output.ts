@@ -11,6 +11,8 @@ import type {
   TaskDto,
   TodayReason,
   TodayViewDto,
+  WebhookDeliveryDto,
+  WebhookSubscriptionDto,
   WorkflowStatusDto,
 } from "@morrowlist/contracts";
 import { describeRecurrence } from "@morrowlist/domain";
@@ -332,6 +334,35 @@ export function formatTagTable(tags: readonly TagListItemDto[]): string {
       const count = `${tag.taskCount} task${tag.taskCount === 1 ? "" : "s"}`;
       const description = tag.description ? `  ${tag.description}` : "";
       return `${name}  ${tag.colorToken.padEnd(7)}  ${count}${description}`;
+    })
+    .join("\n");
+}
+
+/** Endpoints with what they listen for; the secret is not among the fields (GAP-18). */
+export function formatWebhookTable(
+  webhooks: readonly WebhookSubscriptionDto[],
+): string {
+  if (webhooks.length === 0) return "No webhook endpoints.";
+  return webhooks
+    .map((webhook) => {
+      const state = webhook.active ? "active" : "paused";
+      const description = webhook.description ? `  ${webhook.description}` : "";
+      return `${webhook.id}  ${state.padEnd(6)}  ${webhook.url}  [${webhook.eventTypes.join(" ")}]${description}`;
+    })
+    .join("\n");
+}
+
+/** One line per attempt: status, code, when it will next be tried, and why it failed. */
+export function formatWebhookDeliveryTable(
+  deliveries: readonly WebhookDeliveryDto[],
+): string {
+  if (deliveries.length === 0) return "No deliveries.";
+  return deliveries
+    .map((delivery) => {
+      const code = delivery.responseCode === null ? "---" : String(delivery.responseCode);
+      const next = delivery.nextAttemptAt ? `  retry ${delivery.nextAttemptAt}` : "";
+      const error = delivery.error ? `  ${delivery.error}` : "";
+      return `${delivery.id}  ${delivery.status.padEnd(9)}  ${code}  attempt ${delivery.attempt}  ${delivery.eventType}${next}${error}`;
     })
     .join("\n");
 }

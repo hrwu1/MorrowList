@@ -11,6 +11,7 @@ import { tagCommand } from "./commands/tag.js";
 import { taskCommand } from "./commands/task.js";
 import { todayCommand } from "./commands/today.js";
 import { viewCommand } from "./commands/view.js";
+import { webhookCommand } from "./commands/webhook.js";
 import { workspaceCommand } from "./commands/workspace.js";
 import { EXIT, printError } from "./formatters/output.js";
 
@@ -48,6 +49,7 @@ program.addCommand(viewCommand());
 program.addCommand(notificationsCommand());
 program.addCommand(exportCommand());
 program.addCommand(importCommand());
+program.addCommand(webhookCommand());
 
 try {
   await program.parseAsync(process.argv);
