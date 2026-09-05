@@ -85,11 +85,18 @@ export interface RankNeighbours {
 export function neighboursOf(
   task: TaskDto,
   candidates: readonly TaskDto[],
+  /**
+   * Ids to ignore when looking for an anchor. A bulk move restores its own tasks one at a
+   * time, so another task from the same batch is not a position anything can be anchored
+   * to yet: only a card that stayed put is.
+   */
+  exclude: ReadonlySet<string> = new Set(),
 ): RankNeighbours {
   const scope = candidates
     .filter(
       (candidate) =>
         candidate.id !== task.id &&
+        !exclude.has(candidate.id) &&
         candidate.deletedAt === null &&
         candidate.projectId === task.projectId &&
         candidate.statusId === task.statusId,

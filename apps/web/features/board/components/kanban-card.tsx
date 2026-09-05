@@ -8,6 +8,7 @@ import type { CSSProperties, KeyboardEventHandler } from "react";
 import { ageBand, daysInStatus } from "@/features/flow/lib/flow-view";
 import { BlockedBadge } from "@/features/relations/components/blocked-badge";
 import { TagChips } from "@/features/tags/components/tag-chip";
+import { SelectionCheckbox } from "@/features/tasks/components/selection-toolbar";
 import {
   DeadlineBadge,
   DeferBadge,
@@ -69,6 +70,8 @@ export function KanbanCard({
       ref={setNodeRef}
       style={style}
       className="board-card"
+      // The `X` key needs to know which card the focus is inside (GAP-08).
+      data-task-id={task.id}
       data-blocked={task.isBlocked || undefined}
       data-dragging={isDragging || undefined}
       data-done={task.isCompleted || undefined}
@@ -77,12 +80,16 @@ export function KanbanCard({
       // The whole card is the pointer drag source; the handle is the keyboard one. The
       // Move menu opens on press, so it never starts a drag.
       onPointerDown={(event) => {
-        if ((event.target as HTMLElement).closest("select, .board-card__my-day"))
+        if (
+          (event.target as HTMLElement).closest("select, input, .board-card__my-day")
+        ) {
           return;
+        }
         listeners?.onPointerDown?.(event);
       }}
     >
       <div className="board-card__controls">
+        <SelectionCheckbox task={task} />
         <label>
           <span className="ml-visually-hidden">Move {task.title}</span>
           <select

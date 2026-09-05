@@ -18,6 +18,7 @@ import {
 import type { TaskDragData } from "../lib/task-dnd";
 import { hasOpenSubtasks } from "../lib/task-projections";
 
+import { SelectionCheckbox } from "./selection-toolbar";
 import {
   DeadlineBadge,
   DeferBadge,
@@ -70,6 +71,8 @@ export function TaskRow({ task, detailHref, selected, today }: TaskRowProps) {
     <li
       ref={setNodeRef}
       className="task-row"
+      // The `X` key needs to know which row the focus is inside (GAP-08).
+      data-task-id={task.id}
       data-busy={busy || undefined}
       data-done={task.isCompleted || undefined}
       data-dragging={isDragging || undefined}
@@ -82,6 +85,7 @@ export function TaskRow({ task, detailHref, selected, today }: TaskRowProps) {
       }}
     >
       <div className="task-row__main">
+        <SelectionCheckbox task={task} />
         <button
           type="button"
           className="task-row__check"

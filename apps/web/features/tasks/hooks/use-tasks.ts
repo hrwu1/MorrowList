@@ -85,7 +85,7 @@ function boardViewOf(key: QueryKey): Partial<BoardViewOptions> {
  * filters it no longer satisfies. Its parents' progress lines follow the change, so a
  * card reads "1/2" the moment a subtask is ticked rather than after the refetch.
  */
-function patchTaskEverywhere(queryClient: QueryClient, task: TaskDto): void {
+export function patchTaskEverywhere(queryClient: QueryClient, task: TaskDto): void {
   const previous = findCachedTask(queryClient, task.id);
   replaceTaskInCaches(queryClient, task);
 
@@ -221,7 +221,7 @@ function invalidateLists(queryClient: QueryClient): void {
 }
 
 /** Every projection that shows tasks: lists, boards, and the Today and Upcoming views. */
-function invalidateTaskProjections(queryClient: QueryClient): void {
+export function invalidateTaskProjections(queryClient: QueryClient): void {
   invalidateLists(queryClient);
   void queryClient.invalidateQueries({ queryKey: projectKeys.boards() });
   // Every mutation records history, so any open activity list is now behind.

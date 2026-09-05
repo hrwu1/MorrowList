@@ -1,9 +1,16 @@
 "use client";
 
-import type { SavedViewDto } from "@morrowlist/contracts";
+import type { SavedViewDto, TaskDto } from "@morrowlist/contracts";
 import { Alert, Button, EmptyState, Spinner } from "@morrowlist/ui";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { useTaskList } from "../hooks/use-tasks";
 import {
@@ -16,6 +23,11 @@ import {
 } from "../lib/task-view";
 
 import { QuickAdd } from "./quick-add";
+import {
+  SelectionProvider,
+  SelectionToolbar,
+  useSelectionKeys,
+} from "./selection-toolbar";
 import { TaskPanel } from "./task-panel";
 import { TaskRow, TrashRow } from "./task-row";
 
@@ -119,9 +131,96 @@ export function TaskListPage({
   }, [openTaskKey]);
 
   const tasks = data?.data ?? [];
+  // Both sections are one selection: a range that starts in the list and ends in the
+  // deferred section is still one continuous run of rows on screen. Memoised on the joined
+  // ids rather than the arrays, so a refetch that changes nothing does not reset it.
+  const orderKey = [...tasks, ...deferredTasks].map((task) => task.id).join(",");
+  const order = useMemo(() => (orderKey === "" ? [] : orderKey.split(",")), [orderKey]);
 
   return (
-    <div className="list-page">
+    <SelectionProvider order={scope === "trash" ? [] : order}>
+      <TaskListBody
+        scope={scope}
+        heading={heading}
+        subtitle={subtitle}
+        emptyTitle={emptyTitle}
+        emptyDescription={emptyDescription}
+        showQuickAdd={showQuickAdd}
+        savedView={savedView}
+        toolbar={toolbar}
+        view={view}
+        base={base}
+        openTaskKey={openTaskKey}
+        tasks={tasks}
+        deferredTasks={deferredTasks}
+        showDeferredSection={showDeferredSection}
+        isPending={isPending}
+        isError={isError}
+        error={error}
+        onRetry={() => void refetch()}
+        onChangeView={changeView}
+        hrefFor={hrefFor}
+        onClosePanel={closePanel}
+      />
+    </SelectionProvider>
+  );
+}
+
+/**
+ * The list itself. Split from the page only so it renders inside the selection provider
+ * and can therefore use the selection: the toolbar, the checkboxes on the rows, and the
+ * `X` and `Cmd/Ctrl+A` keys all read the same state.
+ */
+function TaskListBody({
+  scope,
+  heading,
+  subtitle,
+  emptyTitle,
+  emptyDescription,
+  showQuickAdd,
+  savedView,
+  toolbar,
+  view,
+  base,
+  openTaskKey,
+  tasks,
+  deferredTasks,
+  showDeferredSection,
+  isPending,
+  isError,
+  error,
+  onRetry,
+  onChangeView,
+  hrefFor,
+  onClosePanel,
+}: {
+  readonly scope: TaskScope;
+  readonly heading: string;
+  readonly subtitle: string;
+  readonly emptyTitle: string;
+  readonly emptyDescription: string;
+  readonly showQuickAdd: boolean;
+  readonly savedView: SavedViewDto | undefined;
+  readonly toolbar: ReactNode | undefined;
+  readonly view: TaskView;
+  readonly base: TaskView;
+  readonly openTaskKey: string | null;
+  readonly tasks: readonly TaskDto[];
+  readonly deferredTasks: readonly TaskDto[];
+  readonly showDeferredSection: boolean;
+  readonly isPending: boolean;
+  readonly isError: boolean;
+  readonly error: unknown;
+  readonly onRetry: () => void;
+  readonly onChangeView: (next: TaskView) => void;
+  readonly hrefFor: (taskKey: string) => string;
+  readonly onClosePanel: () => void;
+}) {
+  const [listRoot, setListRoot] = useState<HTMLDivElement | null>(null);
+  useSelectionKeys(listRoot);
+
+  return (
+    <div className="list-page" ref={setListRoot}>
       <div className="stack">
         <header className="page-header">
           <h1>{heading}</h1>
@@ -135,12 +234,15 @@ export function TaskListPage({
           scope={scope}
           view={view}
           base={base}
-          onChange={changeView}
+          onChange={onChangeView}
           showCompletion={scope === "inbox" || scope === "all"}
           allowSave={scope !== "trash"}
           savedView={savedView}
           resultCount={tasks.length}
         />
+
+        {/* Under the filters, where the selection it acts on begins (GAP-02, GAP-08). */}
+        <SelectionToolbar tasks={[...tasks, ...deferredTasks]} />
 
         {isPending ? (
           <div className="task-list__status">
@@ -149,7 +251,7 @@ export function TaskListPage({
         ) : isError ? (
           <Alert tone="error" title={`${heading} could not be loaded`}>
             <p>{error instanceof Error ? error.message : "Something went wrong."}</p>
-            <Button onClick={() => void refetch()}>Try again</Button>
+            <Button onClick={onRetry}>Try again</Button>
           </Alert>
         ) : tasks.length === 0 ? (
           <EmptyState title={emptyTitle} description={emptyDescription} />
@@ -191,7 +293,7 @@ export function TaskListPage({
         ) : null}
       </div>
 
-      {openTaskKey ? <TaskPanel idOrKey={openTaskKey} onClose={closePanel} /> : null}
+      {openTaskKey ? <TaskPanel idOrKey={openTaskKey} onClose={onClosePanel} /> : null}
     </div>
   );
 }

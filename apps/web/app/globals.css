@@ -2920,6 +2920,62 @@
     bottom: max(3.6rem, calc(env(safe-area-inset-bottom) + 2.85rem));
   }
 
+  /* Multi-select (spec 10.4). The checkbox is quiet until the row is hovered, focused,
+     or selected, so an ordinary list is not a wall of empty boxes; it stays in the tab
+     order and full size throughout, because a control that only exists on hover is
+     unreachable by keyboard and invisible on touch (spec 14). */
+  .selection-check {
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    accent-color: var(--accent);
+    opacity: 0.25;
+    cursor: pointer;
+    transition: opacity 120ms ease;
+  }
+  .selection-check:checked,
+  .selection-check:focus-visible,
+  .task-row:hover .selection-check,
+  .board-card:hover .selection-check,
+  .task-row:focus-within .selection-check,
+  .board-card:focus-within .selection-check {
+    opacity: 1;
+  }
+
+  .selection-toolbar {
+    display: flex;
+    position: sticky;
+    top: 0.25rem;
+    z-index: 30;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-md);
+    background: var(--accent-subtle);
+  }
+  .selection-toolbar[data-busy] {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+  .selection-toolbar__count {
+    margin-right: 0.25rem;
+    color: var(--accent-text);
+    font-size: 0.8125rem;
+  }
+  .selection-toolbar__control {
+    display: flex;
+    align-items: center;
+  }
+  .selection-toolbar .ml-select,
+  .selection-toolbar .ml-input,
+  .selection-toolbar .ml-button {
+    min-height: 2rem;
+    font-size: 0.8125rem;
+  }
+
   /* The undo offer (spec 10.3). A live region that is empty until there is something to
      take back, so a screen reader hears the offer without the focus moving. It sits
      above the connectivity notices, which are rarer and less urgent. */
