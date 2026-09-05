@@ -52,9 +52,10 @@ export const SCOPE_PRESETS = {
   /**
    * An assistant or automation: reshape work, but do not reshape the workspace.
    *
-   * `export:read` and `import:write` are withheld for the same reason as the two write
-   * scopes above: one hands over the entire workspace in a single call, the other creates
-   * a project. Both are decisions a person should make (ADR-006, GAP-07).
+   * `export:read` is granted — it reads nothing the paged read scopes above do not
+   * already reach, it just does it in one call. `import:write` is withheld for the same
+   * reason as the two write scopes: it creates a project, and destroying or inventing
+   * structure stays a human act (ADR-006, GAP-07).
    */
   agent: [
     SCOPES.tasksRead,
@@ -64,6 +65,7 @@ export const SCOPE_PRESETS = {
     SCOPES.tagsWrite,
     SCOPES.activityRead,
     SCOPES.viewsRead,
+    SCOPES.exportRead,
   ],
   /** A dashboard, an export job, a status page. */
   readonly: [
