@@ -4009,3 +4009,173 @@
     font-weight: 600;
   }
 }
+
+/* Command palette and keyboard cheat sheet (GAP-10). The palette borrows the search
+   dialog's shell so the two surfaces are one thing to look at and one thing to style. */
+@layer components {
+  .workspace-nav__key {
+    margin-left: auto;
+    padding: 0.05rem 0.38rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: 0.65rem;
+    font-weight: 600;
+  }
+  .palette-command__button {
+    display: flex;
+    width: 100%;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.5rem 0.65rem;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .palette-command[aria-selected="true"] .palette-command__button {
+    background: var(--surface-sunken);
+  }
+  .palette-command .search-result__eyebrow {
+    flex: none;
+    min-width: 4.5rem;
+  }
+  .palette-command .search-result__title {
+    flex: 1;
+    min-width: 0;
+  }
+  .palette-command__keys {
+    display: flex;
+    flex: none;
+    gap: 0.25rem;
+  }
+  .palette-command__keys kbd {
+    padding: 0 0.3rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: 0.7rem;
+  }
+
+  .cheat-sheet {
+    width: min(44rem, calc(100% - 2rem));
+    max-width: none;
+    margin: 6vh auto auto;
+    padding: 0;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface-overlay);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-lg);
+  }
+  .cheat-sheet::backdrop {
+    background: color-mix(in oklch, var(--text-primary) 28%, transparent);
+    backdrop-filter: blur(1px);
+  }
+  .cheat-sheet__surface {
+    display: flex;
+    max-height: 84vh;
+    flex-direction: column;
+  }
+  .cheat-sheet__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .cheat-sheet__header h2 {
+    margin: 0;
+    font-size: 1rem;
+  }
+  .cheat-sheet__close {
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    line-height: 1.4;
+    cursor: pointer;
+  }
+  .cheat-sheet__body {
+    display: grid;
+    gap: 1.25rem;
+    padding: 1rem;
+    overflow-y: auto;
+    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  }
+  .cheat-sheet__group h3 {
+    margin: 0 0 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .cheat-sheet__list {
+    display: grid;
+    margin: 0;
+    gap: 0.3rem;
+  }
+  .cheat-sheet__row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: 0.85rem;
+  }
+  .cheat-sheet__row[data-unavailable] {
+    color: var(--text-muted);
+  }
+  .cheat-sheet__row dt {
+    min-width: 0;
+  }
+  .cheat-sheet__row dd {
+    display: flex;
+    flex: none;
+    margin: 0;
+    gap: 0.25rem;
+  }
+  .cheat-sheet__row kbd {
+    padding: 0 0.35rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--surface-sunken);
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+  .cheat-sheet__off {
+    font-size: 0.72rem;
+    font-style: italic;
+  }
+  .cheat-sheet__footer {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.9rem 1rem;
+    border-top: 1px solid var(--border-subtle);
+  }
+  .cheat-sheet__setting {
+    display: flex;
+    align-items: start;
+    gap: 0.55rem;
+    font-size: 0.85rem;
+  }
+  .cheat-sheet__setting label {
+    display: grid;
+    gap: 0.15rem;
+  }
+  .cheat-sheet__hint,
+  .cheat-sheet__note {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+}

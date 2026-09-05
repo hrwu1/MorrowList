@@ -38,6 +38,10 @@ import {
 import { purgeOfflineCaches } from "@/features/offline/lib/service-worker";
 import { useCreateProject, useProjects } from "@/features/projects/hooks/use-projects";
 import { SearchBox } from "@/features/search/components/search-box";
+import {
+  useShortcutDialogs,
+  useShortcutSurface,
+} from "@/features/shortcuts/components/shortcuts-provider";
 import { QuickAdd } from "@/features/tasks/components/quick-add";
 import { UndoToast } from "@/features/tasks/components/undo-toast";
 import { useMoveTaskToProject, useTaskList } from "@/features/tasks/hooks/use-tasks";
@@ -121,28 +125,11 @@ export function WorkspaceShell({
     window.requestAnimationFrame(() => restoreFocusTo.current?.focus());
   }
 
-  useEffect(() => {
-    // Single-key shortcuts: N captures, / searches (spec 9.8). Neither fires while
-    // typing or while a dialog is already open.
-    function onKeyDown(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-      const typing =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.tagName === "SELECT" ||
-        target?.isContentEditable;
-      if (inboxOpen || searchOpen || typing || event.metaKey || event.ctrlKey) return;
-      if (event.key.toLowerCase() === "n") {
-        event.preventDefault();
-        openInbox();
-      } else if (event.key === "/") {
-        event.preventDefault();
-        openSearch();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [inboxOpen, searchOpen]);
+  // Capture and search are registry commands like every other shortcut (GAP-10); the
+  // shell only lends the registry the two things only it can do. One listener owns the
+  // keyboard, so "never while typing, never over a dialog" is decided in one place.
+  useShortcutSurface({ openSearch, openCapture: openInbox });
+  const shortcutDialogs = useShortcutDialogs();
 
   async function signOut() {
     // Nothing private may outlive the session on this device (spec 25.3): the worker's
@@ -357,6 +344,21 @@ export function WorkspaceShell({
               <Icon name="settings" />
               <span>Workspace settings</span>
             </Link>
+            {/* A keyboard-first product has to say so somewhere a mouse can reach
+                (spec 14); the sheet itself is generated from the registry. */}
+            {shortcutDialogs ? (
+              <button
+                type="button"
+                className="workspace-nav__link workspace-nav__link--button workspace-nav__link--quiet"
+                onClick={shortcutDialogs.openCheatSheet}
+              >
+                <Icon name="keyboard" />
+                <span>Keyboard shortcuts</span>
+                <kbd className="workspace-nav__key" aria-hidden="true">
+                  ?
+                </kbd>
+              </button>
+            ) : null}
 
             <details className="workspace-account" key={`account-${pathname}`}>
               <summary>
@@ -1215,6 +1217,7 @@ type IconName =
   | "close"
   | "history"
   | "inbox"
+  | "keyboard"
   | "menu"
   | "plus"
   | "search"
@@ -1254,6 +1257,12 @@ function Icon({
       <>
         <path d="M4 5h16v14H4z" />
         <path d="M4 14h4l2 2h4l2-2h4" />
+      </>
+    ),
+    keyboard: (
+      <>
+        <rect x="3" y="6" width="18" height="12" rx="2" />
+        <path d="M7 10h.01M11 10h.01M15 10h.01M17 10h.01M8 14h8" />
       </>
     ),
     menu: <path d="M4 7h16M4 12h16M4 17h16" />,

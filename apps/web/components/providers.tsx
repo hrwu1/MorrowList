@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
 import { OfflineStatus } from "@/features/offline/components/offline-status";
+import { ShortcutsProvider } from "@/features/shortcuts/components/shortcuts-provider";
 import { UndoProvider } from "@/features/tasks/components/undo-toast";
 
 /**
@@ -42,8 +43,11 @@ export function Providers({ children }: { readonly children: ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <OfflineStatus />
       {/* The undo stack lives above every route, so the toast survives the navigation a
-          compensating command may cause (spec 10.3). */}
-      <UndoProvider>{children}</UndoProvider>
+          compensating command may cause (spec 10.3). Shortcuts nest inside it, because
+          the palette's undo command dispatches through the stack (GAP-10). */}
+      <UndoProvider>
+        <ShortcutsProvider>{children}</ShortcutsProvider>
+      </UndoProvider>
     </QueryClientProvider>
   );
 }
