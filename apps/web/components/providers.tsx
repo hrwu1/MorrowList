@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
 import { OfflineStatus } from "@/features/offline/components/offline-status";
+import { UndoProvider } from "@/features/tasks/components/undo-toast";
 
 /**
  * Server-state configuration (spec 23.1, 24.3).
@@ -40,7 +41,9 @@ export function Providers({ children }: { readonly children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <OfflineStatus />
-      {children}
+      {/* The undo stack lives above every route, so the toast survives the navigation a
+          compensating command may cause (spec 10.3). */}
+      <UndoProvider>{children}</UndoProvider>
     </QueryClientProvider>
   );
 }

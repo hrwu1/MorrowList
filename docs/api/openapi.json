@@ -17716,6 +17716,7 @@
     "/tasks/{id}/restore": {
       "post": {
         "summary": "Restore a task from Trash",
+        "description": "`expectedVersion` makes undoing a delete safe: a task that changed since is left alone and answers 409.",
         "parameters": [
           {
             "name": "id",
@@ -17734,6 +17735,15 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "expectedVersion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
             }
           }
         ],
@@ -17760,6 +17770,16 @@
           },
           "403": {
             "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version conflict",
             "content": {
               "application/json": {
                 "schema": {

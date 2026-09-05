@@ -1133,9 +1133,24 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
       "/tasks/{id}/restore": {
         post: {
           summary: "Restore a task from Trash",
-          parameters: [taskIdParam, workspaceIdParam],
+          description:
+            "`expectedVersion` makes undoing a delete safe: a task that changed since is left alone and answers 409.",
+          parameters: [
+            taskIdParam,
+            workspaceIdParam,
+            {
+              name: "expectedVersion",
+              in: "query",
+              required: false,
+              schema: { type: "integer", minimum: 1 },
+            },
+          ],
           responses: {
             "200": { description: "The restored task", ...jsonContent(ref("Task")) },
+            "409": {
+              description: "Version conflict",
+              ...jsonContent(ref("ErrorResponse")),
+            },
             ...commonErrors,
           },
         },

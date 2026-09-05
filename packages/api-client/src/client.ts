@@ -578,10 +578,18 @@ export class ApiClient {
     return response.data;
   }
 
-  async restoreTask(id: string, options: RequestOptions = {}): Promise<TaskDto> {
+  /**
+   * `expectedVersion` is what makes an undo of a delete safe: if the task changed while
+   * the toast was open, the restore is refused rather than overwriting that change.
+   */
+  async restoreTask(
+    id: string,
+    expectedVersion?: number,
+    options: RequestOptions = {},
+  ): Promise<TaskDto> {
     const response = await this.send<{ data: TaskDto }>(
       "POST",
-      `/tasks/${encodeURIComponent(id)}/restore${this.queryString({}, options)}`,
+      `/tasks/${encodeURIComponent(id)}/restore${this.queryString({ expectedVersion }, options)}`,
       undefined,
       options,
     );

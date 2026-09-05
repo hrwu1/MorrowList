@@ -2919,6 +2919,67 @@
   .update-prompt {
     bottom: max(3.6rem, calc(env(safe-area-inset-bottom) + 2.85rem));
   }
+
+  /* The undo offer (spec 10.3). A live region that is empty until there is something to
+     take back, so a screen reader hears the offer without the focus moving. It sits
+     above the connectivity notices, which are rarer and less urgent. */
+  .undo-toast-region {
+    display: contents;
+  }
+  .undo-toast {
+    position: fixed;
+    left: 50%;
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    z-index: 70;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    max-width: calc(100vw - 1.5rem);
+    padding: 0.4rem 0.4rem 0.4rem 0.95rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: var(--surface-overlay);
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-50%);
+  }
+  .undo-toast[data-tone="error"] {
+    border-color: var(--danger);
+    background: var(--danger-subtle);
+  }
+  .undo-toast__label {
+    overflow: hidden;
+    max-width: 22rem;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .undo-toast .ml-button {
+    min-height: 2rem;
+    gap: 0.35rem;
+    padding-inline: 0.7rem;
+  }
+  .undo-toast kbd {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+  }
+  .undo-toast__dismiss {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  .undo-toast__dismiss:hover {
+    background: var(--surface-sunken);
+    color: var(--text-primary);
+  }
   .update-prompt .ml-button {
     min-height: 2rem;
     padding-inline: 0.7rem;

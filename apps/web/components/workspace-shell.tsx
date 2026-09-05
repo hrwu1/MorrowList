@@ -39,6 +39,7 @@ import { purgeOfflineCaches } from "@/features/offline/lib/service-worker";
 import { useCreateProject, useProjects } from "@/features/projects/hooks/use-projects";
 import { SearchBox } from "@/features/search/components/search-box";
 import { QuickAdd } from "@/features/tasks/components/quick-add";
+import { UndoToast } from "@/features/tasks/components/undo-toast";
 import { useMoveTaskToProject, useTaskList } from "@/features/tasks/hooks/use-tasks";
 import {
   destinationDroppableId,
@@ -398,6 +399,8 @@ export function WorkspaceShell({
         <output className="ml-visually-hidden" aria-live="polite">
           {dnd.announcement}
         </output>
+
+        <UndoToast />
 
         <DragOverlay>
           {dnd.active ? (

@@ -14,7 +14,9 @@ import { moveTaskInBoard, type BoardPlacement } from "../lib/board-view";
 
 import { activityKeys } from "@/features/activity/hooks/use-activity";
 import { flowKeys } from "@/features/flow/hooks/use-flow";
-import { taskKeys } from "@/features/tasks/hooks/use-tasks";
+import { cachedTasks, taskKeys } from "@/features/tasks/hooks/use-tasks";
+import { useUndo } from "@/features/tasks/hooks/use-undo";
+import { neighboursOf, undoLabel } from "@/features/tasks/lib/undo";
 import { workspaceKeys } from "@/features/workspace/hooks/use-workspace";
 import { apiClient } from "@/lib/api-client";
 
@@ -42,6 +44,7 @@ export interface MoveBoardTaskInput {
  */
 export function useMoveBoardTask(projectId: string) {
   const queryClient = useQueryClient();
+  const { offer } = useUndo();
   // Every cached variant of this board (subtasks hidden or shown) moves together.
   const boardKey = projectKeys.projectBoards(projectId);
 
@@ -70,6 +73,9 @@ export function useMoveBoardTask(projectId: string) {
       const previous = queryClient.getQueriesData<ProjectBoardResponse>({
         queryKey: boardKey,
       });
+      // Where the card sits now, read before the optimistic patch moves it: this is the
+      // position an undo has to restore.
+      const origin = neighboursOf(input.task, cachedTasks(queryClient));
       queryClient.setQueriesData<ProjectBoardResponse>(
         { queryKey: boardKey },
         (current) =>
@@ -81,14 +87,14 @@ export function useMoveBoardTask(projectId: string) {
               })
             : current,
       );
-      return { previous };
+      return { previous, origin };
     },
     onError: (_error, _input, context) => {
       for (const [key, value] of context?.previous ?? []) {
         queryClient.setQueryData(key, value);
       }
     },
-    onSuccess: (result, input) => {
+    onSuccess: (result, input, context) => {
       queryClient.setQueriesData<ProjectBoardResponse>(
         { queryKey: boardKey },
         (current) =>
@@ -101,6 +107,23 @@ export function useMoveBoardTask(projectId: string) {
               })
             : current,
       );
+      // Undo puts the card back in the column it came from and between the same two
+      // cards, using the version this move produced: a card someone else has since moved
+      // reports a conflict instead of being dragged back over their change (spec 24.3).
+      offer({
+        id: result.task.id,
+        label: undoLabel("Moved", result.task),
+        compensate: async () => {
+          await apiClient.moveTask(result.task.id, {
+            projectId: input.task.projectId,
+            ...(input.task.statusId ? { statusId: input.task.statusId } : {}),
+            ...context.origin,
+            expectedVersion: result.task.version,
+          });
+          void queryClient.invalidateQueries({ queryKey: boardKey });
+          void queryClient.invalidateQueries({ queryKey: taskKeys.all });
+        },
+      });
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: boardKey });
