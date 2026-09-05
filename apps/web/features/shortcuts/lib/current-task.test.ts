@@ -99,7 +99,9 @@ describe("findTaskInCaches", () => {
 
   it("finds a task inside a Today section", () => {
     const entries = [
-      { data: { date: "2026-09-05", sections: [{ reason: "my_day", tasks: [wanted] }] } },
+      {
+        data: { date: "2026-09-05", sections: [{ reason: "my_day", tasks: [wanted] }] },
+      },
     ];
     expect(findTaskInCaches(entries, "ML-7")).toBe(wanted);
   });
@@ -116,6 +118,8 @@ describe("findTaskInCaches", () => {
   });
 
   it("answers nothing for a key no projection holds", () => {
-    expect(findTaskInCaches([{ data: [other] }, undefined, null], "ML-7")).toBeUndefined();
+    expect(
+      findTaskInCaches([{ data: [other] }, undefined, null], "ML-7"),
+    ).toBeUndefined();
   });
 });

@@ -16,7 +16,12 @@ import {
   type ShortcutSurfaceActions,
 } from "../hooks/use-shortcut-commands";
 import { currentTaskKey } from "../lib/current-task";
-import { CHORD_TIMEOUT_MS, isModalOpen, isTypingTarget, strokeChord } from "../lib/keys";
+import {
+  CHORD_TIMEOUT_MS,
+  isModalOpen,
+  isTypingTarget,
+  strokeChord,
+} from "../lib/keys";
 import {
   browserStorage,
   readSingleKeyEnabled,
@@ -97,6 +102,7 @@ export function ShortcutsProvider({ children }: { readonly children: ReactNode }
   // The task that was current when a dialog opened. Focus moves into the dialog, so
   // without this the palette would forget the row the user was standing on.
   const pinnedTask = useRef<string | null>(null);
+  const dialogOpenRef = useRef(false);
   const pendingChord = useRef<string | null>(null);
   const pendingTimer = useRef<number | null>(null);
 
@@ -127,23 +133,23 @@ export function ShortcutsProvider({ children }: { readonly children: ReactNode }
     show(true);
   }, []);
 
-  const openPalette = useCallback(
-    () => openDialog(setPaletteOpen),
-    [openDialog],
-  );
-  const openCheatSheet = useCallback(
-    () => openDialog(setCheatSheetOpen),
-    [openDialog],
-  );
+  const openPalette = useCallback(() => openDialog(setPaletteOpen), [openDialog]);
+  const openCheatSheet = useCallback(() => openDialog(setCheatSheetOpen), [openDialog]);
 
   const closeDialog = useCallback((show: (open: boolean) => void) => {
     show(false);
-    pinnedTask.current = null;
     setDialogContext(IDLE_CONTEXT);
     window.requestAnimationFrame(() => restoreFocusTo.current?.focus());
   }, []);
 
-  const pinnedTaskKey = useCallback(() => pinnedTask.current, []);
+  // The pin is only the answer while a dialog is on screen. It is never cleared on
+  // close: a command chosen in the palette runs from the click handler, before the
+  // close has re-rendered, and reading a ref set during render is what makes that
+  // ordering safe rather than a race.
+  const pinnedTaskKey = useCallback(
+    () => (dialogOpenRef.current ? pinnedTask.current : null),
+    [],
+  );
 
   const commands = useShortcutCommands({
     surface,
@@ -172,6 +178,7 @@ export function ShortcutsProvider({ children }: { readonly children: ReactNode }
   enabledRef.current = singleKeyEnabled;
   const activeRef = useRef(surface !== null);
   activeRef.current = surface !== null;
+  dialogOpenRef.current = paletteOpen || cheatSheetOpen;
 
   useEffect(() => {
     function clearPending() {
@@ -239,7 +246,11 @@ export function ShortcutsProvider({ children }: { readonly children: ReactNode }
 
       {/* One live region for every shortcut, so a keyboard user hears the result of a
           key whose effect may be off screen (spec 14). */}
-      <output className="ml-visually-hidden" aria-live="polite">
+      <output
+        className="ml-visually-hidden"
+        aria-live="polite"
+        aria-label="Keyboard shortcut result"
+      >
         {announcement}
       </output>
 

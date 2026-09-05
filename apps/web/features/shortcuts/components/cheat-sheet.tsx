@@ -88,7 +88,11 @@ export function CheatSheet({
 
         <div className="cheat-sheet__body">
           {groups.map(({ group, commands: entries }) => (
-            <section key={group} className="cheat-sheet__group" aria-labelledby={`${group}-heading`}>
+            <section
+              key={group}
+              className="cheat-sheet__group"
+              aria-labelledby={`${group}-heading`}
+            >
               <h3 id={`${group}-heading`}>{group}</h3>
               <dl className="cheat-sheet__list">
                 {entries.map((command) => {
@@ -105,7 +109,9 @@ export function CheatSheet({
                       <dt>{command.title}</dt>
                       <dd>
                         {keys.length > 0 ? (
-                          keys.map((chord) => <kbd key={chord}>{chordLabel(chord)}</kbd>)
+                          keys.map((chord) => (
+                            <kbd key={chord}>{chordLabel(chord)}</kbd>
+                          ))
                         ) : (
                           <span className="cheat-sheet__off">off</span>
                         )}
@@ -129,8 +135,8 @@ export function CheatSheet({
             <label htmlFor={toggleId}>
               Single-key shortcuts
               <span className="cheat-sheet__hint">
-                Off leaves only Ctrl/⌘ K and ?, for anyone who triggers keys by accident.
-                Saved on this device.
+                Off leaves only Ctrl/⌘ K and ?, for anyone who triggers keys by
+                accident. Saved on this device.
               </span>
             </label>
           </div>

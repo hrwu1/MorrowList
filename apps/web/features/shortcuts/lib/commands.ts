@@ -23,7 +23,10 @@ export interface TaskShortcutActions {
   readonly removeFromDay: (task: TaskDto) => Promise<void>;
   readonly remove: (task: TaskDto) => Promise<void>;
   /** Moves to the adjacent open column and answers with its name. */
-  readonly moveByOneColumn: (task: TaskDto, direction: 1 | -1) => Promise<string | null>;
+  readonly moveByOneColumn: (
+    task: TaskDto,
+    direction: 1 | -1,
+  ) => Promise<string | null>;
   /** Follows the focused row's own detail link, so navigation stays in one place. */
   readonly openDetail: (task: TaskDto) => void;
 }
@@ -61,9 +64,7 @@ export function buildCommands(deps: ShortcutDeps): readonly Command[] {
    * with no subject says so rather than failing silently, because a keyboard user has no
    * hover state to tell them which task the app thinks is current (spec 14).
    */
-  function onTask(
-    run: (task: TaskDto) => void | Promise<void>,
-  ): () => Promise<void> {
+  function onTask(run: (task: TaskDto) => void | Promise<void>): () => Promise<void> {
     return async () => {
       const task = await deps.currentTask();
       if (!task) {

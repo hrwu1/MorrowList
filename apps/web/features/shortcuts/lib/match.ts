@@ -45,7 +45,8 @@ export function fuzzyMatch(query: string, text: string): FuzzyMatch | null {
     else score -= Math.min(index - cursor, 10) * GAP_PENALTY;
 
     const last = ranges[ranges.length - 1];
-    if (last && last.end === index) ranges[ranges.length - 1] = { ...last, end: index + 1 };
+    if (last && last.end === index)
+      ranges[ranges.length - 1] = { ...last, end: index + 1 };
     else ranges.push({ start: index, end: index + 1 });
 
     previousIndex = index;
@@ -83,9 +84,7 @@ export function rankCommands<T extends Rankable>(
       ranked.push({ command, ranges: onTitle.ranges, score: onTitle.score });
       continue;
     }
-    const onKeywords = command.keywords
-      ? fuzzyMatch(query, command.keywords)
-      : null;
+    const onKeywords = command.keywords ? fuzzyMatch(query, command.keywords) : null;
     if (onKeywords) {
       // Found by a synonym rather than by what is on screen; rank it below the rest.
       ranked.push({ command, ranges: [], score: onKeywords.score - 40 });

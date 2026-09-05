@@ -146,14 +146,16 @@ export function useShortcutCommands(input: CommandsInput): readonly Command[] {
       const status = adjacentStatus(detail.statuses, task.statusId, direction);
       if (!status) return null;
       await moveToStatus.mutateAsync({ task, status });
+      // The card is re-parented into another column, so React drops the element that
+      // had focus. Without this the next shortcut would find no task and the keyboard
+      // user would be back at the top of the page (spec 14).
+      refocusTask(task.key);
       return status.name;
     },
     openDetail: (task) => {
       // The row and the card already own the href for their own projection; following
       // their link keeps one definition of "open this task" rather than a second one.
-      const link =
-        document.getElementById(`task-link-${task.key}`) ??
-        document.getElementById(`board-task-link-${task.key}`);
+      const link = taskLink(task.key);
       if (link) link.click();
       else router.push(`/tasks/${encodeURIComponent(task.key)}`);
     },
@@ -172,6 +174,47 @@ export function useShortcutCommands(input: CommandsInput): readonly Command[] {
   };
 
   return buildCommands(deps);
+}
+
+/** A task's own title link, in whichever projection is on screen. */
+function taskLink(key: string): HTMLElement | null {
+  return (
+    document.getElementById(`task-link-${key}`) ??
+    document.getElementById(`board-task-link-${key}`)
+  );
+}
+
+/** How long a card is given to settle before focus stops chasing it, and how often. */
+const REFOCUS_WINDOW_MS = 1_200;
+const REFOCUS_INTERVAL_MS = 60;
+
+/**
+ * Put focus back on a task whose element React replaced.
+ *
+ * A column move re-parents the card, and the refetch that follows the mutation replaces
+ * it a second time a moment later, so one attempt is not enough. Focus is restored for
+ * as long as the card keeps moving, and only while nothing else has claimed it: a person
+ * who tabbed away in the meantime keeps where they went.
+ *
+ * A timer rather than an animation frame, which a browser suspends while the tab is in
+ * the background — the move can complete there, and focus still has to end up right.
+ */
+function refocusTask(key: string): void {
+  const deadline = Date.now() + REFOCUS_WINDOW_MS;
+  const attempt = () => {
+    const active = document.activeElement;
+    const claimed = active !== null && active !== document.body;
+    if (
+      claimed &&
+      active.id !== `task-link-${key}` &&
+      active.id !== `board-task-link-${key}`
+    ) {
+      return;
+    }
+    taskLink(key)?.focus();
+    if (Date.now() < deadline) window.setTimeout(attempt, REFOCUS_INTERVAL_MS);
+  };
+  window.setTimeout(attempt, 0);
 }
 
 /**

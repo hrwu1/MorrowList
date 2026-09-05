@@ -79,7 +79,9 @@ export function CommandPalette({
   // Search only takes over when the words are not a command; that keeps "complete" a
   // command rather than a query, which is what a person pressing Ctrl+K expects.
   const searchable =
-    matches.length === 0 && query.trim().length >= SEARCH_MIN_LENGTH ? query.trim() : "";
+    matches.length === 0 && query.trim().length >= SEARCH_MIN_LENGTH
+      ? query.trim()
+      : "";
   const debounced = useDebounced(searchable, SEARCH_DEBOUNCE_MS);
   const results = useSearch(debounced, {}, { limit: RESULT_LIMIT });
   const page = results.data?.pages[0];
@@ -114,8 +116,10 @@ export function CommandPalette({
   function choose(index: number) {
     const match = matches[index];
     if (match) {
-      onDismiss();
+      // Started before the dialog closes, so the command still sees the task the user
+      // was standing on when they opened the palette.
       void match.command.run();
+      onDismiss();
       return;
     }
     const item = items[index];
@@ -194,7 +198,12 @@ export function CommandPalette({
         </div>
 
         {matches.length > 0 ? (
-          <ul id={listId} className="search-results" role="listbox" aria-label="Commands">
+          <ul
+            id={listId}
+            className="search-results"
+            role="listbox"
+            aria-label="Commands"
+          >
             {matches.map(({ command, ranges }, index) => (
               <li
                 key={command.id}

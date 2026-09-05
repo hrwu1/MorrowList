@@ -45,9 +45,7 @@ export function focusedTaskKey(doc: Document): string | null {
   const direct = taskKeyFromElementId(active.id);
   if (direct) return direct;
   const container = active.closest(".task-row, .board-card");
-  const link = container?.querySelector(
-    '[id^="task-link-"], [id^="board-task-link-"]',
-  );
+  const link = container?.querySelector('[id^="task-link-"], [id^="board-task-link-"]');
   return taskKeyFromElementId(link?.id ?? null);
 }
 
@@ -93,7 +91,8 @@ export function findTaskInCaches(
 const MAX_DEPTH = 6;
 
 function searchEntry(value: unknown, key: string, depth: number): TaskDto | undefined {
-  if (depth > MAX_DEPTH || value === null || typeof value !== "object") return undefined;
+  if (depth > MAX_DEPTH || value === null || typeof value !== "object")
+    return undefined;
   if (isTask(value)) return value.key === key ? value : undefined;
   if (Array.isArray(value)) {
     for (const item of value) {

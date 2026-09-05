@@ -117,7 +117,8 @@ export function isPendingPrefix(
     (command) =>
       isAvailable(command, context) &&
       command.keys.some(
-        (chord) => isChordPrefix(prefix, chord) && chordIsEnabled(command, chord, options),
+        (chord) =>
+          isChordPrefix(prefix, chord) && chordIsEnabled(command, chord, options),
       ),
   );
 }
@@ -145,7 +146,9 @@ export interface ShortcutConflict {
  * and a single key that is also the first step of a sequence (pressing it would either
  * swallow the sequence or delay the single key). A unit test fails on any of them.
  */
-export function findConflicts(commands: readonly Command[]): readonly ShortcutConflict[] {
+export function findConflicts(
+  commands: readonly Command[],
+): readonly ShortcutConflict[] {
   const conflicts: ShortcutConflict[] = [];
   for (let i = 0; i < commands.length; i += 1) {
     for (let j = i + 1; j < commands.length; j += 1) {
@@ -162,7 +165,8 @@ export function findConflicts(commands: readonly Command[]): readonly ShortcutCo
             });
           } else if (isChordPrefix(chordA, chordB) || isChordPrefix(chordB, chordA)) {
             conflicts.push({
-              chord: chordSteps(chordA).length < chordSteps(chordB).length ? chordA : chordB,
+              chord:
+                chordSteps(chordA).length < chordSteps(chordB).length ? chordA : chordB,
               commands: [a.id, b.id],
               reason: "prefix",
             });
