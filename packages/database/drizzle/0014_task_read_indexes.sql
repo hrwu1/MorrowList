@@ -1,0 +1,34 @@
+-- Reviewed migration (spec 32).
+--
+-- Two partial indexes for reads that the GAP-23 query-discipline pass caught scanning the
+-- whole task table at the spec 29.1 reference scale (100,000 tasks, 10,000 of them live).
+-- Both are pure additions: no column, constraint, or row changes.
+--
+-- 1. Completed history — `GET /tasks?isCompleted=true&sort=updatedAt&order=desc` (spec
+--    9.6). Measured before: Parallel Seq Scan over 100,000 rows plus a top-N heapsort,
+--    26.64 ms and 6,086 buffers to return 51 rows. The index carries the sort order, so
+--    the top-N becomes an index-only scan of the first page. Partial on the completed,
+--    undeleted rows because that is the only set this view reads, and it keeps the index
+--    off the live tasks that every other query touches.
+--
+-- 2. Today — `GET /views/today` (spec 9.2). It could only use `tasks_due_idx`, which
+--    covers every task in the workspace including all the history, so the predicate threw
+--    away 99,895 of the 100,110 rows it walked: 26.26 ms and 53,087 buffers for 215 rows.
+--    Restricting the index to live, open tasks cuts the walk to the 10,000 rows that can
+--    possibly appear in Today, and carrying `due_date, rank, id` matches the view's sort
+--    so nothing has to be re-sorted. It serves Upcoming and the due-date filters too.
+--
+-- `rank` is `varchar(64) COLLATE "C"` since migration 0001, so the index inherits that
+-- collation and orders by code point. Spelling `COLLATE "C"` again here would change
+-- nothing and would drift from `tasks_board_idx`, which relies on the column the same way
+-- (see 0001). An integration test proves the ordering rather than trusting the comment.
+--
+-- Concurrency note for an operator with a large live table: these are plain CREATE INDEX
+-- statements and take an ACCESS SHARE-blocking lock for the duration. At the reference
+-- scale that is well under a second. A deployment that cannot take it should create the
+-- same two indexes with CREATE INDEX CONCURRENTLY out of band first; this migration's
+-- IF NOT EXISTS then makes it a no-op.
+
+CREATE INDEX IF NOT EXISTS "tasks_completed_recent_idx" ON "tasks" USING btree ("workspace_id","updated_at" DESC,"id" DESC) WHERE "tasks"."deleted_at" IS NULL AND "tasks"."completed_at" IS NOT NULL;
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "tasks_open_due_idx" ON "tasks" USING btree ("workspace_id","due_date","rank","id") WHERE "tasks"."deleted_at" IS NULL AND "tasks"."completed_at" IS NULL;

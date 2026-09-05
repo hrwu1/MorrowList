@@ -122,6 +122,20 @@ export const tasks = pgTable(
       .where(
         sql`${table.deletedAt} IS NULL AND ${table.completedAt} IS NULL AND ${table.deadline} IS NOT NULL`,
       ),
+    // The completed history read, newest first (spec 9.6, migration 0014). Partial on the
+    // completed rows, which is the only set that view touches, and carrying the sort order
+    // so the first page is an index-only scan rather than a top-N sort over the table.
+    index("tasks_completed_recent_idx")
+      .on(table.workspaceId, table.updatedAt.desc(), table.id.desc())
+      .where(sql`${table.deletedAt} IS NULL AND ${table.completedAt} IS NOT NULL`),
+    // Live, open tasks by due date, in the order Today and Upcoming read them (spec 9.2,
+    // 9.3, migration 0014). `tasks_due_idx` covers the whole workspace including history,
+    // so those views walked every row; this one is restricted to the tasks that can
+    // appear in them. `rank` is COLLATE "C" on the column (migration 0001), so the index
+    // orders by code point — `tasks.integration.test.ts` proves it.
+    index("tasks_open_due_idx")
+      .on(table.workspaceId, table.dueDate, table.rank, table.id)
+      .where(sql`${table.deletedAt} IS NULL AND ${table.completedAt} IS NULL`),
     // Invariant 3: a due time cannot exist without a due date (spec 8.2).
     check(
       "tasks_due_time_requires_date",

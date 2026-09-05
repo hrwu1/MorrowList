@@ -177,6 +177,113 @@ describe("task number allocation", () => {
   });
 });
 
+describe("task read indexes (migration 0014)", () => {
+  /** A live task with a due date, inserted directly so the row shape is under our control. */
+  async function insertLiveTask(taskNumber: number, rank: string, dueDate: string) {
+    await handle.pool.query(
+      `insert into tasks (id, workspace_id, task_number, title, rank, due_date, priority,
+         version, created_by_actor_kind, created_by_actor_id, last_actor_kind,
+         last_actor_id, created_at, updated_at)
+       values ($1, $2, $3, $4, $5, $6, 'none', 1, 'user', 'u', 'user', 'u', now(), now())`,
+      [uuidv7(), workspaceId, taskNumber, `Task ${rank}`, rank, dueDate],
+    );
+  }
+
+  async function indexDefinition(name: string): Promise<string> {
+    const { rows } = await handle.pool.query<{ indexdef: string }>(
+      "select indexdef from pg_indexes where tablename = 'tasks' and indexname = $1",
+      [name],
+    );
+    return rows[0]?.indexdef ?? "";
+  }
+
+  it("indexes the completed history in the order that view reads it", async () => {
+    // Without this the completed list is a sequential scan of every task ever created
+    // plus a top-N sort; the partial index makes the first page an index-only scan.
+    const definition = await indexDefinition("tasks_completed_recent_idx");
+    expect(definition).toContain("(workspace_id, updated_at DESC, id DESC)");
+    expect(definition).toContain("(deleted_at IS NULL)");
+    expect(definition).toContain("(completed_at IS NOT NULL)");
+  });
+
+  it("indexes live, open tasks by due date for Today and Upcoming", async () => {
+    const definition = await indexDefinition("tasks_open_due_idx");
+    expect(definition).toContain("(workspace_id, due_date, rank, id)");
+    expect(definition).toContain("(deleted_at IS NULL)");
+    expect(definition).toContain("(completed_at IS NULL)");
+  });
+
+  it("stores the rank position of tasks_open_due_idx in the C collation", async () => {
+    // The index inherits the column's collation (migration 0001), and `pg_get_indexdef`
+    // does not print a collation that matches the column — so the catalogue is the only
+    // place this is visible. A locale-aware rank position here would order a board
+    // differently from the table it indexes.
+    const { rows } = await handle.pool.query<{
+      attname: string;
+      collname: string | null;
+    }>(
+      `select a.attname, coll.collname
+         from pg_index i
+         join pg_class ci on ci.oid = i.indexrelid
+         join lateral unnest(i.indkey::int[]) with ordinality as k(attnum, ord) on true
+         join pg_attribute a on a.attrelid = i.indrelid and a.attnum = k.attnum
+         left join pg_collation coll on coll.oid = (i.indcollation::oid[])[k.ord - 1]
+        where ci.relname = 'tasks_open_due_idx'
+        order by k.ord`,
+    );
+
+    expect(rows.map((row) => row.attname)).toEqual([
+      "workspace_id",
+      "due_date",
+      "rank",
+      "id",
+    ]);
+    expect(rows.find((row) => row.attname === "rank")?.collname).toBe("C");
+  });
+
+  it("returns code-point rank order straight from the index, with no sort", async () => {
+    // The behavioural half of the test above. Under the cluster's en_US.UTF-8 default,
+    // 'aa' sorts before 'aZ'; from a C-collated index it does not. Sorting and sequential
+    // scans are disabled for this transaction so the planner has to answer from the
+    // index itself — otherwise a re-sort could mask a wrongly ordered index.
+    const ranks = ["a0", "a9", "aZ", "aa", "az", "b0"];
+    for (const [index, rank] of ranks.entries()) {
+      await insertLiveTask(300 + index, rank, "2026-09-05");
+    }
+
+    const client = await handle.pool.connect();
+    try {
+      await client.query("begin");
+      await client.query("set local enable_seqscan = off");
+      await client.query("set local enable_sort = off");
+
+      const query = `select rank from tasks
+         where workspace_id = $1
+           and deleted_at is null
+           and completed_at is null
+           and due_date <= $2
+         order by due_date, rank, id`;
+
+      const plan = await client.query<{ "QUERY PLAN": string }>(
+        `explain (costs off) ${query}`,
+        [workspaceId, "2026-09-05"],
+      );
+      const planText = plan.rows.map((row) => row["QUERY PLAN"]).join("\n");
+      expect(planText).toContain("tasks_open_due_idx");
+      expect(planText).not.toContain("Sort");
+
+      const { rows } = await client.query<{ rank: string }>(query, [
+        workspaceId,
+        "2026-09-05",
+      ]);
+      expect(rows.map((row) => row.rank)).toEqual(ranks);
+    } finally {
+      await client.query("rollback");
+      client.release();
+    }
+  });
+});
+
 describe("rank ordering", () => {
   it("orders ranks by code point, not by locale", async () => {
     // Guards migration 0001: under the default en_US.UTF-8 collation PostgreSQL sorts

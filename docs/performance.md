@@ -34,6 +34,11 @@ drives the real HTTP endpoints.
 > contention rather than the application. A quiet machine is materially faster — see
 > [Sequential latency](#sequential-latency-one-request-at-a-time) below.
 
+> **These p95s are provisional.** A clean re-run on a quiet machine is pending; until it
+> lands, read the table below as "no budget is breached even under this much contention",
+> not as the product's latency. The `EXPLAIN` plans further down are not provisional —
+> plan shapes and buffer counts do not move with the load average.
+
 ## The dataset
 
 Built by `scripts/seed-scale.mjs --scale reference`, matching spec 29.1:
@@ -80,6 +85,12 @@ of the three runs' p95; the last column is their full spread.
 
 **Every spec 29.2 budget is met.** No scenario returned an error in any run.
 
+These runs predate migration `0014_task_read_indexes.sql`, which landed straight after the
+query-discipline pass below. Two rows of this table are therefore pessimistic by a known
+amount: Today's query drops from 35.9 ms to 7.8 ms and the completed history's from
+22.7 ms to 0.3 ms, so the end-to-end p95s for those two scenarios should fall. The pending
+quiet-machine re-run will be the first with 0014 applied.
+
 The 500-card board is the only scenario without comfortable headroom: its median p95 is
 88% of the budget, and in the busiest of the three runs — load average 17.4 — it went over
 at 443 ms. Nothing else came within half of its budget in any run.
@@ -112,66 +123,91 @@ The real SQL was captured from the server by turning on `log_min_duration_statem
 the benchmark database, so these are the statements the application actually issues, not
 a hand-written approximation.
 
-Most reads are already index scans and cost a few milliseconds. Two do not.
+Most reads are already index scans and cost a few milliseconds. Two were not, and
+**migration `0014_task_read_indexes.sql` fixes both.** The plans below are a matched pair:
+the same 100,000-row dataset, captured with the migration applied and again with its two
+indexes dropped, so the comparison is not across two seeds or two machines.
 
-### 1. Completed history is a sequential scan
+### 1. Completed history was a sequential scan
 
-`GET /tasks?isCompleted=true&sort=updatedAt&order=desc` scans the whole task table and
-top-N sorts it:
+`GET /tasks?isCompleted=true&sort=updatedAt&order=desc` had to read every task ever
+created and top-N sort it. The cost grew with the history, which is the part of the table
+that only ever grows.
 
 ```text
-Limit (actual time=25.141..26.569 rows=51 loops=1)
-  Buffers: shared hit=6086
-  ->  Gather Merge
+-- before 0014
+Limit (actual time=20.937..22.678 rows=51 loops=1)
+  Buffers: shared hit=5961 read=120
+  ->  Gather Merge  (Workers Launched: 2)
         ->  Sort (Sort Key: updated_at DESC, id DESC; top-N heapsort)
-              ->  Parallel Seq Scan on tasks (rows=28236.67 loops=3)
+              ->  Parallel Seq Scan on tasks (rows=28200 loops=3)
                     Filter: deleted_at IS NULL AND completed_at IS NOT NULL AND workspace_id = ...
-Execution Time: 26.640 ms
+                    Rows Removed by Filter: 5133
+Execution Time: 22.708 ms
+
+-- after 0014
+Limit (actual time=0.084..0.268 rows=51 loops=1)
+  Buffers: shared hit=54 read=1
+  ->  Index Only Scan using tasks_completed_recent_idx on tasks
+        Index Cond: workspace_id = ...
+        Heap Fetches: 51
+Execution Time: 0.297 ms
 ```
 
-The cost grows with the whole history, which is the part of the table that only ever
-grows.
+### 2. Today read the whole workspace
 
-### 2. Today reads the whole workspace
-
-`GET /views/today` uses `tasks_due_idx`, but that index covers every task in the
-workspace, so the predicate throws almost all of them away:
+`GET /views/today` could only use `tasks_due_idx`, which covers every task in the
+workspace, history included — so the predicate threw away 99,725 of the rows it walked.
 
 ```text
-Limit (actual time=17.368..26.240 rows=215 loops=1)
-  Buffers: shared hit=53087
+-- before 0014
+Limit (actual time=24.418..35.911 rows=275 loops=1)
+  Buffers: shared hit=53053 read=1
   ->  Incremental Sort (Sort Key: due_date, rank COLLATE "C", id)
         ->  Index Scan using tasks_due_idx on tasks
               Index Cond: workspace_id = ...
               Filter: ((due_date <= today AND (defer_until IS NULL OR defer_until <= today))
                        OR id = ANY (day plans for today))
-              Rows Removed by Filter: 99895
-Execution Time: 26.261 ms
+              Rows Removed by Filter: 99725
+Execution Time: 35.934 ms
+
+-- after 0014
+Limit (actual time=0.023..7.780 rows=275 loops=1)
+  Buffers: shared hit=9316 read=7
+  ->  Index Scan using tasks_open_due_idx on tasks
+        Index Cond: workspace_id = ...
+        Filter: (same predicate)
+        Rows Removed by Filter: 9725
+Execution Time: 7.823 ms
 ```
 
-53,000 buffer hits to return 215 rows.
+The sort disappears as well as most of the walk: the index carries `due_date, rank, id`,
+which is the order the view reads.
 
-### The fix, measured
-
-Two partial indexes, tried on the reference-scale database:
+### Migration 0014, measured
 
 ```sql
 CREATE INDEX tasks_completed_recent_idx ON tasks (workspace_id, updated_at DESC, id DESC)
   WHERE deleted_at IS NULL AND completed_at IS NOT NULL;
 
-CREATE INDEX tasks_open_due_idx ON tasks (workspace_id, due_date, rank COLLATE "C", id)
+CREATE INDEX tasks_open_due_idx ON tasks (workspace_id, due_date, rank, id)
   WHERE deleted_at IS NULL AND completed_at IS NULL;
 ```
 
 | Query             | Before                   | After                      | Plan after                           |
 | ----------------- | ------------------------ | -------------------------- | ------------------------------------ |
-| Completed history | 26.64 ms, 6,086 buffers  | **0.07 ms**, 18 buffers    | Index Only Scan                      |
-| Today             | 26.26 ms, 53,087 buffers | **4.04 ms**, 9,369 buffers | Index Scan, 10k rows instead of 100k |
+| Completed history | 22.71 ms, 6,081 buffers  | **0.30 ms**, 55 buffers    | Index Only Scan                      |
+| Today             | 35.93 ms, 53,054 buffers | **7.82 ms**, 9,323 buffers | Index Scan, 10k rows instead of 100k |
 
-Both are pure additions with no data change. **They are not applied yet:** they need a
-reviewed migration, and the next free migration numbers were reserved for other work in
-flight when this was measured. Nothing is over budget without them — they are the
-difference between "fits today" and "still fits when the history is ten times larger".
+Both are pure additions: no column, constraint, or row changes, and nothing else in the
+schema moves. `rank` has been `varchar(64) COLLATE "C"` since migration 0001, so the
+second index inherits code-point ordering from the column rather than restating it —
+`pg_get_indexdef` does not print a collation that matches the column, so
+`tasks.integration.test.ts` asserts it from the catalogue and then proves it behaviourally
+by forcing the planner to answer from the index with sorting disabled.
+
+Nothing was over budget without these indexes. They are the difference between "fits
+today" and "still fits when the history is ten times larger".
 
 ### Two smaller observations, not acted on
 
@@ -201,6 +237,10 @@ difference between "fits today" and "still fits when the history is ten times la
   an empty connection pool and plan cache.
 
 ## Keeping the numbers honest
+
+The table above is a snapshot taken under contention and before migration 0014; it is
+replaced by a clean re-run on a quiet machine, which is the first thing to do when the
+parallel work that was loading this machine has finished.
 
 `scripts/bench.mjs` exits non-zero when any scenario's p95 exceeds its spec 29.2 budget,
 and `--check <previous.json> --regression 20` additionally fails when a p95 is more than

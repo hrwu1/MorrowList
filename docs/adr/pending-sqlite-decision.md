@@ -72,8 +72,9 @@ most expensive kinds of moving part there is.
 - The specification's deployment section keeps PostgreSQL 18 as a requirement, and
   `docs/runbooks/self-hosting.md` documents backup and restore in PostgreSQL's terms only.
 - Repositories may continue to use PostgreSQL features freely — partial indexes, generated
-  columns, `SKIP LOCKED`, full-text search — without a portability caveat. Two partial
-  indexes identified by the GAP-23 query-discipline pass are examples of exactly that.
+  columns, `SKIP LOCKED`, full-text search — without a portability caveat. The two partial
+  indexes added by migration `0014_task_read_indexes.sql` are an example of exactly that:
+  neither predicate has a portable equivalent worth writing.
 - Self-hosters who genuinely cannot run PostgreSQL are not served. The honest answer to
   them is the compose file, which asks them to run a container rather than install a
   database.
