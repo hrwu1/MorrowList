@@ -1,4 +1,8 @@
-import type { ActivityEntryDto, TaskDto } from "@morrowlist/contracts";
+import type {
+  ActivityEntryDto,
+  FieldDefinitionListItemDto,
+  TaskDto,
+} from "@morrowlist/contracts";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -6,6 +10,7 @@ import {
   exitCodeFor,
   formatActivity,
   formatFlowSummary,
+  formatFieldTable,
   formatTagTable,
   formatStatusTable,
   formatTaskDetail,
@@ -413,5 +418,47 @@ describe("defer and deadline dates (GAP-16)", () => {
     );
     expect(formatTaskDetail(task())).toContain("  deferred    no");
     expect(formatTaskDetail(task())).not.toContain("warning");
+  });
+});
+
+describe("formatFieldTable", () => {
+  const field = (
+    overrides: Partial<FieldDefinitionListItemDto>,
+  ): FieldDefinitionListItemDto => ({
+    id: "01a04e0f-0000-7000-8000-00000000000a",
+    workspaceId: "01a04e0f-0000-7000-8000-000000000002",
+    key: "effort",
+    name: "Effort",
+    type: "number",
+    options: [],
+    rank: "a0",
+    showOnCard: false,
+    taskCount: 0,
+    createdAt: "2026-09-05T09:00:00.000Z",
+    updatedAt: "2026-09-05T09:00:00.000Z",
+    ...overrides,
+  });
+
+  it("says so when there are none", () => {
+    expect(formatFieldTable([])).toBe("No custom fields.");
+  });
+
+  it("lines up the key, name, type, use count, card flag and options", () => {
+    const rendered = formatFieldTable([
+      field({ taskCount: 1 }),
+      field({
+        key: "stage",
+        name: "Release stage",
+        type: "select",
+        options: ["alpha", "beta"],
+        showOnCard: true,
+        taskCount: 4,
+      }),
+    ]);
+
+    expect(rendered.split("\n")).toEqual([
+      "effort  Effort         number  1 task",
+      "stage   Release stage  select  4 tasks  on cards  [alpha, beta]",
+    ]);
   });
 });

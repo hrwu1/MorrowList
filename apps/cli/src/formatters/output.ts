@@ -1,5 +1,6 @@
 import type {
   ActivityEntryDto,
+  FieldDefinitionListItemDto,
   FlowSummaryDto,
   DateWarning,
   ImportResultDto,
@@ -248,6 +249,9 @@ export function formatTaskDetail(
         ]
       : []),
     `  tags        ${task.tags.map((tag) => tag.name).join(", ") || "none"}`,
+    ...Object.entries(task.fields).map(
+      ([key, value]) => `  ${key.slice(0, 11).padEnd(11)} ${String(value)}`,
+    ),
     `  version     ${task.version}`,
     `  created     ${task.createdAt}`,
   ];
@@ -337,6 +341,26 @@ export function formatTagTable(tags: readonly TagListItemDto[]): string {
       const count = `${tag.taskCount} task${tag.taskCount === 1 ? "" : "s"}`;
       const description = tag.description ? `  ${tag.description}` : "";
       return `${name}  ${tag.colorToken.padEnd(7)}  ${count}${description}`;
+    })
+    .join("\n");
+}
+
+/** `morrow field list`: key, type, whether it shows on a card, and how many tasks use it. */
+export function formatFieldTable(
+  fields: readonly FieldDefinitionListItemDto[],
+): string {
+  if (fields.length === 0) return "No custom fields.";
+
+  const keyWidth = Math.max(...fields.map((field) => field.key.length));
+  const nameWidth = Math.max(...fields.map((field) => field.name.length));
+  return fields
+    .map((field) => {
+      const key = field.key.padEnd(keyWidth);
+      const name = field.name.padEnd(nameWidth);
+      const count = `${field.taskCount} task${field.taskCount === 1 ? "" : "s"}`;
+      const card = field.showOnCard ? "  on cards" : "";
+      const options = field.options.length > 0 ? `  [${field.options.join(", ")}]` : "";
+      return `${key}  ${name}  ${field.type.padEnd(6)}  ${count}${card}${options}`;
     })
     .join("\n");
 }

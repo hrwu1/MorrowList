@@ -15,7 +15,11 @@ import { findTag } from "./tag.js";
  */
 
 export const WHERE_HELP = `operators: ${SEARCH_OPERATORS.map((op) =>
-  op.values ? `${op.key}:${op.values.join("|")}` : `${op.key}:<name>`,
+  op.values
+    ? `${op.key}:${op.values.join("|")}`
+    : op.key === "field"
+      ? "field:<key>:<operator>[:<value>]"
+      : `${op.key}:<name>`,
 ).join("  ")}`;
 
 /** The list query a parsed filter set stands for; `tag` is resolved to an id first. */

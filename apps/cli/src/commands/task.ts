@@ -6,6 +6,7 @@ import type {
   CreateTaskRequest,
   UpdateTaskRequest,
 } from "@morrowlist/contracts";
+import { parseFieldFilter } from "@morrowlist/domain";
 import { Command } from "commander";
 
 import {
@@ -16,6 +17,7 @@ import {
   printJson,
 } from "../formatters/output.js";
 
+import { fieldPatchFrom } from "./field.js";
 import {
   capture,
   captureContext,
@@ -239,6 +241,10 @@ export function taskCommand(): Command {
     .option("--deadline <filter>", "overdue | week | none")
     .option("--tag <name>", "restrict to tasks carrying a tag")
     .option("--blocked", "blocked tasks only: flagged, or waiting on an open blocker")
+    .option(
+      "--field <filter...>",
+      "a typed custom field, as key:operator[:value], e.g. --field effort:gt:3",
+    )
     .option("--where <query>", `filters in the search grammar; ${WHERE_HELP}`)
     .option("--limit <n>", "page size, 1-200", "50")
     .action(async (options, command: Command) => {
@@ -266,6 +272,9 @@ export function taskCommand(): Command {
             ...(options.deadline ? { deadline: options.deadline } : {}),
             ...(tag ? { tagId: tag.id } : {}),
             ...(options.blocked ? { isBlocked: true } : {}),
+            ...(options.field
+              ? { fields: (options.field as string[]).map(parseFieldFilter) }
+              : {}),
             ...where.query,
             limit: Number(options.limit),
           } as never);
@@ -398,7 +407,15 @@ export function taskCommand(): Command {
             ).version;
           }
 
+          const customFields = await fieldPatchFrom(
+            client,
+            (options.field ?? []) as string[],
+            (options.clearField ?? []) as string[],
+            json,
+          );
+
           const fields: UpdateTaskRequest = {
+            ...(customFields ? { fields: customFields } : {}),
             ...(options.title ? { title: options.title } : {}),
             // An explicit clear flag is how the CLI expresses null, which the API
             // distinguishes from an omitted field (spec 20.4).
