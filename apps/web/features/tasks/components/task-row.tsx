@@ -31,6 +31,7 @@ import {
   SubtaskProgressBadge,
 } from "./task-fields";
 
+import { FieldChips } from "@/features/fields/components/field-chips";
 import { BlockedBadge } from "@/features/relations/components/blocked-badge";
 import { blockedSummary } from "@/features/relations/lib/relations";
 import { TagChips } from "@/features/tags/components/tag-chip";
@@ -140,6 +141,7 @@ export function TaskRow({ task, detailHref, selected, today }: TaskRowProps) {
             <MyDayBadge dayPlans={task.dayPlans} />
             <BlockedBadge task={task} />
             <SubtaskProgressBadge progress={task.subtaskProgress} />
+            <FieldChips values={task.fields} />
             {task.completedAt ? (
               <time dateTime={task.completedAt}>
                 Completed {new Date(task.completedAt).toLocaleDateString()}

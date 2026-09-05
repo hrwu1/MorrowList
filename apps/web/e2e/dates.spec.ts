@@ -67,9 +67,12 @@ test("a deferred task leaves Today, Upcoming, and the Inbox, and returns on its 
   await expect(upcomingLink).toContainText("1");
 
   // Defer both to next week: they leave the main Inbox list and wait, collapsed.
-  await editRow(page, "Due today", "Defer until", nextWeek);
-  await editRow(page, "Due tomorrow", "Defer until", nextWeek);
+  // One at a time: the refetch that follows the first defer re-renders the list, and a
+  // value typed into the second row's date input while that lands is thrown away.
   const inboxList = page.getByRole("list", { name: "Inbox tasks" });
+  await editRow(page, "Due today", "Defer until", nextWeek);
+  await expect(inboxList.getByRole("link", { name: "Due today" })).toBeHidden();
+  await editRow(page, "Due tomorrow", "Defer until", nextWeek);
   await expect(inboxList).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Your Inbox is clear" }),

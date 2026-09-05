@@ -145,6 +145,18 @@ export function WorkspaceSettingsPage() {
           <Link href="/settings/webhooks">Webhooks</Link>
         </p>
       </section>
+
+      <section className="settings-form" aria-label="Custom fields">
+        <h2 className="task-detail__section-title">Custom fields</h2>
+        <p className="page-header__subtitle">
+          Up to ten typed slots on every task — a choice, a number, a date, a note.
+        </p>
+        <div className="button-row">
+          <Link className="ml-button" href="/settings/fields">
+            Manage fields
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }

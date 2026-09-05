@@ -3045,6 +3045,68 @@
     list-style: none;
   }
 
+  /* Typed custom fields (GAP-24) */
+  .field-settings__key {
+    padding: 0.1rem 0.4rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--surface-sunken);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+  }
+  .field-settings__card-toggle {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 0.4rem;
+    padding-bottom: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  .task-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .task-fields__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.75rem;
+  }
+  /* One line on a card, never more: at most two fields are ever rendered here. */
+  .field-chips {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    gap: 0.35rem;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .field-chip {
+    display: inline-flex;
+    gap: 0.3rem;
+    max-width: 12rem;
+    padding: 0.05rem 0.4rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+  .field-chip__name {
+    opacity: 0.75;
+  }
+  .field-chip__value {
+    overflow: hidden;
+    color: var(--text-primary);
+    text-overflow: ellipsis;
+  }
+  .filters__control--field {
+    flex: 2 1 22rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
   /* Connectivity and update notices (spec 25). Fixed at the bottom so they never fight
      the sticky headers, and above the mobile sheet so they stay readable. */
   .offline-banner,

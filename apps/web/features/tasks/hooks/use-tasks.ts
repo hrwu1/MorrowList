@@ -406,7 +406,14 @@ export function useUpdateTask() {
     onMutate: async ({ task, patch }) => {
       await cancelTaskProjections(queryClient);
       const previous = snapshotTaskProjections(queryClient);
-      patchTaskEverywhere(queryClient, { ...task, ...stripControlFields(patch) });
+      patchTaskEverywhere(queryClient, {
+        ...task,
+        ...stripControlFields(patch),
+        // The field patch is a per-key delta, not a replacement (GAP-24).
+        ...(patch.fields
+          ? { fields: mergeFieldValues(task.fields, patch.fields) }
+          : {}),
+      });
       return { previous };
     },
     onError: (_error, _variables, context) => {
@@ -421,6 +428,22 @@ export function useUpdateTask() {
 function stripControlFields(patch: UpdateTaskRequest): Partial<TaskDto> {
   const { expectedVersion: _expectedVersion, ...fields } = patch;
   return fields as Partial<TaskDto>;
+}
+
+/**
+ * Apply a typed custom-field patch to the cached values (GAP-24): an omitted key is
+ * untouched, an explicit null removes it. The same rule the domain applies on the server.
+ */
+function mergeFieldValues(
+  current: TaskDto["fields"],
+  patch: NonNullable<UpdateTaskRequest["fields"]>,
+): TaskDto["fields"] {
+  const next: Record<string, string | number> = { ...current };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) delete next[key];
+    else next[key] = value;
+  }
+  return next;
 }
 
 /**

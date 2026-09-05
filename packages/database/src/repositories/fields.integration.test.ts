@@ -285,7 +285,7 @@ describe("filtering by a field value", () => {
       expect(page.data).toHaveLength(50);
       expect(page.data.every((task) => task.fields.stage === "beta")).toBe(true);
       // Reported so a regression is visible in the test output, not only as a failure.
-      // eslint-disable-next-line no-console
+
       console.log(
         `field equality filter over ${SCALE_TASKS} tasks: ${elapsedMs.toFixed(1)} ms`,
       );

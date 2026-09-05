@@ -1,9 +1,15 @@
 "use client";
 
-import type { Priority, SavedViewDto } from "@morrowlist/contracts";
+import type {
+  FieldDefinitionDto,
+  FieldFilterDto,
+  FieldFilterOperator,
+  Priority,
+  SavedViewDto,
+} from "@morrowlist/contracts";
 import { Button, Select, TextInput } from "@morrowlist/ui";
 import { usePathname, useRouter } from "next/navigation";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 
 import {
   useCreateSavedView,
@@ -11,6 +17,11 @@ import {
   useUpdateSavedView,
 } from "../hooks/use-saved-views";
 
+import { useFields } from "@/features/fields/hooks/use-fields";
+import {
+  formatFieldFilter,
+  operatorsForType,
+} from "@/features/fields/lib/field-filters";
 import { useProjects } from "@/features/projects/hooks/use-projects";
 import { useTags } from "@/features/tags/hooks/use-tags";
 import { PRIORITY_LABELS } from "@/features/tasks/components/task-fields";
@@ -79,6 +90,27 @@ const DEADLINE_LABELS: Record<DeadlineFilter, string> = {
   none: "No deadline",
 };
 
+/** The six operators, read as a person would say them (GAP-24). */
+const FIELD_OPERATOR_LABELS: Record<FieldFilterOperator, string> = {
+  eq: "is",
+  ne: "is not",
+  lt: "is before",
+  gt: "is after",
+  between: "is between",
+  empty: "is empty",
+};
+
+/** Ordering reads differently on a number than on a date. */
+function operatorLabel(
+  operator: FieldFilterOperator,
+  type: FieldDefinitionDto["type"],
+): string {
+  if (type !== "number") return FIELD_OPERATOR_LABELS[operator];
+  if (operator === "lt") return "is less than";
+  if (operator === "gt") return "is more than";
+  return FIELD_OPERATOR_LABELS[operator];
+}
+
 const COMPLETION_LABELS: Record<Completion, string> = {
   open: "Open only",
   done: "Completed only",
@@ -120,6 +152,8 @@ export function FilterPanel({
   const projectItems = projects.data?.data ?? [];
   const activeTag = tagItems.find((tag) => tag.id === view.tag);
   const activeProject = projectItems.find((project) => project.id === view.project);
+  const fields = useFields();
+  const fieldItems = fields.data?.data ?? [];
   const isDefault =
     view.project === base.project &&
     view.priority === base.priority &&
@@ -128,6 +162,8 @@ export function FilterPanel({
     view.blocked === base.blocked &&
     view.deferred === base.deferred &&
     view.deadline === base.deadline &&
+    describeFieldFilters(view.fields, fieldItems) ===
+      describeFieldFilters(base.fields, fieldItems) &&
     (!showSort || (view.sort === base.sort && view.order === base.order)) &&
     (!showCompletion || view.completion === base.completion);
   const activeChoices = [
@@ -160,6 +196,7 @@ export function FilterPanel({
     ...(view.deadline === base.deadline
       ? []
       : [view.deadline === "any" ? "Any deadline" : DEADLINE_LABELS[view.deadline]]),
+    ...view.fields.map((filter) => fieldChoiceLabel(filter, fieldItems)),
     ...(!showCompletion || view.completion === base.completion
       ? []
       : [COMPLETION_LABELS[view.completion]]),
@@ -365,6 +402,15 @@ export function FilterPanel({
             </Select>
           </div>
 
+          {fieldItems.length > 0 ? (
+            <FieldFilterControl
+              id={`${id}-field`}
+              definitions={fieldItems}
+              value={view.fields}
+              onChange={(next) => onChange({ ...view, fields: next })}
+            />
+          ) : null}
+
           {showSort ? (
             <>
               <div className="filters__control">
@@ -555,4 +601,214 @@ function SavedViewActions({
       ) : null}
     </form>
   );
+}
+
+/**
+ * One typed custom-field filter (GAP-24): which field, which operator, and the value the
+ * operator needs. Deliberately one filter at a time in the panel — the list query and the
+ * search grammar carry several, but a control per field would be the spreadsheet this
+ * plan exists to avoid.
+ *
+ * The controls hold a draft, because a half-built filter ("Stage is …") is a normal step
+ * on the way to a complete one and must not be thrown away. Only a complete filter is
+ * applied to the list; an incomplete one clears it.
+ */
+interface FieldFilterDraft {
+  readonly key: string;
+  readonly op: FieldFilterOperator;
+  readonly value: string;
+  readonly upper: string;
+}
+
+const EMPTY_DRAFT: FieldFilterDraft = { key: "", op: "eq", value: "", upper: "" };
+
+function toDraft(filter: FieldFilterDto | null): FieldFilterDraft {
+  if (!filter) return EMPTY_DRAFT;
+  return {
+    key: filter.key,
+    op: filter.op,
+    value: filter.value === null ? "" : String(filter.value),
+    upper: filter.upper === null ? "" : String(filter.upper),
+  };
+}
+
+/** The draft as a filter, or null while it is still missing something. */
+function completeFilter(
+  draft: FieldFilterDraft,
+  definitions: readonly FieldDefinitionDto[],
+): FieldFilterDto | null {
+  const definition = definitions.find((each) => each.key === draft.key);
+  if (!definition || !operatorsForType(definition.type).includes(draft.op)) return null;
+  if (draft.op === "empty") {
+    return { key: draft.key, op: "empty", value: null, upper: null };
+  }
+  if (draft.value.trim().length === 0) return null;
+  if (draft.op === "between") {
+    if (draft.upper.trim().length === 0) return null;
+    return {
+      key: draft.key,
+      op: "between",
+      value: draft.value.trim(),
+      upper: draft.upper.trim(),
+    };
+  }
+  return { key: draft.key, op: draft.op, value: draft.value.trim(), upper: null };
+}
+
+function FieldFilterControl({
+  id,
+  definitions,
+  value,
+  onChange,
+}: {
+  readonly id: string;
+  readonly definitions: readonly FieldDefinitionDto[];
+  readonly value: readonly FieldFilterDto[];
+  readonly onChange: (next: FieldFilterDto[]) => void;
+}) {
+  const applied = value[0] ?? null;
+  const appliedText = applied ? formatFieldFilter(applied) : "";
+  const [draft, setDraft] = useState<FieldFilterDraft>(() => toDraft(applied));
+  // The draft follows the applied filter when it changes elsewhere — a reload, a reset,
+  // opening a saved view — but not when this control is what changed it.
+  const synced = useRef(appliedText);
+  if (synced.current !== appliedText) {
+    synced.current = appliedText;
+    setDraft(toDraft(applied));
+  }
+
+  const definition = definitions.find((each) => each.key === draft.key);
+  const operators = definition ? operatorsForType(definition.type) : [];
+
+  const change = (patch: Partial<FieldFilterDraft>) => {
+    let next = { ...draft, ...patch };
+    const target = definitions.find((each) => each.key === next.key);
+    // Switching to a field whose type has no such operator falls back to "is".
+    if (target && !operatorsForType(target.type).includes(next.op)) {
+      next = { ...next, op: "eq" };
+    }
+    setDraft(next);
+    const filter = completeFilter(next, definitions);
+    synced.current = filter ? formatFieldFilter(filter) : "";
+    onChange(filter ? [filter] : []);
+  };
+
+  const inputType =
+    definition?.type === "number"
+      ? "number"
+      : definition?.type === "date"
+        ? "date"
+        : "text";
+
+  return (
+    <div className="filters__control filters__control--field">
+      <label className="ml-field__label" htmlFor={`${id}-key`}>
+        Custom field
+      </label>
+      <Select
+        id={`${id}-key`}
+        value={definition?.key ?? "any"}
+        onChange={(event) =>
+          event.target.value === "any"
+            ? change(EMPTY_DRAFT)
+            : change({ key: event.target.value, value: "", upper: "" })
+        }
+      >
+        <option value="any">Any field</option>
+        {definitions.map((each) => (
+          <option key={each.id} value={each.key}>
+            {each.name}
+          </option>
+        ))}
+      </Select>
+
+      {definition ? (
+        <>
+          <label className="ml-visually-hidden" htmlFor={`${id}-op`}>
+            {definition.name} comparison
+          </label>
+          <Select
+            id={`${id}-op`}
+            value={draft.op}
+            onChange={(event) =>
+              change({ op: event.target.value as FieldFilterOperator })
+            }
+          >
+            {operators.map((each) => (
+              <option key={each} value={each}>
+                {operatorLabel(each, definition.type)}
+              </option>
+            ))}
+          </Select>
+
+          {draft.op === "empty" ? null : (
+            <>
+              <label className="ml-visually-hidden" htmlFor={`${id}-value`}>
+                {definition.name} value
+              </label>
+              {definition.type === "select" ? (
+                <Select
+                  id={`${id}-value`}
+                  value={draft.value}
+                  onChange={(event) => change({ value: event.target.value })}
+                >
+                  <option value="">Choose a value</option>
+                  {definition.options.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </Select>
+              ) : (
+                <TextInput
+                  id={`${id}-value`}
+                  type={inputType}
+                  value={draft.value}
+                  onChange={(event) => change({ value: event.target.value })}
+                />
+              )}
+            </>
+          )}
+
+          {draft.op === "between" ? (
+            <>
+              <label className="ml-visually-hidden" htmlFor={`${id}-upper`}>
+                {definition.name} upper bound
+              </label>
+              <TextInput
+                id={`${id}-upper`}
+                type={inputType}
+                value={draft.upper}
+                onChange={(event) => change({ upper: event.target.value })}
+              />
+            </>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function fieldChoiceLabel(
+  filter: FieldFilterDto,
+  definitions: readonly FieldDefinitionDto[],
+): string {
+  const definition = definitions.find((each) => each.key === filter.key);
+  const name = definition?.name ?? filter.key;
+  const comparison = definition
+    ? operatorLabel(filter.op, definition.type)
+    : FIELD_OPERATOR_LABELS[filter.op];
+  if (filter.op === "empty") return `${name} ${comparison}`;
+  if (filter.op === "between") {
+    return `${name} ${comparison} ${filter.value} and ${filter.upper}`;
+  }
+  return `${name} ${comparison} ${filter.value}`;
+}
+
+/** A stable string for the "is this the base view?" comparison. */
+function describeFieldFilters(
+  filters: readonly FieldFilterDto[],
+  definitions: readonly FieldDefinitionDto[],
+): string {
+  return filters.map((filter) => fieldChoiceLabel(filter, definitions)).join(" · ");
 }

@@ -49,6 +49,7 @@ import {
 } from "./task-fields";
 
 import { ActivityList } from "@/features/activity/components/activity-list";
+import { TaskFieldValues } from "@/features/fields/components/task-field-values";
 import { useProjects } from "@/features/projects/hooks/use-projects";
 import { BlockedFlag } from "@/features/relations/components/blocked-flag";
 import { RelationList } from "@/features/relations/components/relation-list";
@@ -692,6 +693,8 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
       ) : null}
 
       <TagPicker task={task} disabled={!editable} />
+
+      <TaskFieldValues task={task} disabled={!editable} />
 
       <BlockedFlag task={task} disabled={!editable} />
 

@@ -5,6 +5,7 @@ import type { TaskDto } from "@morrowlist/contracts";
 import Link from "next/link";
 import type { CSSProperties, KeyboardEventHandler } from "react";
 
+import { FieldChips } from "@/features/fields/components/field-chips";
 import { ageBand, daysInStatus } from "@/features/flow/lib/flow-view";
 import { BlockedBadge } from "@/features/relations/components/blocked-badge";
 import { TagChips } from "@/features/tags/components/tag-chip";
@@ -199,6 +200,8 @@ export function KanbanCard({
           <TagChips tags={task.tags} />
         </div>
       ) : null}
+
+      <FieldChips values={task.fields} />
     </li>
   );
 }
