@@ -49,7 +49,8 @@ export function authCommand(): Command {
         "  pbpaste | morrow --base-url https://morrow.example.com/api/v1 auth login\n",
     )
     .action(async (_options, command: Command) => {
-      const globals = globalsOf<ResolveOptions>(command);
+      const globals = globalsOf<ResolveOptions & { json?: boolean }>(command);
+      const json = Boolean(globals.json);
       const config = await readConfig();
       const name = globals.profile ?? config.defaultProfile;
       const existing = config.profiles[name];
@@ -58,10 +59,17 @@ export function authCommand(): Command {
       // process table, so the stored key comes from stdin.
       const apiKey = globals.apiKey ?? (await readKeyFromStdin());
       if (!apiKey) {
-        printError(
-          "error: no API key supplied. Pipe it in, for example:\n" +
-            "  pbpaste | morrow auth login",
-        );
+        if (json) {
+          printJson({
+            ok: false,
+            error: { code: "USAGE", message: "no API key supplied on stdin" },
+          });
+        } else {
+          printError(
+            "error: no API key supplied. Pipe it in, for example:\n" +
+              "  pbpaste | morrow auth login",
+          );
+        }
         process.exit(EXIT.usage);
       }
 
@@ -78,9 +86,12 @@ export function authCommand(): Command {
         },
       });
 
-      process.stdout.write(
-        `Saved profile "${name}" to ${configPath()} with owner-only permissions.\n`,
-      );
+      // The key itself is never echoed back, in either mode.
+      if (json) printJson({ ok: true, data: { profile: name, path: configPath() } });
+      else
+        process.stdout.write(
+          `Saved profile "${name}" to ${configPath()} with owner-only permissions.\n`,
+        );
     });
 
   auth
@@ -146,13 +157,15 @@ export function authCommand(): Command {
     .command("logout")
     .description("Remove the stored API key for a profile")
     .action(async (_options, command: Command) => {
-      const globals = globalsOf<ResolveOptions>(command);
+      const globals = globalsOf<ResolveOptions & { json?: boolean }>(command);
+      const json = Boolean(globals.json);
       const config = await readConfig();
       const name = globals.profile ?? config.defaultProfile;
       const existing = config.profiles[name];
 
       if (!existing) {
-        process.stdout.write(`No profile named "${name}".\n`);
+        if (json) printJson({ ok: true, data: { profile: name, removed: false } });
+        else process.stdout.write(`No profile named "${name}".\n`);
         return;
       }
 
@@ -161,7 +174,8 @@ export function authCommand(): Command {
         defaultProfile: config.defaultProfile,
         profiles: { ...config.profiles, [name]: rest },
       });
-      process.stdout.write(`Removed the API key from profile "${name}".\n`);
+      if (json) printJson({ ok: true, data: { profile: name, removed: true } });
+      else process.stdout.write(`Removed the API key from profile "${name}".\n`);
     });
 
   return auth;

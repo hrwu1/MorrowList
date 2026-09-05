@@ -50,19 +50,10 @@ export function assertScope(context: ActorContext, scope: string): void {
   }
 }
 
-export const SCOPES = {
-  tasksRead: "tasks:read",
-  tasksWrite: "tasks:write",
-  projectsRead: "projects:read",
-  projectsWrite: "projects:write",
-  activityRead: "activity:read",
-  tagsRead: "tags:read",
-  tagsWrite: "tags:write",
-  workspaceWrite: "workspace:write",
-  viewsRead: "views:read",
-  viewsWrite: "views:write",
-  /** Reading the whole workspace out (GAP-07); wider than any single read scope. */
-  exportRead: "export:read",
-  /** Writing a whole project in from another tool (GAP-07). */
-  importWrite: "import:write",
-} as const;
+/** Re-exported so the application layer's callers need one import, not two. */
+export {
+  SCOPES,
+  SCOPE_PRESETS,
+  type Scope,
+  type ScopePreset,
+} from "@morrowlist/contracts";

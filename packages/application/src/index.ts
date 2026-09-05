@@ -1,9 +1,12 @@
 export {
   SCOPES,
+  SCOPE_PRESETS,
   actorRef,
   assertScope,
   assertWorkspaceAccess,
   type ActorContext,
+  type Scope,
+  type ScopePreset,
 } from "./shared/actor-context.js";
 export { decodeCursor, encodeCursor, type CursorPayload } from "./shared/cursor.js";
 export { recordEvent, type RecordEventInput } from "./shared/event-recorder.js";

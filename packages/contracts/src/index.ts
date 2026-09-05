@@ -1,4 +1,5 @@
 export * from "./common.js";
+export * from "./auth.js";
 export * from "./tag.js";
 export * from "./task.js";
 export * from "./board.js";
