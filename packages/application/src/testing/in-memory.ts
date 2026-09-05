@@ -1,10 +1,13 @@
 import {
   addDays,
+  canonicalFieldValues,
   childProgress,
   isBlocked,
   inProgressTasks,
   isDeferred,
+  matchesFieldFilter,
   type DayPlan,
+  type FieldDefinition,
   type PlainDate,
   type Reminder,
   type StatusInterval,
@@ -21,6 +24,7 @@ import type {
   AggregateType,
   Cursor,
   DayPlanRepository,
+  FieldDefinitionRepository,
   Notification,
   NotificationPreferenceRepository,
   NotificationPreferences,
@@ -74,6 +78,7 @@ export interface InMemoryData {
   projects: Map<string, Project>;
   statuses: Map<string, WorkflowStatus>;
   tags: Map<string, Tag>;
+  fields: Map<string, FieldDefinition>;
   savedViews: Map<string, SavedView>;
   taskTags: { taskId: string; tagId: string; createdAt: Date }[];
   relations: Map<string, TaskRelation>;
@@ -106,6 +111,7 @@ export function emptyData(): InMemoryData {
     projects: new Map(),
     statuses: new Map(),
     tags: new Map(),
+    fields: new Map(),
     savedViews: new Map(),
     taskTags: [],
     relations: new Map(),
@@ -204,6 +210,9 @@ function filterTasks(data: InMemoryData, filter: TaskFilter): Task[] {
 
   if (filter.isBlocked !== undefined) {
     items = items.filter((t) => blockedIn(data, t) === filter.isBlocked);
+  }
+  for (const fieldFilter of filter.fields ?? []) {
+    items = items.filter((task) => matchesFieldFilter(task.fields, fieldFilter));
   }
   return items;
 }
@@ -673,6 +682,73 @@ function tagRepository(data: InMemoryData): TagRepository {
       data.tags.delete(tagId);
       // The SQL foreign key cascades; the double has to do it by hand.
       data.taskTags = data.taskTags.filter((link) => link.tagId !== tagId);
+    },
+  };
+}
+
+/** Rank, then id: the same order the SQL repository's COLLATE "C" produces. */
+function compareFields(left: FieldDefinition, right: FieldDefinition): number {
+  if (left.rank !== right.rank) return left.rank < right.rank ? -1 : 1;
+  return left.id < right.id ? -1 : 1;
+}
+
+function fieldDefinitionRepository(data: InMemoryData): FieldDefinitionRepository {
+  const inWorkspace = (workspaceId: string) =>
+    [...data.fields.values()]
+      .filter((definition) => definition.workspaceId === workspaceId)
+      .sort(compareFields);
+
+  return {
+    async findById(workspaceId, fieldId) {
+      const definition = data.fields.get(fieldId);
+      return definition && definition.workspaceId === workspaceId ? definition : null;
+    },
+    async findByKey(workspaceId, key) {
+      return inWorkspace(workspaceId).find((each) => each.key === key) ?? null;
+    },
+    async listByWorkspace(workspaceId) {
+      return inWorkspace(workspaceId);
+    },
+    async valueCounts(workspaceId) {
+      const counts = new Map<string, number>();
+      for (const task of data.tasks.values()) {
+        if (task.workspaceId !== workspaceId || task.deletedAt !== null) continue;
+        for (const key of Object.keys(task.fields)) {
+          counts.set(key, (counts.get(key) ?? 0) + 1);
+        }
+      }
+      return counts;
+    },
+    async insert(definition) {
+      data.fields.set(definition.id, definition);
+    },
+    async update(definition) {
+      if (!data.fields.has(definition.id)) return false;
+      data.fields.set(definition.id, definition);
+      return true;
+    },
+    async clearValues(workspaceId, key) {
+      let affected = 0;
+      for (const [id, task] of data.tasks) {
+        if (task.workspaceId !== workspaceId || !(key in task.fields)) continue;
+        const { [key]: _removed, ...rest } = task.fields;
+        data.tasks.set(id, { ...task, fields: rest });
+        affected += 1;
+      }
+      return affected;
+    },
+    async delete(workspaceId, fieldId) {
+      const definition = data.fields.get(fieldId);
+      if (!definition || definition.workspaceId !== workspaceId) return;
+      data.fields.delete(fieldId);
+      // The SQL side drops orphaned values in the same transaction; so does the double.
+      for (const [id, task] of data.tasks) {
+        if (task.workspaceId !== workspaceId) continue;
+        const fields = canonicalFieldValues(task.fields, inWorkspace(workspaceId));
+        if (Object.keys(fields).length !== Object.keys(task.fields).length) {
+          data.tasks.set(id, { ...task, fields });
+        }
+      }
     },
   };
 }
@@ -1306,6 +1382,7 @@ export function createInMemoryUnitOfWork(
     projects: new Map(source.projects),
     statuses: new Map(source.statuses),
     tags: new Map(source.tags),
+    fields: new Map(source.fields),
     savedViews: new Map(source.savedViews),
     taskTags: [...source.taskTags],
     relations: new Map(source.relations),
@@ -1330,6 +1407,7 @@ export function createInMemoryUnitOfWork(
     target.projects = source.projects;
     target.statuses = source.statuses;
     target.tags = source.tags;
+    target.fields = source.fields;
     target.savedViews = source.savedViews;
     target.taskTags = source.taskTags;
     target.relations = source.relations;
@@ -1364,6 +1442,7 @@ export function createInMemoryUnitOfWork(
         projects: projectRepository(working),
         statuses: statusRepository(working),
         tags: tagRepository(working),
+        fields: fieldDefinitionRepository(working),
         statusIntervals: statusIntervalRepository(working),
         savedViews: savedViewRepository(working),
         workspaces: workspaceRepository(working),

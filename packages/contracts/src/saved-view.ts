@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { prioritySchema, uuidSchema } from "./common.js";
+import { MAX_FIELD_FILTERS, fieldFilterSchema } from "./field.js";
 import { deadlineFilterSchema, dueFilterSchema } from "./task.js";
 
 /**
@@ -27,6 +28,8 @@ export const savedViewFiltersSchema = z
     due: dueFilterSchema.optional(),
     deferred: z.boolean().optional(),
     deadline: deadlineFilterSchema.optional(),
+    /** Typed custom-field filters, exactly as the list query carries them (GAP-24). */
+    fields: z.array(fieldFilterSchema).max(MAX_FIELD_FILTERS).optional(),
     inbox: z.boolean().optional(),
     sort: z.enum(["rank", "createdAt", "dueDate", "priority", "updatedAt"]).optional(),
     order: z.enum(["asc", "desc"]).optional(),

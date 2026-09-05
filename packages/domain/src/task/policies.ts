@@ -8,6 +8,13 @@ import {
 } from "../shared/errors.js";
 
 import {
+  applyFields,
+  sameFieldValues,
+  type FieldDefinition,
+  type FieldValuePatch,
+  type FieldValues,
+} from "./fields.js";
+import {
   assertCompletionConsistency,
   assertParentIsAssignable,
   assertStatusBelongsToProject,
@@ -72,6 +79,8 @@ export interface CreateTaskInput {
   readonly reminderOffsetMinutes?: number | null;
   readonly defaultReminderOffsetMinutes?: number;
   readonly parentTaskId?: string | null;
+  /** Typed custom-field values, already validated against their definitions (GAP-24). */
+  readonly fields?: FieldValues;
   readonly recurrence?: RecurrenceRuleInput | null;
   /** The series this task continues; a new repeating task starts its own. */
   readonly seriesId?: string | null;
@@ -114,6 +123,7 @@ export function createTask(input: CreateTaskInput, context: PolicyContext): Task
       input.reminderOffsetMinutes,
       input.defaultReminderOffsetMinutes,
     ),
+    fields: input.fields ?? {},
     parentTaskId: input.parentTaskId ?? null,
     recurrence: input.recurrence ? toRecurrenceRule(input.recurrence) : null,
     seriesId: input.seriesId ?? (input.recurrence ? input.id : null),
@@ -150,6 +160,13 @@ export interface UpdateTaskFieldsInput {
   /** Omitted keeps the current offset, or applies the default when a due time first appears. */
   readonly reminderOffsetMinutes?: Patch<number>;
   readonly defaultReminderOffsetMinutes?: number;
+  /**
+   * Typed custom-field values (GAP-24): an omitted key is untouched, `null` clears one.
+   * The workspace's definitions come with it so the values are validated here rather
+   * than at the transport boundary, which cannot know what a workspace defined.
+   */
+  readonly fields?: FieldValuePatch;
+  readonly fieldDefinitions?: readonly FieldDefinition[];
 }
 
 /**
@@ -227,6 +244,10 @@ export function updateTaskFields(
       input.reminderOffsetMinutes,
       input.defaultReminderOffsetMinutes,
     ),
+    fields:
+      input.fields === undefined
+        ? task.fields
+        : applyFields(task.fields, input.fields, input.fieldDefinitions ?? []),
   };
 
   return touch(next, task, context);
@@ -282,6 +303,8 @@ export function spawnNextOccurrence(
     priority: task.priority,
     projectId: task.projectId,
     parentTaskId: task.parentTaskId,
+    // The next occurrence starts where this one did, custom values included.
+    fields: task.fields,
     dueDate: next.dueDate,
     dueTime: task.dueTime,
     dueTimezone: task.dueTimezone,
@@ -702,6 +725,7 @@ const MATERIAL_FIELDS = [
   "parentTaskId",
   "recurrence",
   "seriesId",
+  "fields",
   "rank",
   "lastActiveStatusId",
   "completedAt",
@@ -717,6 +741,7 @@ function fieldChanged(
 ) {
   if (field === "recurrence")
     return !sameRecurrence(next.recurrence, previous.recurrence);
+  if (field === "fields") return !sameFieldValues(next.fields, previous.fields);
   const a = next[field];
   const b = previous[field];
   if (a instanceof Date && b instanceof Date) return a.getTime() !== b.getTime();

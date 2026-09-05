@@ -1,6 +1,9 @@
 import type { Project, SavedView, Workspace } from "@morrowlist/application";
 import type {
   ActorKind,
+  FieldDefinition,
+  FieldType,
+  FieldValues,
   RecurrenceRule,
   Tag,
   TagColorToken,
@@ -10,6 +13,7 @@ import type {
 } from "@morrowlist/domain";
 
 import type {
+  fieldDefinitions,
   projects,
   savedViews,
   tags,
@@ -33,6 +37,7 @@ type WorkspaceRow = typeof workspaces.$inferSelect;
 type TagRow = typeof tags.$inferSelect;
 type RelationRow = typeof taskRelations.$inferSelect;
 type SavedViewRow = typeof savedViews.$inferSelect;
+type FieldDefinitionRow = typeof fieldDefinitions.$inferSelect;
 
 export function toTask(row: TaskRow): Task {
   return {
@@ -57,6 +62,7 @@ export function toTask(row: TaskRow): Task {
     parentTaskId: row.parentTaskId,
     recurrence: (row.recurrence as RecurrenceRule | null) ?? null,
     seriesId: row.seriesId,
+    fields: (row.fields as FieldValues | null) ?? {},
     rank: row.rank,
     lastActiveStatusId: row.lastActiveStatusId,
     completedAt: row.completedAt,
@@ -95,6 +101,7 @@ export function toTaskRow(task: Task): TaskInsertRow {
     parentTaskId: task.parentTaskId,
     recurrence: task.recurrence,
     seriesId: task.seriesId,
+    fields: task.fields,
     rank: task.rank,
     lastActiveStatusId: task.lastActiveStatusId,
     completedAt: task.completedAt,
@@ -223,6 +230,36 @@ export function toSavedViewRow(view: SavedView): SavedViewRow {
     rank: view.rank,
     createdAt: view.createdAt,
     updatedAt: view.updatedAt,
+  };
+}
+
+export function toFieldDefinition(row: FieldDefinitionRow): FieldDefinition {
+  return {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    key: row.key,
+    name: row.name,
+    type: row.type as FieldType,
+    options: (row.options as string[] | null) ?? [],
+    rank: row.rank,
+    showOnCard: row.showOnCard,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export function toFieldDefinitionRow(definition: FieldDefinition): FieldDefinitionRow {
+  return {
+    id: definition.id,
+    workspaceId: definition.workspaceId,
+    key: definition.key,
+    name: definition.name,
+    type: definition.type,
+    options: [...definition.options],
+    rank: definition.rank,
+    showOnCard: definition.showOnCard,
+    createdAt: definition.createdAt,
+    updatedAt: definition.updatedAt,
   };
 }
 

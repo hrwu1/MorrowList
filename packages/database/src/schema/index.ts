@@ -4,6 +4,7 @@ export * from "./project.js";
 export * from "./task.js";
 export * from "./events.js";
 export * from "./tag.js";
+export * from "./field.js";
 export * from "./flow.js";
 export * from "./notification.js";
 export * from "./saved-view.js";

@@ -1,6 +1,7 @@
-import { fixedClock, uuidv7 } from "@morrowlist/domain";
+import { fixedClock, parseFieldFilter, uuidv7 } from "@morrowlist/domain";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { FieldService } from "../fields/service.js";
 import { SCOPES, type ActorContext } from "../shared/actor-context.js";
 import { TagService } from "../tags/service.js";
 import {
@@ -2526,5 +2527,135 @@ describe("TaskService.batch (GAP-08, spec 10.4)", () => {
       }),
       // Reported as not-found so the response never confirms it exists (spec 22.5).
     ).rejects.toMatchObject({ code: "WORKSPACE_NOT_FOUND" });
+  });
+});
+
+describe("typed custom fields on a task (GAP-24)", () => {
+  let fields: FieldService;
+
+  beforeEach(async () => {
+    fields = new FieldService({ unitOfWork, clock: fixedClock(NOW) });
+    await fields.create(seeded.context, seeded.workspace.id, {
+      name: "Effort",
+      type: "number",
+    });
+    await fields.create(seeded.context, seeded.workspace.id, {
+      name: "Stage",
+      type: "select",
+      options: ["alpha", "beta"],
+    });
+  });
+
+  it("sets values on create and validates them against the definitions", async () => {
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Sized",
+      fields: { effort: "3", stage: "beta" },
+    });
+
+    expect(task.fields).toEqual({ effort: 3, stage: "beta" });
+    await expect(
+      service.create(seeded.context, {
+        workspaceId: seeded.workspace.id,
+        title: "Bad",
+        fields: { stage: "gamma" },
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    await expect(
+      service.create(seeded.context, {
+        workspaceId: seeded.workspace.id,
+        title: "Unknown",
+        fields: { nope: 1 },
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  });
+
+  it("patches one key, clears with null, and bumps the version once", async () => {
+    const created = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Sized",
+      fields: { effort: 3, stage: "alpha" },
+    });
+
+    const patched = await service.update(
+      seeded.context,
+      seeded.workspace.id,
+      created.id,
+      { fields: { stage: "beta" } },
+    );
+    expect(patched.fields).toEqual({ effort: 3, stage: "beta" });
+    expect(patched.version).toBe(created.version + 1);
+
+    const cleared = await service.update(
+      seeded.context,
+      seeded.workspace.id,
+      created.id,
+      { fields: { effort: null } },
+    );
+    expect(cleared.fields).toEqual({ stage: "beta" });
+
+    // The diff lands in the ordinary task.updated payload, so no new event type exists.
+    expect(unitOfWork.data.activity.at(-1)).toMatchObject({
+      eventType: "task.updated",
+      payload: { changes: { fields: { to: { stage: "beta" } } } },
+    });
+  });
+
+  it("records nothing when the values are unchanged", async () => {
+    const created = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Sized",
+      fields: { effort: 3 },
+    });
+    const before = unitOfWork.data.activity.length;
+
+    const again = await service.update(
+      seeded.context,
+      seeded.workspace.id,
+      created.id,
+      { fields: { effort: 3 } },
+    );
+    expect(again.version).toBe(created.version);
+    expect(unitOfWork.data.activity).toHaveLength(before);
+  });
+
+  it("filters a list by every operator and refuses an unknown key", async () => {
+    const small = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Small",
+      fields: { effort: 1, stage: "alpha" },
+    });
+    const large = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Large",
+      fields: { effort: 8, stage: "beta" },
+    });
+    const unsized = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Unsized",
+    });
+
+    const ids = async (expression: string) =>
+      (
+        await service.list(
+          seeded.context,
+          listQuery({ fields: [parseFieldFilter(expression)] }),
+        )
+      ).data.map((task) => task.id);
+
+    expect(await ids("effort:eq:8")).toEqual([large.id]);
+    expect(await ids("effort:gt:5")).toEqual([large.id]);
+    expect(await ids("effort:lt:5")).toEqual([small.id]);
+    expect(await ids("effort:between:1..5")).toEqual([small.id]);
+    expect(await ids("effort:empty")).toEqual([unsized.id]);
+    expect(await ids("effort:ne:8")).toEqual([small.id, unsized.id]);
+    expect(await ids("stage:eq:beta")).toEqual([large.id]);
+
+    await expect(
+      service.list(
+        seeded.context,
+        listQuery({ fields: [parseFieldFilter("ghost:eq:1")] }),
+      ),
+    ).rejects.toMatchObject({ code: "FIELD_NOT_FOUND" });
   });
 });

@@ -1,6 +1,7 @@
 import { PROJECT_BOARD_TASK_LIMIT, UPCOMING_TASK_LIMIT } from "@morrowlist/contracts";
 import type {
   ChildProgress,
+  FieldFilter,
   PlainDate,
   RelationType,
   Tag,
@@ -43,6 +44,11 @@ export interface TaskFilter {
   readonly deferred?: boolean | undefined;
   /** `week` is a deadline from `today` through the next seven days inclusive. */
   readonly deadline?: "overdue" | "week" | "none" | undefined;
+  /**
+   * Typed custom-field filters (GAP-24), already resolved against their definitions so
+   * the values are in stored form. Combined with AND, at most `MAX_FIELD_FILTERS`.
+   */
+  readonly fields?: readonly FieldFilter[] | undefined;
   /** The workspace's local date, for the `due`, `deferred`, and `deadline` filters (spec 12.3). */
   readonly today?: string | undefined;
   readonly sort?:

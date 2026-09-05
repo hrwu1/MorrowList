@@ -13,7 +13,8 @@ export type AggregateType =
   | "status"
   | "tag"
   | "workspace"
-  | "saved_view";
+  | "saved_view"
+  | "field";
 
 export interface ActivityEventInput {
   readonly id: string;

@@ -14,7 +14,10 @@ import {
   createStatusRequestSchema,
   createSavedViewRequestSchema,
   createTaskRequestSchema,
+  createFieldRequestSchema,
   errorResponseSchema,
+  fieldListResponseSchema,
+  fieldResponseSchema,
   exportTasksCsvQuerySchema,
   exportWorkspaceQuerySchema,
   flowQuerySchema,
@@ -67,6 +70,7 @@ import {
   webhookSubscriptionListResponseSchema,
   webhookSubscriptionResponseSchema,
   upcomingViewResponseSchema,
+  updateFieldRequestSchema,
   updateSavedViewRequestSchema,
   updateTagRequestSchema,
   updateProjectRequestSchema,
@@ -106,6 +110,10 @@ const registry = {
   TagList: tagListResponseSchema,
   CreateTagRequest: createTagRequestSchema,
   UpdateTagRequest: updateTagRequestSchema,
+  Field: fieldResponseSchema,
+  FieldList: fieldListResponseSchema,
+  CreateFieldRequest: createFieldRequestSchema,
+  UpdateFieldRequest: updateFieldRequestSchema,
   WorkflowStatus: workflowStatusResponseSchema,
   WorkflowStatusList: workflowStatusListResponseSchema,
   CreateProjectRequest: createProjectRequestSchema,
@@ -210,6 +218,21 @@ const statusIdParam = {
   in: "path",
   required: true,
   schema: { type: "string", format: "uuid" },
+};
+
+/**
+ * The dotted field-filter parameters cannot be enumerated: their names depend on what a
+ * workspace defined. OpenAPI 3.1 spells that as one free-form object parameter.
+ */
+const fieldFilterParam = {
+  name: "field",
+  in: "query",
+  required: false,
+  style: "form",
+  explode: true,
+  description:
+    "Typed custom-field filters, sent as `field.<key>=<operator>[:<value>]`. Operators: eq, ne, lt, gt, between (low..high), empty.",
+  schema: { type: "object", additionalProperties: { type: "string" } },
 };
 
 const notFound = {
@@ -901,6 +924,62 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
           },
         },
       },
+      "/fields": {
+        get: {
+          summary: "List typed custom fields",
+          description:
+            "Every field the workspace defines, in the order they are shown, with the number of live tasks carrying a value for each.",
+          parameters: [workspaceIdParam],
+          responses: {
+            "200": {
+              description: "The workspace's fields",
+              ...jsonContent(ref("FieldList")),
+            },
+            ...commonErrors,
+          },
+        },
+        post: {
+          summary: "Define a typed custom field",
+          description:
+            "A workspace may define at most ten fields of four types (select, number, date, text). The eleventh is refused with FIELD_LIMIT_REACHED: the cap is the design, not a quota. The key is derived from the name when omitted and is unique per workspace.",
+          parameters: [workspaceIdParam],
+          requestBody: { required: true, ...jsonContent(ref("CreateFieldRequest")) },
+          responses: {
+            "201": { description: "The created field", ...jsonContent(ref("Field")) },
+            "409": {
+              description: "The key is taken, or the workspace already has ten fields",
+              ...jsonContent(ref("ErrorResponse")),
+            },
+            ...commonErrors,
+          },
+        },
+      },
+      "/fields/{id}": {
+        patch: {
+          summary:
+            "Rename a field, recut a select's options, or change what shows on a card",
+          description:
+            "The key and the type are immutable: changing either would reinterpret the values already stored on tasks.",
+          parameters: [taskIdParam, workspaceIdParam],
+          requestBody: { required: true, ...jsonContent(ref("UpdateFieldRequest")) },
+          responses: {
+            "200": { description: "The updated field", ...jsonContent(ref("Field")) },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+        delete: {
+          summary: "Delete a field",
+          description:
+            "Removes the definition and, in the same transaction, its value from every task. The activity entry records how many tasks lost a value.",
+          parameters: [taskIdParam, workspaceIdParam],
+          responses: {
+            "204": { description: "The field was deleted" },
+            "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
       "/tasks/{id}/tags/{tagId}": {
         post: {
           summary: "Add a tag to a task",
@@ -932,7 +1011,15 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
       "/tasks": {
         get: {
           summary: "List tasks",
-          parameters: [workspaceIdParam, ...queryParameters(listTasksQuerySchema)],
+          description:
+            "Typed custom fields are filtered with one parameter per field: `field.<key>=<operator>[:<value>]`, where the operator is one of eq, ne, lt, gt, between or empty and `between` takes `low..high`. For example `field.effort=gt:3`. At most four may be combined.",
+          parameters: [
+            workspaceIdParam,
+            ...queryParameters(listTasksQuerySchema).filter(
+              (parameter) => (parameter as { name: string }).name !== "fields",
+            ),
+            fieldFilterParam,
+          ],
           responses: {
             "200": { description: "A page of tasks", ...jsonContent(ref("TaskList")) },
             ...commonErrors,

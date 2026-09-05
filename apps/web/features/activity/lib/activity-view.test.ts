@@ -1,4 +1,5 @@
 import {
+  FIELD_EVENTS,
   PROJECT_EVENTS,
   TASK_EVENTS,
   WORKSPACE_EVENTS,
@@ -44,6 +45,7 @@ const CATALOGUE: Record<string, Partial<ActivityEntryDto>> = {
       { field: "deferUntil", from: null, to: "2026-09-10" },
       { field: "deadline", from: "2026-09-20", to: null },
       { field: "descriptionMd", from: null, to: "## Notes" },
+      { field: "fields", from: null, to: "effort: 3" },
     ],
   },
   [TASK_EVENTS.moved]: { summary: "Moved task to another status" },
@@ -113,6 +115,12 @@ const CATALOGUE: Record<string, Partial<ActivityEntryDto>> = {
     aggregateType: "workspace",
     summary: "Removed webhook endpoint https://hooks.example/morrow",
   },
+  [FIELD_EVENTS.created]: { aggregateType: "field", summary: "Created field Effort" },
+  [FIELD_EVENTS.updated]: {
+    aggregateType: "field",
+    summary: "Updated field Effort",
+  },
+  [FIELD_EVENTS.deleted]: { aggregateType: "field", summary: "Deleted field Effort" },
 };
 
 describe("describeEntry", () => {
@@ -121,6 +129,7 @@ describe("describeEntry", () => {
       ...Object.values(TASK_EVENTS),
       ...Object.values(PROJECT_EVENTS),
       ...Object.values(WORKSPACE_EVENTS),
+      ...Object.values(FIELD_EVENTS),
     ];
     expect(Object.keys(CATALOGUE).sort()).toEqual([...catalogued].sort());
 

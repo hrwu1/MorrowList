@@ -17,6 +17,7 @@ const FIELD_LABELS: Record<string, string> = {
   deadline: "Deadline",
   deadlineTime: "Deadline time",
   reminderOffsetMinutes: "Reminder (minutes before)",
+  fields: "Custom fields",
 };
 
 const ACTOR_KIND_LABELS: Record<ActivityEntryDto["actorKind"], string> = {

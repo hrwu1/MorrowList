@@ -14,6 +14,7 @@ import {
   skipOccurrenceRequestSchema,
   updateTaskRequestSchema,
 } from "@morrowlist/contracts";
+import { MAX_FIELD_FILTERS, parseFieldFilter } from "@morrowlist/domain";
 import { Hono } from "hono";
 import type { z } from "zod";
 
@@ -32,7 +33,7 @@ export function taskRoutes(deps: ApiDependencies) {
     new Hono<ApiEnv>()
       .get("/tasks", async (c) => {
         const actor = c.get("actor");
-        const query = parseQuery(c.req.query(), listTasksQuerySchema);
+        const query = parseQuery(withFieldFilters(c.req.query()), listTasksQuerySchema);
         const result = await deps.taskService.list(actor, {
           ...query,
           workspaceId: requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
@@ -324,4 +325,31 @@ async function parseOptionalBody<T extends z.ZodType>(
     throw new ApiError("VALIDATION_FAILED", "Request body must be valid JSON.");
   }
   return parseQuery(parsed as Record<string, string | undefined>, schema);
+}
+
+/**
+ * Fold the typed custom-field parameters of a list query into the array the contract
+ * carries (GAP-24). On the wire each filter is its own parameter — `field.effort=gt:3`,
+ * `field.stage=eq:beta`, `field.owner=empty` — because that reads in an address bar and
+ * needs no escaping beyond the value itself. A malformed expression is a validation
+ * error, never a silently wider list.
+ */
+function withFieldFilters(
+  query: Record<string, string | undefined>,
+): Record<string, unknown> {
+  const filters = Object.entries(query).flatMap(([name, value]) =>
+    name.startsWith("field.") ? [`${name.slice("field.".length)}:${value ?? ""}`] : [],
+  );
+  if (filters.length === 0) return query;
+  if (filters.length > MAX_FIELD_FILTERS) {
+    throw new ApiError(
+      "VALIDATION_FAILED",
+      `At most ${MAX_FIELD_FILTERS} field filters can be combined.`,
+      { field: "fields", maxFilters: MAX_FIELD_FILTERS },
+    );
+  }
+  return {
+    ...query,
+    fields: filters.map((expression) => parseFieldFilter(expression)),
+  };
 }

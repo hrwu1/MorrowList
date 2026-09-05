@@ -23,7 +23,7 @@ export async function parseJsonBody<T extends z.ZodType>(
 }
 
 export function parseQuery<T extends z.ZodType>(
-  query: Record<string, string | string[] | undefined>,
+  query: Record<string, unknown>,
   schema: T,
 ): z.infer<T> {
   return parseWith(schema, query);

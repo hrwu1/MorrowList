@@ -11,6 +11,12 @@ import {
   timezoneSchema,
   uuidSchema,
 } from "./common.js";
+import {
+  MAX_FIELD_FILTERS,
+  fieldFilterSchema,
+  fieldValuePatchSchema,
+  fieldValuesSchema,
+} from "./field.js";
 import { tagSchema } from "./tag.js";
 
 /** Task transport schemas (spec 20.3–20.5). */
@@ -127,6 +133,11 @@ export const taskSchema = z.object({
   dateWarnings: z.array(dateWarningSchema),
   /** Minutes before the due time a reminder fires; null when there is no reminder. */
   reminderOffsetMinutes: reminderOffsetSchema.nullable(),
+  /**
+   * Values of the workspace's typed custom fields, keyed by the definition's key
+   * (GAP-24). `{}` when nothing is set; a key whose definition is gone is never listed.
+   */
+  fields: fieldValuesSchema,
   parentTaskId: uuidSchema.nullable(),
   recurrence: recurrenceRuleSchema.nullable(),
   /** Shared by every occurrence of a repeating task; the first occurrence's id. */
@@ -185,6 +196,8 @@ export const createTaskRequestSchema = z
     /** Omitted applies the default when there is a due time; null means no reminder. */
     reminderOffsetMinutes: reminderOffsetSchema.nullish(),
     parentTaskId: uuidSchema.nullish(),
+    /** Typed custom-field values, validated against the workspace's definitions. */
+    fields: fieldValuePatchSchema.optional(),
     recurrence: recurrenceRuleSchema.nullish(),
     /** Add the new task to a My Day date in the same command (spec 20.4). */
     addToDay: plainDateSchema.nullish(),
@@ -222,6 +235,8 @@ export const updateTaskRequestSchema = z
     deadlineTime: plainTimeSchema.nullable().optional(),
     /** Requires a due time; null removes the reminder (GAP-13). */
     reminderOffsetMinutes: reminderOffsetSchema.nullable().optional(),
+    /** An omitted key is untouched; an explicit null clears that field (GAP-24). */
+    fields: fieldValuePatchSchema.optional(),
     expectedVersion: z.number().int().positive().optional(),
   })
   .refine((body) => Object.keys(body).some((key) => key !== "expectedVersion"), {
@@ -360,6 +375,12 @@ export const listTasksQuerySchema = paginationQuerySchema.extend({
   deferred: z.stringbool().optional(),
   /** `week` is a deadline from today through the next seven days inclusive. */
   deadline: deadlineFilterSchema.optional(),
+  /**
+   * Typed custom-field filters (GAP-24). On the wire each one is its own query
+   * parameter, `field.<key>=<op>[:<value>]` — for example `field.effort=gt:3` or
+   * `field.stage=between:a..b`; the route folds them into this array.
+   */
+  fields: z.array(fieldFilterSchema).max(MAX_FIELD_FILTERS).optional(),
   includeSubtasks: z.stringbool().default(true),
   /** Inbox tasks only: no project (spec 9.1). */
   inbox: z.stringbool().optional(),

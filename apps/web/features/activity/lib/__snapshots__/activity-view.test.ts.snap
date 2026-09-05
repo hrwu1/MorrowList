@@ -2,6 +2,9 @@
 
 exports[`describeEntry > renders a readable line for every event type in the catalogue 1`] = `
 {
+  "field.created": "Created field Effort",
+  "field.deleted": "Deleted field Effort",
+  "field.updated": "Updated field Effort",
   "project.archived": "Archived project",
   "project.created": "Created project Launch",
   "project.restored": "Restored project",
@@ -26,7 +29,7 @@ exports[`describeEntry > renders a readable line for every event type in the cat
   "task.tag_added": "Added tag Focus",
   "task.tag_removed": "Removed tag Focus",
   "task.unblocked": "Cleared the blocked flag",
-  "task.updated": "Updated task fields · Title: Draft brief → Draft the brief · Priority: none → high · Due date: none → 2026-09-15 · Defer until: none → 2026-09-10 · Deadline: 2026-09-20 → none · Description: none → ## Notes",
+  "task.updated": "Updated task fields · Title: Draft brief → Draft the brief · Priority: none → high · Due date: none → 2026-09-15 · Defer until: none → 2026-09-10 · Deadline: 2026-09-20 → none · Description: none → ## Notes · Custom fields: none → effort: 3",
   "workspace.created": "Created workspace Alex's Workspace",
   "workspace.digest_sent": "Sent Today digest for 2026-08-29",
   "workspace.imported": "Imported 24 tasks from Trello into Website Relaunch",

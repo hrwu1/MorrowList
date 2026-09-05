@@ -22,6 +22,7 @@ import {
   DomainError,
   MAX_TAGS_PER_TASK,
   ValidationError,
+  applyFields,
   assertExpectedVersion,
   assertNoBlocksCycle,
   assertParentIsAssignable,
@@ -54,6 +55,7 @@ import {
   type Clock,
   type CreateTaskInput,
   type DayPlanSource,
+  type FieldValues,
   type PlainDate,
   type PlainTime,
   type StatusCategory,
@@ -63,6 +65,7 @@ import {
   type WorkflowStatus,
 } from "@morrowlist/domain";
 
+import { resolveFieldFilters } from "../fields/service.js";
 import { syncIntervals } from "../flow/intervals.js";
 import {
   defaultReminderOffset,
@@ -180,6 +183,15 @@ export class TaskService {
           request.workspaceId,
         ),
         parentTaskId: parent?.id ?? null,
+        // Values are validated against the workspace's own definitions, which the
+        // transport cannot know about (GAP-24).
+        fields: request.fields
+          ? applyFields(
+              {},
+              request.fields,
+              await tx.fields.listByWorkspace(request.workspaceId),
+            )
+          : ({} as FieldValues),
         recurrence: request.recurrence ?? null,
         project: destination,
       });
@@ -287,9 +299,10 @@ export class TaskService {
       const after = query.cursor
         ? decodeCursor(query.cursor, this.cursorSecret).i
         : undefined;
+      const fields = await resolveFieldFilters(tx, query.workspaceId, query.fields);
 
       const page: Page<Task> = await tx.tasks.list(
-        toTaskFilter(query, this.workspaceToday(workspace.timezone)),
+        toTaskFilter(query, this.workspaceToday(workspace.timezone), fields),
         { limit: query.limit, after },
       );
 
@@ -370,6 +383,12 @@ export class TaskService {
               : {}),
             ...(request.reminderOffsetMinutes !== undefined
               ? { reminderOffsetMinutes: request.reminderOffsetMinutes }
+              : {}),
+            ...(request.fields !== undefined
+              ? {
+                  fields: request.fields,
+                  fieldDefinitions: await tx.fields.listByWorkspace(workspaceId),
+                }
               : {}),
             defaultReminderOffsetMinutes: await defaultReminderOffset(
               tx,

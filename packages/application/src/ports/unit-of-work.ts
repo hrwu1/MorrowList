@@ -1,5 +1,6 @@
 import type { DayPlanRepository } from "./day-plans.js";
 import type { ActivityRepository, OutboxRepository } from "./events.js";
+import type { FieldDefinitionRepository } from "./fields.js";
 import type { StatusIntervalRepository } from "./flow.js";
 import type {
   NotificationPreferenceRepository,
@@ -29,6 +30,7 @@ export interface TransactionContext {
   readonly projects: ProjectRepository;
   readonly statuses: WorkflowStatusRepository;
   readonly tags: TagRepository;
+  readonly fields: FieldDefinitionRepository;
   readonly statusIntervals: StatusIntervalRepository;
   readonly savedViews: SavedViewRepository;
   readonly webhookSubscriptions: WebhookSubscriptionRepository;

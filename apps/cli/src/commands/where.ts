@@ -23,8 +23,15 @@ export function listQueryFromFilters(
   filters: SearchFilters,
   tagId: string | undefined,
 ): Partial<ListTasksQuery> {
-  const { tag: _tag, ...rest } = filters;
-  return { ...rest, ...(tagId ? { tagId } : {}) };
+  const { tag: _tag, fields, ...rest } = filters;
+  return {
+    ...rest,
+    // The list query carries the field filters as its own mutable array (GAP-24).
+    ...(fields && fields.length > 0
+      ? { fields: fields.map((each) => ({ ...each })) }
+      : {}),
+    ...(tagId ? { tagId } : {}),
+  };
 }
 
 export interface WhereResult {

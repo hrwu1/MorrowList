@@ -10,6 +10,7 @@ import {
   isCompleted,
   isDeleted,
   taskKey,
+  type FieldFilter,
   type PlainDate,
   type Tag,
   type Task,
@@ -30,6 +31,9 @@ import { toTagDto } from "../tags/mappers.js";
 export function toTaskFilter(
   query: Partial<ListTasksQuery> & { readonly workspaceId: string },
   today: PlainDate,
+  // Resolved separately because binding a field filter to its definition needs the
+  // transaction (GAP-24); the raw `query.fields` cannot be used directly.
+  fields?: readonly FieldFilter[] | undefined,
 ): TaskFilter {
   return {
     workspaceId: query.workspaceId,
@@ -47,6 +51,7 @@ export function toTaskFilter(
     due: query.due,
     deferred: query.deferred,
     deadline: query.deadline,
+    fields,
     today,
     sort: query.sort,
     order: query.order,
@@ -155,6 +160,9 @@ export function toTaskDto(
         }
       : null,
     seriesId: task.seriesId,
+    // A slot on the canonical task, so the projection reads it straight off the row
+    // and no page needs an extra query for it (GAP-24, ADR-001).
+    fields: { ...task.fields },
     rank: task.rank,
     isCompleted: isCompleted(task),
     completedAt: task.completedAt?.toISOString() ?? null,

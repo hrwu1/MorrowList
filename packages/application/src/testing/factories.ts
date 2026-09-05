@@ -156,6 +156,7 @@ export function buildTask(
     blockedSince: null,
     recurrence: null,
     seriesId: null,
+    fields: {},
     version: 1,
     createdBy: { kind: "user", id: seeded.userId },
     lastActor: { kind: "user", id: seeded.userId },

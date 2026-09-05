@@ -12,11 +12,15 @@ import type {
   CompleteTaskRequest,
   CreateProjectRequest,
   CreateSavedViewRequest,
+  CreateFieldRequest,
   CreateTagRequest,
   CreateStatusRequest,
   CreateTaskRequest,
   ErrorCode,
   ErrorResponse,
+  FieldDefinitionDto,
+  FieldFilterDto,
+  FieldListResponse,
   ExportTasksCsvQuery,
   ExportWorkspaceQuery,
   FlowQuery,
@@ -61,6 +65,7 @@ import type {
   TodayViewResponse,
   UpcomingViewQuery,
   UpcomingViewResponse,
+  UpdateFieldRequest,
   UpdateNotificationPreferencesRequest,
   UpdateSavedViewRequest,
   UpdateTagRequest,
@@ -816,6 +821,51 @@ export class ApiClient {
     return response.data;
   }
 
+  async listFields(options: RequestOptions = {}): Promise<FieldListResponse> {
+    return this.send<FieldListResponse>(
+      "GET",
+      `/fields${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+  }
+
+  async createField(
+    body: CreateFieldRequest,
+    options: RequestOptions = {},
+  ): Promise<FieldDefinitionDto> {
+    const response = await this.send<{ data: FieldDefinitionDto }>(
+      "POST",
+      `/fields${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async updateField(
+    id: string,
+    body: UpdateFieldRequest,
+    options: RequestOptions = {},
+  ): Promise<FieldDefinitionDto> {
+    const response = await this.send<{ data: FieldDefinitionDto }>(
+      "PATCH",
+      `/fields/${encodeURIComponent(id)}${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async deleteField(id: string, options: RequestOptions = {}): Promise<void> {
+    await this.send<void>(
+      "DELETE",
+      `/fields/${encodeURIComponent(id)}${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+  }
+
   async listNotifications(
     query: Partial<ListNotificationsQuery> = {},
     options: RequestOptions = {},
@@ -1052,7 +1102,15 @@ export class ApiClient {
     if (workspaceId) params.set("workspaceId", workspaceId);
 
     for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== null) params.set(key, String(value));
+      if (value === undefined || value === null) continue;
+      // Typed custom-field filters are one dotted parameter each (GAP-24).
+      if (key === "fields" && Array.isArray(value)) {
+        for (const filter of value as FieldFilterDto[]) {
+          params.set(`field.${filter.key}`, fieldFilterValue(filter));
+        }
+        continue;
+      }
+      params.set(key, String(value));
     }
     const encoded = params.toString();
     return encoded ? `?${encoded}` : "";
@@ -1128,4 +1186,14 @@ export class ApiClient {
       error?.requestId ?? response.headers.get("x-request-id") ?? undefined,
     );
   }
+}
+
+/**
+ * The value half of a `field.<key>=` parameter: `<operator>[:<value>]`, with `between`
+ * spelled `low..high`. The server parses the same shape (GAP-24).
+ */
+function fieldFilterValue(filter: FieldFilterDto): string {
+  if (filter.op === "empty") return "empty";
+  if (filter.op === "between") return `between:${filter.value}..${filter.upper}`;
+  return `${filter.op}:${filter.value}`;
 }

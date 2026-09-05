@@ -17,6 +17,7 @@ export {
   type UpcomingTaskQuery,
 } from "./tasks.js";
 export type { DayPlanRepository } from "./day-plans.js";
+export type { FieldDefinitionRepository } from "./fields.js";
 export {
   NOTIFICATION_KINDS,
   type Notification,

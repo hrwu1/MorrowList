@@ -1,6 +1,7 @@
 import {
   ActivityService,
   ExportService,
+  FieldService,
   FlowService,
   ImportService,
   NotificationService,
@@ -104,6 +105,7 @@ beforeEach(async () => {
     importService: new ImportService({ unitOfWork, clock: fixedClock(NOW) }),
     viewService: new ViewService({ unitOfWork, clock: fixedClock(NOW) }),
     tagService: new TagService({ unitOfWork, clock: fixedClock(NOW) }),
+    fieldService: new FieldService({ unitOfWork, clock: fixedClock(NOW) }),
     searchService: new SearchService({
       unitOfWork,
       clock: fixedClock(NOW),

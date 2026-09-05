@@ -14,10 +14,14 @@ describe("--where to list query", () => {
   it.each(SEARCH_GRAMMAR_EXAMPLES.filter((row) => row.text === ""))(
     "maps $query",
     ({ query, filters }) => {
-      const { tag, ...rest } = filters;
+      const { tag, fields, ...rest } = filters;
       expect(
         listQueryFromFilters(parseSearchQuery(query).filters, tag ? TAG_ID : undefined),
-      ).toEqual({ ...rest, ...(tag ? { tagId: TAG_ID } : {}) });
+      ).toEqual({
+        ...rest,
+        ...(fields ? { fields: fields.map((each) => ({ ...each })) } : {}),
+        ...(tag ? { tagId: TAG_ID } : {}),
+      });
     },
   );
 

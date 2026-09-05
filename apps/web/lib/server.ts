@@ -3,6 +3,7 @@ import "server-only";
 import { createApiApp, type ApiDependencies } from "@morrowlist/api";
 import {
   ActivityService,
+  FieldService,
   ExportService,
   FlowService,
   ImportService,
@@ -139,6 +140,7 @@ export function getContainer(): Container {
     importService: new ImportService({ unitOfWork }),
     viewService: new ViewService({ unitOfWork }),
     tagService: new TagService({ unitOfWork }),
+    fieldService: new FieldService({ unitOfWork }),
     searchService: new SearchService({ unitOfWork, cursorSecret }),
     savedViewService: new SavedViewService({ unitOfWork }),
     notificationService,

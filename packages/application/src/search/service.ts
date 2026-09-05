@@ -18,6 +18,7 @@ import {
   type Task,
 } from "@morrowlist/domain";
 
+import { resolveFieldFilters } from "../fields/service.js";
 import type {
   TaskFilter,
   TransactionContext,
@@ -92,6 +93,9 @@ export class SearchService {
         due: parsed.filters.due ?? request.due,
         deferred: parsed.filters.deferred ?? request.deferred,
         deadline: parsed.filters.deadline ?? request.deadline,
+        // `field:` operators are resolved against the workspace's definitions; an
+        // unknown key is an error, never a silently wider result (GAP-24).
+        fields: await resolveFieldFilters(tx, workspace.id, parsed.filters.fields),
         today,
       };
 

@@ -34,6 +34,7 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     parentTaskId: null,
     recurrence: null,
     seriesId: null,
+    fields: {},
     rank: "aa",
     isCompleted: false,
     completedAt: null,
@@ -76,9 +77,24 @@ describe("readTaskView", () => {
       blocked: "any",
       deferred: "any",
       deadline: "any",
+      fields: [],
       sort: "dueDate",
       order: "desc",
     });
+  });
+
+  it("reads, writes and applies typed custom-field filters (GAP-24)", () => {
+    const view = readTaskView(
+      new URLSearchParams("field=effort%3Agt%3A3&field=stage%3Aeq%3Abeta"),
+    );
+    expect(view.fields).toEqual([
+      { key: "effort", op: "gt", value: "3", upper: null },
+      { key: "stage", op: "eq", value: "beta", upper: null },
+    ]);
+    expect(writeTaskView(view)).toBe("field=effort%3Agt%3A3&field=stage%3Aeq%3Abeta");
+    expect(toListQuery("all", view).fields).toEqual(view.fields);
+    // A broken expression is dropped rather than made into an unreachable page.
+    expect(readTaskView(new URLSearchParams("field=nonsense")).fields).toEqual([]);
   });
 });
 
@@ -293,8 +309,12 @@ describe("saved view filters", () => {
   it.each(SEARCH_GRAMMAR_EXAMPLES.filter((row) => row.text === ""))(
     "produces the same query as --where $query",
     ({ filters }) => {
-      const { tag, ...rest } = filters;
-      const expected = { ...rest, ...(tag ? { tagId: TAG_ID } : {}) };
+      const { tag, fields, ...rest } = filters;
+      const expected = {
+        ...rest,
+        ...(fields ? { fields: fields.map((each) => ({ ...each })) } : {}),
+        ...(tag ? { tagId: TAG_ID } : {}),
+      };
       const view = viewFromFilters(expected);
       const {
         sort: _sort,

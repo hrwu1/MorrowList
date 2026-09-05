@@ -48,6 +48,7 @@ const BASE_TASK: TaskDto = {
   parentTaskId: null,
   recurrence: null,
   seriesId: null,
+  fields: {},
   rank: "a0",
   isCompleted: false,
   completedAt: null,

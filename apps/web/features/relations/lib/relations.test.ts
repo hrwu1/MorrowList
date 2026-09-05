@@ -64,6 +64,7 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     isBlocked: false,
     recurrence: null,
     seriesId: null,
+    fields: {},
     ...overrides,
   };
 }

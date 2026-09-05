@@ -1,9 +1,17 @@
 import type {
+  FieldFilterDto,
   ListTasksQuery,
   Priority,
   SavedViewFilters,
   TaskDto,
 } from "@morrowlist/contracts";
+
+import {
+  MAX_FIELD_FILTERS,
+  formatFieldFilter,
+  matchesFieldFilter,
+  parseFieldFilter,
+} from "@/features/fields/lib/field-filters";
 
 /**
  * List view state as URL state (spec 7.5, VIEW-002).
@@ -47,6 +55,11 @@ export interface TaskView {
    */
   readonly deferred: DeferredFilter | "any";
   readonly deadline: DeadlineFilter | "any";
+  /**
+   * Typed custom-field filters (GAP-24). Each one is a `field=<key>:<op>[:<value>]`
+   * query parameter, so a filtered list is still a copyable URL.
+   */
+  readonly fields: readonly FieldFilterDto[];
   readonly sort: TaskSort;
   readonly order: TaskOrder;
 }
@@ -66,6 +79,7 @@ export const DEFAULT_VIEW: TaskView = {
   blocked: "any",
   deferred: "any",
   deadline: "any",
+  fields: [],
   sort: "rank",
   order: "asc",
 };
@@ -99,6 +113,7 @@ export function readTaskView(
     blocked: oneOf(BLOCKED_FILTERS, params.get("blocked")) ?? base.blocked,
     deferred: oneOfOrAny(DEFERRED_FILTERS, params.get("deferred")) ?? base.deferred,
     deadline: oneOfOrAny(DEADLINE_FILTERS, params.get("deadline")) ?? base.deadline,
+    fields: readFieldFilters(params) ?? base.fields,
     sort: oneOf(SORTS, params.get("sort")) ?? base.sort,
     order: oneOf(ORDERS, params.get("order")) ?? base.order,
   };
@@ -130,6 +145,11 @@ export function writeTaskView(
   set("sort", view.sort, base.sort);
   set("order", view.order, base.order);
 
+  params.delete("field");
+  if (writeFieldFilters(view.fields) !== writeFieldFilters(base.fields)) {
+    for (const filter of view.fields) params.append("field", formatFieldFilter(filter));
+  }
+
   return params.toString();
 }
 
@@ -155,6 +175,7 @@ export function toListQuery(scope: TaskScope, view: TaskView): Partial<ListTasks
     // An explicit choice overrides the Inbox's default of hiding deferred tasks.
     ...(view.deferred === "any" ? {} : { deferred: view.deferred === "yes" }),
     ...(view.deadline === "any" ? {} : { deadline: view.deadline }),
+    ...(view.fields.length > 0 ? { fields: view.fields.map((f) => ({ ...f })) } : {}),
     sort: view.sort,
     order: view.order,
   };
@@ -196,6 +217,7 @@ export function viewFromFilters(filters: SavedViewFilters): {
             ? "yes"
             : "no",
       deadline: filters.deadline ?? "any",
+      fields: filters.fields ?? [],
       completion:
         filters.isCompleted === undefined
           ? "any"
@@ -251,5 +273,26 @@ export function matchesFilters(
   }
   if (filters.seriesId !== undefined && task.seriesId !== filters.seriesId)
     return false;
+  for (const filter of filters.fields ?? []) {
+    if (!matchesFieldFilter(task.fields, filter)) return false;
+  }
   return true;
+}
+
+/**
+ * The field filters a URL carries. An expression that does not parse is dropped rather
+ * than shown as an error: the address bar is user input, and a broken filter must not
+ * make the page unreachable.
+ */
+function readFieldFilters(params: URLSearchParams): FieldFilterDto[] | undefined {
+  const raw = params.getAll("field");
+  if (raw.length === 0) return undefined;
+  return raw
+    .slice(0, MAX_FIELD_FILTERS)
+    .flatMap((expression) => parseFieldFilter(expression) ?? []);
+}
+
+/** A stable string for comparing two filter sets. */
+export function writeFieldFilters(filters: readonly FieldFilterDto[]): string {
+  return filters.map(formatFieldFilter).join(" ");
 }

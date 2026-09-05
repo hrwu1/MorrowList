@@ -15,6 +15,7 @@ import {
 import {
   addDays,
   type ChildProgress,
+  type FieldFilter,
   type PlainDate,
   type Tag,
   type Task,
@@ -86,6 +87,37 @@ const PRIORITY_RANK = sql`
     else 0
   end
 `;
+
+/**
+ * One typed custom-field filter as SQL (GAP-24).
+ *
+ * `eq` is jsonb containment, which is what `tasks_fields_idx` can answer with an index
+ * scan; `empty` is key existence, also a GIN operator. The ordering comparisons compare
+ * the extracted jsonb value against a jsonb literal, so numbers compare numerically and
+ * strings lexicographically — chronological for ISO dates — and a key that is absent
+ * yields NULL and drops out. No cast can fail on a value of another shape.
+ */
+const fieldCondition = (filter: FieldFilter): SQL => {
+  const key = filter.key;
+  const value = sql`${JSON.stringify(filter.value ?? null)}::jsonb`;
+  switch (filter.op) {
+    case "empty":
+      return sql`not (${tasks.fields} ? ${key}::text)`;
+    case "eq":
+      return sql`${tasks.fields} @> ${JSON.stringify({ [key]: filter.value })}::jsonb`;
+    case "ne":
+      // A task with no value is "not X" too, which is what people mean by "is not".
+      return sql`not (${tasks.fields} @> ${JSON.stringify({ [key]: filter.value })}::jsonb)`;
+    case "lt":
+      return sql`${tasks.fields} -> ${key}::text < ${value}`;
+    case "gt":
+      return sql`${tasks.fields} -> ${key}::text > ${value}`;
+    default: {
+      const upper = sql`${JSON.stringify(filter.upper ?? null)}::jsonb`;
+      return sql`(${tasks.fields} -> ${key}::text >= ${value} and ${tasks.fields} -> ${key}::text <= ${upper})`;
+    }
+  }
+};
 
 /** Live on `date`: no defer date, or one that has arrived (GAP-16). */
 const notDeferredOn = (date: PlainDate) =>
@@ -166,6 +198,9 @@ export function createTaskRepository(db: Database): TaskRepository {
 
     if (filter.isBlocked !== undefined) {
       conditions.push(filter.isBlocked ? BLOCKED : sql`not ${BLOCKED}`);
+    }
+    for (const fieldFilter of filter.fields ?? []) {
+      conditions.push(fieldCondition(fieldFilter));
     }
     return conditions;
   };

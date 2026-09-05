@@ -68,6 +68,9 @@ export const tasks = pgTable(
     recurrence: jsonb("recurrence"),
     // The first occurrence's id, shared by every task in one repeating series.
     seriesId: uuid("series_id"),
+    // Typed custom-field values keyed by the definition's key (GAP-24). A slot on the
+    // canonical task, indexed with GIN so an equality filter is an index scan.
+    fields: jsonb("fields").notNull().default({}),
     // COLLATE "C" is applied in the migration; see domain/shared/rank.ts for why.
     rank: varchar("rank", { length: 64 }).notNull(),
     // The COLLATE "C" clause itself lives in migration 0001; Drizzle does not model
@@ -97,6 +100,7 @@ export const tasks = pgTable(
   (table) => [
     uniqueIndex("tasks_workspace_number_key").on(table.workspaceId, table.taskNumber),
     index("tasks_search_idx").using("gin", table.searchVector),
+    index("tasks_fields_idx").using("gin", table.fields),
     index("tasks_workspace_state_idx").on(
       table.workspaceId,
       table.deletedAt,

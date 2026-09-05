@@ -752,6 +752,7 @@ describe("recurrence", () => {
       priority: "high",
       projectId: "project-1",
       parentTaskId: "parent-1",
+      fields: {},
       dueDate: "2026-09-10",
       dueTime: "09:00",
       dueTimezone: "Europe/Berlin",

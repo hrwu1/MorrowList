@@ -1,5 +1,6 @@
 import type { ActorRef } from "../shared/actor.js";
 
+import type { FieldValues } from "./fields.js";
 import type { RecurrenceRule } from "./recurrence.js";
 import type { Priority, PlainDate, PlainTime } from "./values.js";
 
@@ -34,6 +35,11 @@ export interface Task {
    * with a due time can carry one (GAP-13).
    */
   readonly reminderOffsetMinutes: number | null;
+  /**
+   * Values of the workspace's typed custom fields, keyed by the definition's key
+   * (GAP-24). A slot on the canonical task, never a second model: `{}` when unset.
+   */
+  readonly fields: FieldValues;
   readonly parentTaskId: string | null;
   /** How the task repeats; completing it creates the next occurrence (GAP-12). */
   readonly recurrence: RecurrenceRule | null;

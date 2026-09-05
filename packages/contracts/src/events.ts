@@ -22,6 +22,7 @@ export const aggregateTypeSchema = z.enum([
   "tag",
   "workspace",
   "saved_view",
+  "field",
 ]);
 
 export const domainEventSchema = z.object({
@@ -94,6 +95,17 @@ export const TAG_EVENTS = {
 } as const;
 
 /** Payload: `{ viewId, name, layout, filters }`; updated adds `changes`. */
+/**
+ * Typed custom-field definitions (GAP-24). Payload: `{ fieldId, key, name, type }`;
+ * `updated` adds `changes`, and `deleted` adds `taskCount` — how many tasks lost a value
+ * when the definition went.
+ */
+export const FIELD_EVENTS = {
+  created: "field.created",
+  updated: "field.updated",
+  deleted: "field.deleted",
+} as const;
+
 export const SAVED_VIEW_EVENTS = {
   created: "saved_view.created",
   updated: "saved_view.updated",

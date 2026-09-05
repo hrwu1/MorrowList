@@ -1,4 +1,9 @@
 import { ValidationError } from "../shared/errors.js";
+import {
+  MAX_FIELD_FILTERS,
+  parseFieldFilter,
+  type FieldFilter,
+} from "../task/fields.js";
 import { PRIORITIES, isPriority, type Priority } from "../task/values.js";
 
 /**
@@ -14,6 +19,7 @@ import { PRIORITIES, isPriority, type Priority } from "../task/values.js";
  *   is:open|done|blocked|deferred
  *   in:inbox
  *   deadline:overdue|week|none
+ *   field:effort:gt:3          a typed custom field (GAP-24); see `parseFieldFilter`
  *
  * Keys are case-insensitive. An unknown key is ordinary text (`12:30` is a time, not an
  * operator); a known key with an unknown value is a validation error, so a typo never
@@ -39,6 +45,8 @@ export interface SearchFilters {
   /** `is:deferred`: hidden until a later day (GAP-16). */
   readonly deferred?: boolean;
   readonly deadline?: DeadlineState;
+  /** Typed custom-field filters (GAP-24); the caller resolves them to definitions. */
+  readonly fields?: readonly FieldFilter[];
 }
 
 export interface SearchQuery {
@@ -55,6 +63,11 @@ export const SEARCH_OPERATORS = [
   { key: "is", values: ["open", "done", "blocked", "deferred"], description: "state" },
   { key: "in", values: ["inbox"], description: "location" },
   { key: "deadline", values: DEADLINE_STATES, description: "deadline state" },
+  {
+    key: "field",
+    values: null,
+    description: "custom field, as key:operator[:value], e.g. field:effort:gt:3",
+  },
 ] as const;
 
 const IS_STATES = ["open", "done", "blocked", "deferred"] as const;
@@ -123,6 +136,22 @@ export function parseSearchQuery(raw: string): SearchQuery {
           unknownValue(key, value, DEADLINE_STATES);
         }
         filters = { ...filters, deadline: deadline as DeadlineState };
+        break;
+      }
+      case "field": {
+        const parsed = parseFieldFilter(unquote(value));
+        // A repeated key keeps its last filter, like every other operator; different
+        // keys accumulate up to the cap.
+        const kept = (filters.fields ?? []).filter(
+          (existing) => existing.key !== parsed.key,
+        );
+        if (kept.length + 1 > MAX_FIELD_FILTERS) {
+          throw new ValidationError(
+            `At most ${MAX_FIELD_FILTERS} field filters can be combined.`,
+            { field: "q", operator: "field", maxFilters: MAX_FIELD_FILTERS },
+          );
+        }
+        filters = { ...filters, fields: [...kept, parsed] };
         break;
       }
       case "in": {
@@ -244,4 +273,24 @@ export const SEARCH_GRAMMAR_EXAMPLES: readonly {
     filters: {},
   },
   { query: "priority:low priority:urgent", text: "", filters: { priority: "urgent" } },
+  {
+    query: "field:effort:gt:3 field:stage:eq:beta",
+    text: "",
+    filters: {
+      fields: [
+        { key: "effort", op: "gt", value: "3", upper: null },
+        { key: "stage", op: "eq", value: "beta", upper: null },
+      ],
+    },
+  },
+  {
+    query: 'field:stage:eq:"in review" field:owner:empty',
+    text: "",
+    filters: {
+      fields: [
+        { key: "stage", op: "eq", value: "in review", upper: null },
+        { key: "owner", op: "empty", value: null, upper: null },
+      ],
+    },
+  },
 ];

@@ -57,6 +57,7 @@ function task(overrides: Partial<TaskDto> = {}): TaskDto {
     parentTaskId: null,
     recurrence: null,
     seriesId: null,
+    fields: {},
     rank: "a0",
     isCompleted: false,
     completedAt: null,

@@ -69,6 +69,7 @@ export function exitCodeFor(errorCode: string): ExitCode {
     case "STATUS_NOT_FOUND":
     case "WORKSPACE_NOT_FOUND":
     case "TAG_NOT_FOUND":
+    case "FIELD_NOT_FOUND":
     case "TASK_RELATION_NOT_FOUND":
     case "SAVED_VIEW_NOT_FOUND":
     case "NOTIFICATION_NOT_FOUND":
@@ -77,6 +78,8 @@ export function exitCodeFor(errorCode: string): ExitCode {
     case "TASK_VERSION_CONFLICT":
     case "TASK_BLOCKED":
     case "TAG_NAME_CONFLICT":
+    case "FIELD_KEY_CONFLICT":
+    case "FIELD_LIMIT_REACHED":
     case "VERSION_CONFLICT":
     case "SAVED_VIEW_NAME_CONFLICT":
     case "IDEMPOTENCY_KEY_REUSED":

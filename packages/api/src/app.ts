@@ -5,6 +5,7 @@ import { ApiError, toErrorBody } from "./errors.js";
 import { authenticate } from "./middleware/authenticate.js";
 import { requestContext } from "./middleware/request-context.js";
 import { bodyLimit } from "./middleware/validate.js";
+import { fieldRoutes } from "./routes/fields.js";
 import { exportRoutes } from "./routes/exports.js";
 import { healthRoutes } from "./routes/health.js";
 import { importRoutes } from "./routes/imports.js";
@@ -64,6 +65,8 @@ export function createApiApp(deps: ApiDependencies) {
   app.use("/search", authenticate(deps.auth, listWorkspaceIds));
   app.use("/tags", authenticate(deps.auth, listWorkspaceIds));
   app.use("/tags/*", authenticate(deps.auth, listWorkspaceIds));
+  app.use("/fields", authenticate(deps.auth, listWorkspaceIds));
+  app.use("/fields/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/statuses/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/webhooks", authenticate(deps.auth, listWorkspaceIds));
   app.use("/webhooks/*", authenticate(deps.auth, listWorkspaceIds));
@@ -78,6 +81,7 @@ export function createApiApp(deps: ApiDependencies) {
   app.route("/", projectRoutes(deps));
   app.route("/", statusRoutes(deps));
   app.route("/", searchRoutes(deps));
+  app.route("/", fieldRoutes(deps));
   app.route("/", tagRoutes(deps));
   app.route("/", taskRoutes(deps));
   app.route("/", viewRoutes(deps));

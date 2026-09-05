@@ -6,6 +6,7 @@ import {
   createActivityRepository,
   createOutboxRepository,
 } from "./repositories/events.js";
+import { createFieldDefinitionRepository } from "./repositories/fields.js";
 import { createStatusIntervalRepository } from "./repositories/flow.js";
 import {
   createNotificationPreferenceRepository,
@@ -44,6 +45,7 @@ export function buildTransactionContext(db: Database): TransactionContext {
     projects: createProjectRepository(db),
     statuses: createWorkflowStatusRepository(db),
     tags: createTagRepository(db),
+    fields: createFieldDefinitionRepository(db),
     statusIntervals: createStatusIntervalRepository(db),
     savedViews: createSavedViewRepository(db),
     webhookSubscriptions: createWebhookSubscriptionRepository(db),
