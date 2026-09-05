@@ -1,8 +1,8 @@
 import { Command } from "commander";
 
 import { authCommand } from "./commands/auth.js";
-import { fieldCommand } from "./commands/field.js";
 import { exportCommand, importCommand } from "./commands/data.js";
+import { fieldCommand } from "./commands/field.js";
 import { notificationsCommand } from "./commands/notifications.js";
 import { projectCommand } from "./commands/project.js";
 import { relationCommand } from "./commands/relation.js";

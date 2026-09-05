@@ -17,7 +17,6 @@ import {
   printJson,
 } from "../formatters/output.js";
 
-import { fieldPatchFrom } from "./field.js";
 import {
   capture,
   captureContext,
@@ -25,6 +24,7 @@ import {
   captureReport,
   projectIdFor,
 } from "./capture.js";
+import { fieldPatchFrom } from "./field.js";
 import {
   BULK_LIMIT,
   assertBulkConfirmed,

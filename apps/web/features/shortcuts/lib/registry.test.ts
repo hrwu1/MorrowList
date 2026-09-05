@@ -293,6 +293,7 @@ describe("running a command", () => {
       deadlineTime: null,
       dateWarnings: [],
       reminderOffsetMinutes: null,
+    fields: {},
       parentTaskId: null,
       recurrence: null,
       seriesId: null,
