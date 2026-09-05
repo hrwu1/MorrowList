@@ -1033,6 +1033,22 @@ function activityRepository(data: InMemoryData): ActivityRepository {
         cursor,
       );
     },
+    async listForWorkspace(
+      workspaceId: string,
+      cursor: Cursor,
+      aggregateTypes?: readonly AggregateType[],
+    ) {
+      return page(
+        data.activity.filter(
+          (event) =>
+            event.workspaceId === workspaceId &&
+            (!aggregateTypes ||
+              aggregateTypes.length === 0 ||
+              aggregateTypes.includes(event.aggregateType)),
+        ),
+        cursor,
+      );
+    },
     async listForProject(workspaceId: string, projectId: string, cursor: Cursor) {
       const taskIds = new Set(
         [...data.tasks.values()]

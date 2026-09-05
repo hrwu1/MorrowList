@@ -1,0 +1,208 @@
+{
+  "id": "62f1b0c5f9a1b2c3d4e5f601",
+  "name": "Website Relaunch",
+  "desc": "Everything for the relaunch.",
+  "closed": false,
+  "dateLastActivity": "2026-08-30T15:04:11.123Z",
+  "prefs": { "permissionLevel": "private", "background": "blue" },
+  "labelNames": { "green": "research", "yellow": "content", "red": "blocked" },
+  "lists": [
+    {
+      "id": "62f1b0c5f9a1b2c3d4e5f611",
+      "name": "Backlog",
+      "closed": false,
+      "idBoard": "62f1b0c5f9a1b2c3d4e5f601",
+      "pos": 16384,
+      "subscribed": false
+    },
+    {
+      "id": "62f1b0c5f9a1b2c3d4e5f612",
+      "name": "This week",
+      "closed": false,
+      "idBoard": "62f1b0c5f9a1b2c3d4e5f601",
+      "pos": 32768,
+      "subscribed": false
+    },
+    {
+      "id": "62f1b0c5f9a1b2c3d4e5f613",
+      "name": "Doing",
+      "closed": false,
+      "idBoard": "62f1b0c5f9a1b2c3d4e5f601",
+      "pos": 49152,
+      "subscribed": false
+    },
+    {
+      "id": "62f1b0c5f9a1b2c3d4e5f614",
+      "name": "Waiting on client",
+      "closed": false,
+      "idBoard": "62f1b0c5f9a1b2c3d4e5f601",
+      "pos": 65536,
+      "subscribed": false
+    },
+    {
+      "id": "62f1b0c5f9a1b2c3d4e5f615",
+      "name": "Done",
+      "closed": false,
+      "idBoard": "62f1b0c5f9a1b2c3d4e5f601",
+      "pos": 81920,
+      "subscribed": false
+    }
+  ],
+  "labels": [
+    {
+      "id": "62f1b0c5f9a1b2c3d4e5f621",
+      "idBoard": "62f1b0c5f9a1b2c3d4e5f601",
+      "name": "research",
+      "color": "green"
+    },
+    {
+      "id": "62f1b0c5f9a1b2c3d4e5f622",
+      "idBoard": "62f1b0c5f9a1b2c3d4e5f601",
+      "name": "content",
+      "color": "yellow"
+    },
+    {
+      "id": "62f1b0c5f9a1b2c3d4e5f623",
+      "idBoard": "62f1b0c5f9a1b2c3d4e5f601",
+      "name": "",
+      "color": "purple"
+    }
+  ],
+  "members": [
+    {
+      "id": "62f1b0c5f9a1b2c3d4e5f631",
+      "fullName": "Alex Rivera",
+      "username": "alexrivera"
+    }
+  ],
+  "cards": [
+    {
+      "id": "62f1b0c5f9a1b2c3d4e5f641",
+      "name": "Interview five customers",
+      "desc": "Recruit from the waitlist; 30 minutes each.",
+      "closed": false,
+      "idBoard": "62f1b0c5f9a1b2c3d4e5f601",
+      "idList": "62f1b0c5f9a1b2c3d4e5f612",
+      "idMembers": ["62f1b0c5f9a1b2c3d4e5f631"],
+      "idLabels": ["62f1b0c5f9a1b2c3d4e5f621"],
+      "idChecklists": ["62f1b0c5f9a1b2c3d4e5f651"],
+      "labels": [
+        {
+          "id": "62f1b0c5f9a1b2c3d4e5f621",
+          "name": "research",
+          "color": "green"
+        }
+      ],
+      "due": "2026-09-14T12:00:00.000Z",
+      "start": "2026-09-07T00:00:00.000Z",
+      "dueComplete": false,
+      "pos": 16384,
+      "shortUrl": "https://trello.com/c/aBcDeFgH",
+      "badges": { "comments": 2, "attachments": 1 }
+    },
+    {
+      "id": "62f1b0c5f9a1b2c3d4e5f642",
+      "name": "Rewrite the pricing copy",
+      "desc": "",
+      "closed": false,
+      "idBoard": "62f1b0c5f9a1b2c3d4e5f601",
+      "idList": "62f1b0c5f9a1b2c3d4e5f613",
+      "idMembers": [],
+      "idLabels": ["62f1b0c5f9a1b2c3d4e5f622", "62f1b0c5f9a1b2c3d4e5f623"],
+      "idChecklists": [],
+      "labels": [],
+      "due": null,
+      "dueComplete": false,
+      "pos": 16384,
+      "shortUrl": "https://trello.com/c/iJkLmNoP"
+    },
+    {
+      "id": "62f1b0c5f9a1b2c3d4e5f643",
+      "name": "Pick a hosting plan",
+      "desc": "Compare the three shortlisted providers.",
+      "closed": false,
+      "idBoard": "62f1b0c5f9a1b2c3d4e5f601",
+      "idList": "62f1b0c5f9a1b2c3d4e5f611",
+      "idMembers": [],
+      "idLabels": [],
+      "idChecklists": [],
+      "labels": [],
+      "due": null,
+      "dueComplete": false,
+      "pos": 16384,
+      "shortUrl": "https://trello.com/c/qRsTuVwX"
+    },
+    {
+      "id": "62f1b0c5f9a1b2c3d4e5f644",
+      "name": "Sign off the sitemap",
+      "desc": "",
+      "closed": false,
+      "idBoard": "62f1b0c5f9a1b2c3d4e5f601",
+      "idList": "62f1b0c5f9a1b2c3d4e5f615",
+      "idMembers": [],
+      "idLabels": ["62f1b0c5f9a1b2c3d4e5f622"],
+      "idChecklists": [],
+      "labels": [],
+      "due": "2026-08-21T16:00:00.000Z",
+      "dueComplete": true,
+      "pos": 16384,
+      "shortUrl": "https://trello.com/c/yZaBcDeF"
+    },
+    {
+      "id": "62f1b0c5f9a1b2c3d4e5f645",
+      "name": "Old vendor spike",
+      "desc": "Abandoned; kept for the notes.",
+      "closed": true,
+      "idBoard": "62f1b0c5f9a1b2c3d4e5f601",
+      "idList": "62f1b0c5f9a1b2c3d4e5f611",
+      "idMembers": [],
+      "idLabels": [],
+      "idChecklists": [],
+      "labels": [],
+      "due": null,
+      "dueComplete": false,
+      "pos": 32768,
+      "shortUrl": "https://trello.com/c/gHiJkLmN"
+    }
+  ],
+  "checklists": [
+    {
+      "id": "62f1b0c5f9a1b2c3d4e5f651",
+      "idBoard": "62f1b0c5f9a1b2c3d4e5f601",
+      "idCard": "62f1b0c5f9a1b2c3d4e5f641",
+      "name": "Recruiting",
+      "pos": 16384,
+      "checkItems": [
+        {
+          "id": "62f1b0c5f9a1b2c3d4e5f661",
+          "idChecklist": "62f1b0c5f9a1b2c3d4e5f651",
+          "name": "Write the screener",
+          "state": "complete",
+          "pos": 16384
+        },
+        {
+          "id": "62f1b0c5f9a1b2c3d4e5f662",
+          "idChecklist": "62f1b0c5f9a1b2c3d4e5f651",
+          "name": "Send the invitations",
+          "state": "incomplete",
+          "pos": 32768
+        },
+        {
+          "id": "62f1b0c5f9a1b2c3d4e5f663",
+          "idChecklist": "62f1b0c5f9a1b2c3d4e5f651",
+          "name": "Book the rooms",
+          "state": "incomplete",
+          "pos": 49152
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "id": "62f1b0c5f9a1b2c3d4e5f671",
+      "type": "commentCard",
+      "date": "2026-08-30T15:04:11.123Z",
+      "data": { "text": "Waiting on the client's brand guide." }
+    }
+  ]
+}

@@ -1,4 +1,9 @@
-import type { SubtaskProgress, TaskDto, TaskRelationDto } from "@morrowlist/contracts";
+import type {
+  ListTasksQuery,
+  SubtaskProgress,
+  TaskDto,
+  TaskRelationDto,
+} from "@morrowlist/contracts";
 import {
   dateOrderWarnings,
   isBlocked,
@@ -10,8 +15,43 @@ import {
   type Task,
 } from "@morrowlist/domain";
 
-import type { RelationEdge, TransactionContext, Workspace } from "../ports/index.js";
+import type {
+  RelationEdge,
+  TaskFilter,
+  TransactionContext,
+  Workspace,
+} from "../ports/index.js";
 import { toTagDto } from "../tags/mappers.js";
+
+/**
+ * The list query as the repository's filter. One mapping, so the task list, a saved
+ * view, and the CSV export (GAP-07) can never disagree about what a filter selects.
+ */
+export function toTaskFilter(
+  query: Partial<ListTasksQuery> & { readonly workspaceId: string },
+  today: PlainDate,
+): TaskFilter {
+  return {
+    workspaceId: query.workspaceId,
+    projectId: query.projectId,
+    statusId: query.statusId,
+    parentTaskId: query.parentTaskId,
+    priority: query.priority,
+    tagId: query.tagId,
+    seriesId: query.seriesId,
+    inboxOnly: query.inbox,
+    isCompleted: query.isCompleted,
+    isBlocked: query.isBlocked,
+    deletedOnly: query.deleted,
+    includeSubtasks: query.includeSubtasks,
+    due: query.due,
+    deferred: query.deferred,
+    deadline: query.deadline,
+    today,
+    sort: query.sort,
+    order: query.order,
+  };
+}
 
 /**
  * Every projection a task DTO carries, read for a whole page at once: day plans,

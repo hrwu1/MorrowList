@@ -96,6 +96,10 @@ const CATALOGUE: Record<string, Partial<ActivityEntryDto>> = {
     aggregateType: "workspace",
     summary: "Updated notification preferences",
   },
+  [WORKSPACE_EVENTS.imported]: {
+    aggregateType: "workspace",
+    summary: "Imported 24 tasks from Trello into Website Relaunch",
+  },
 };
 
 describe("describeEntry", () => {

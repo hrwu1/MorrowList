@@ -54,6 +54,16 @@ export interface ActivityRepository {
     projectId: string,
     cursor: Cursor,
   ): Promise<Page<ActivityEvent>>;
+  /**
+   * The whole workspace's history, same order and paging, optionally narrowed to some
+   * aggregate types. The archive walks it (GAP-07); nothing else reads history this
+   * broadly, which is why it is paged rather than returned whole.
+   */
+  listForWorkspace(
+    workspaceId: string,
+    cursor: Cursor,
+    aggregateTypes?: readonly AggregateType[],
+  ): Promise<Page<ActivityEvent>>;
 }
 
 export interface OutboxEventInput {

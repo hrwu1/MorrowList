@@ -28,6 +28,7 @@ exports[`describeEntry > renders a readable line for every event type in the cat
   "task.updated": "Updated task fields · Title: Draft brief → Draft the brief · Priority: none → high · Due date: none → 2026-09-15 · Defer until: none → 2026-09-10 · Deadline: 2026-09-20 → none · Description: none → ## Notes",
   "workspace.created": "Created workspace Alex's Workspace",
   "workspace.digest_sent": "Sent Today digest for 2026-08-29",
+  "workspace.imported": "Imported 24 tasks from Trello into Website Relaunch",
   "workspace.notification_preferences_updated": "Updated notification preferences",
   "workspace.updated": "Updated workspace Alex's Workspace",
 }

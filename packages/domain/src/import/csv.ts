@@ -1,3 +1,4 @@
+import { isTerminalCategory } from "../project/status.js";
 import { parseCsv } from "../shared/csv.js";
 import { normalizeTitle, TITLE_MAX_LENGTH } from "../task/values.js";
 
@@ -148,13 +149,18 @@ export function planFromCsv(text: string, options: CsvImportOptions = {}): Impor
     }
 
     const statusName = cell(record, "status");
-    if (statusName && !statusNames.has(statusName.toLocaleLowerCase("en-US"))) {
-      statusNames.set(statusName.toLocaleLowerCase("en-US"), {
+    const statusKey = statusName?.toLocaleLowerCase("en-US") ?? null;
+    if (statusName && statusKey && !statusNames.has(statusKey)) {
+      statusNames.set(statusKey, {
         name: statusName.slice(0, 80),
         category: guessStatusCategory(statusName),
-        externalId: statusName.toLocaleLowerCase("en-US"),
+        externalId: statusKey,
       });
     }
+    // A row in a Done column is done, exactly as a Trello card in a Done list is.
+    const inDoneColumn = statusKey
+      ? isTerminalCategory(statusNames.get(statusKey)?.category ?? "backlog")
+      : false;
 
     drafts.push({
       row,
@@ -169,8 +175,8 @@ export function planFromCsv(text: string, options: CsvImportOptions = {}): Impor
         deadline: readPlainDate(cell(record, "deadline")),
         deferUntil: readPlainDate(cell(record, "deferUntil")),
         tags: readTagNames(cell(record, "tags")),
-        statusExternalId: statusName ? statusName.toLocaleLowerCase("en-US") : null,
-        isCompleted: isTruthy(record[fields.get("completed") ?? -1]),
+        statusExternalId: statusKey,
+        isCompleted: isTruthy(record[fields.get("completed") ?? -1]) || inDoneColumn,
         isArchived: false,
         externalId: cell(record, "key"),
         subtasks: [],

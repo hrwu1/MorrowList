@@ -21,11 +21,9 @@ import {
   assertExpectedVersion,
   assertNoBlocksCycle,
   assertParentIsAssignable,
-  boardPlacement,
   canonicalizeRelation,
   clearBlocked as applyClearBlocked,
   completeTask,
-  createTask,
   deleteTask,
   flagBlocked,
   isBlocked,
@@ -60,7 +58,7 @@ import {
   type WorkflowStatus,
 } from "@morrowlist/domain";
 
-import { openInterval, syncIntervals } from "../flow/intervals.js";
+import { syncIntervals } from "../flow/intervals.js";
 import {
   defaultReminderOffset,
   recomputeReminder,
@@ -82,7 +80,8 @@ import {
 import { decodeCursor, encodeCursor } from "../shared/cursor.js";
 import { recordEvent } from "../shared/event-recorder.js";
 
-import { loadTaskDtos } from "./mappers.js";
+import { insertNewTask, type TaskOrigin } from "./create.js";
+import { loadTaskDtos, toTaskFilter } from "./mappers.js";
 
 /**
  * Task use cases (spec 19.2). Each method is one user-visible intention: it authorises,
@@ -285,26 +284,7 @@ export class TaskService {
         : undefined;
 
       const page: Page<Task> = await tx.tasks.list(
-        {
-          workspaceId: query.workspaceId,
-          projectId: query.projectId,
-          statusId: query.statusId,
-          parentTaskId: query.parentTaskId,
-          priority: query.priority,
-          tagId: query.tagId,
-          seriesId: query.seriesId,
-          inboxOnly: query.inbox,
-          isCompleted: query.isCompleted,
-          isBlocked: query.isBlocked,
-          deletedOnly: query.deleted,
-          includeSubtasks: query.includeSubtasks,
-          due: query.due,
-          deferred: query.deferred,
-          deadline: query.deadline,
-          today: this.workspaceToday(workspace.timezone),
-          sort: query.sort,
-          order: query.order,
-        },
+        toTaskFilter(query, this.workspaceToday(workspace.timezone)),
         { limit: query.limit, after },
       );
 
@@ -1113,66 +1093,25 @@ export class TaskService {
   }
 
   /**
-   * Persist a new task at the end of its scope with its `task.created` event. Shared by
-   * capture and by the spawn of a repeating task's next occurrence, so both land the same
-   * way: a workspace number, a rank after everything else, and one activity row.
+   * Persist a new task at the end of its scope with its `task.created` event. The work
+   * lives in `tasks/create.ts` because an import creates tasks the same way, inside its
+   * own transaction (GAP-07).
    */
   private async insertNewTask(
     tx: TransactionContext,
     context: ActorContext,
     workspace: Workspace,
     fields: Omit<CreateTaskInput, "workspaceId" | "taskNumber" | "rank">,
-    origin: { spawnedFrom: string; tags: readonly Tag[] } | null = null,
+    origin: TaskOrigin | null = null,
   ): Promise<Task> {
-    const scope: RankScope = {
-      workspaceId: workspace.id,
-      projectId: fields.project?.id ?? null,
-      statusId: fields.project?.status.id ?? null,
-    };
-    // New tasks land at the end of their scope so capture never reorders existing work.
-    const lastRank = await tx.tasks.lastRankIn(scope);
-
-    const task = createTask(
-      {
-        ...fields,
-        workspaceId: workspace.id,
-        taskNumber: await tx.taskCounters.allocate(workspace.id),
-        rank: rankBetween(lastRank, null),
-      },
-      { actor: actorRef(context), clock: this.clock },
-    );
-
-    await tx.tasks.insert(task);
-    // The reminder schedule is derived in the same transaction as the row, for a
-    // captured task and for the next occurrence a completion spawns alike (GAP-13).
-    await recomputeReminder(tx, task, workspace.timezone, this.clock.now());
-    for (const tag of origin?.tags ?? []) {
-      await tx.tasks.addTag(task.id, tag.id, this.clock.now());
-    }
-    // A task on a board starts its first stay now, a spawned occurrence included.
-    const placement = boardPlacement(task);
-    if (placement) await openInterval(tx, task, placement, fields.project?.status);
-    const key = taskKey(workspace.taskKeyPrefix, task.taskNumber);
-    await recordEvent(tx, context, this.clock, {
-      workspaceId: task.workspaceId,
-      aggregateType: "task",
-      aggregateId: task.id,
-      eventType: TASK_EVENTS.created,
-      summary: origin
-        ? `Created task ${key} as the next occurrence of a repeating task`
-        : `Created task ${key}`,
-      payload: {
-        taskId: task.id,
-        taskNumber: task.taskNumber,
-        projectId: task.projectId,
-        statusId: task.statusId,
-        priority: task.priority,
-        parentTaskId: task.parentTaskId,
-        seriesId: task.seriesId,
-        ...(origin ? { spawnedFrom: origin.spawnedFrom } : {}),
-      },
+    return insertNewTask({
+      tx,
+      context,
+      clock: this.clock,
+      workspace,
+      fields,
+      origin,
     });
-    return task;
   }
   private async insertDayPlan(
     tx: TransactionContext,

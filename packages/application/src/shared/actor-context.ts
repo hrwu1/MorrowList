@@ -61,4 +61,8 @@ export const SCOPES = {
   workspaceWrite: "workspace:write",
   viewsRead: "views:read",
   viewsWrite: "views:write",
+  /** Reading the whole workspace out (GAP-07); wider than any single read scope. */
+  exportRead: "export:read",
+  /** Writing a whole project in from another tool (GAP-07). */
+  importWrite: "import:write",
 } as const;

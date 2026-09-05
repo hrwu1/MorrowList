@@ -82,6 +82,18 @@ export function createActivityRepository(db: Database): ActivityRepository {
       );
     },
 
+    async listForWorkspace(workspaceId, cursor, aggregateTypes) {
+      return page(
+        and(
+          eq(activityEvents.workspaceId, workspaceId),
+          aggregateTypes && aggregateTypes.length > 0
+            ? inArray(activityEvents.aggregateType, [...aggregateTypes])
+            : undefined,
+        ),
+        cursor,
+      );
+    },
+
     async listForProject(workspaceId, projectId, cursor) {
       // Trashed tasks keep their project, so their history stays part of the project's.
       const projectTaskIds = db
