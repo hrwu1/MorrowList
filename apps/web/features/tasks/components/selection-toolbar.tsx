@@ -68,15 +68,17 @@ export interface SelectionToolbarProps {
   readonly projectId?: string | undefined;
 }
 
+/**
+ * The live region and, once something is selected, the actions. Split in two so an
+ * ordinary list mounts nothing but the region: the actions fetch the workspace's tags,
+ * and a screen that is not bulk-editing has no business asking for them.
+ */
 export function SelectionToolbar({
   tasks,
   statuses,
   projectId,
 }: SelectionToolbarProps) {
   const selection = useSelection();
-  const bulk = useBulkTasks();
-  const tags = useTags();
-  const fieldId = useId();
   const [done, setDone] = useState("");
   const selected = selection.tasksIn(tasks);
 
@@ -89,19 +91,6 @@ export function SelectionToolbar({
     if (selected.length === 0) setDone("");
   }, [selected.length]);
 
-  function apply(action: BulkAction, describe: string) {
-    if (selected.length === 0 || bulk.isPending) return;
-    bulk.mutate(
-      { action, tasks: selected },
-      {
-        onSuccess: () => {
-          setDone(`${selected.length} tasks ${describe}.`);
-          selection.clear();
-        },
-      },
-    );
-  }
-
   if (!selection.enabled) return null;
 
   return (
@@ -111,112 +100,153 @@ export function SelectionToolbar({
       </output>
 
       {selected.length > 0 ? (
-        <section
-          className="selection-toolbar"
-          aria-label={`Bulk actions, ${selectionLabel(selected.length)}`}
-          data-busy={bulk.isPending || undefined}
-        >
-          <strong className="selection-toolbar__count">
-            {selectionLabel(selected.length)}
-          </strong>
-
-          <Button
-            variant="ghost"
-            disabled={bulk.isPending}
-            onClick={() => apply({ kind: "complete" }, "completed")}
-          >
-            Complete
-          </Button>
-
-          {statuses && projectId ? (
-            <label className="selection-toolbar__control">
-              <span className="ml-visually-hidden">Move selected tasks to</span>
-              <Select
-                value=""
-                disabled={bulk.isPending}
-                onChange={(event) => {
-                  const statusId = event.target.value;
-                  if (statusId) apply({ kind: "move", projectId, statusId }, "moved");
-                }}
-              >
-                <option value="">Move to…</option>
-                {statuses.map((status) => (
-                  <option key={status.id} value={status.id}>
-                    {status.name}
-                  </option>
-                ))}
-              </Select>
-            </label>
-          ) : null}
-
-          <label className="selection-toolbar__control">
-            <span className="ml-visually-hidden">Set priority of selected tasks</span>
-            {/* A placeholder rather than a current value: a selection has many
-                priorities, and the control is a command, not a field. */}
-            <Select
-              id={`${fieldId}-priority`}
-              value=""
-              disabled={bulk.isPending}
-              onChange={(event) => {
-                const priority = event.target.value as Priority;
-                if (priority) apply({ kind: "setPriority", priority }, "reprioritised");
-              }}
-            >
-              <option value="">Priority…</option>
-              {PRIORITIES.map((priority) => (
-                <option key={priority} value={priority}>
-                  {PRIORITY_LABELS[priority]}
-                </option>
-              ))}
-            </Select>
-          </label>
-
-          <label className="selection-toolbar__control">
-            <span className="ml-visually-hidden">Set due date of selected tasks</span>
-            <DueDateInput
-              id={`${fieldId}-due`}
-              value={null}
-              disabled={bulk.isPending}
-              onChange={(dueDate) =>
-                dueDate === null
-                  ? undefined
-                  : apply({ kind: "setDueDate", dueDate }, "rescheduled")
-              }
-            />
-          </label>
-
-          <label className="selection-toolbar__control">
-            <span className="ml-visually-hidden">Add a tag to selected tasks</span>
-            <Select
-              value=""
-              disabled={bulk.isPending || (tags.data?.data.length ?? 0) === 0}
-              onChange={(event) => {
-                const tagId = event.target.value;
-                if (tagId) apply({ kind: "addTag", tagId }, "tagged");
-              }}
-            >
-              <option value="">Add tag…</option>
-              {(tags.data?.data ?? []).map((tag) => (
-                <option key={tag.id} value={tag.id}>
-                  {tag.name}
-                </option>
-              ))}
-            </Select>
-          </label>
-
-          <Button
-            variant="danger"
-            disabled={bulk.isPending}
-            onClick={() => apply({ kind: "delete" }, "moved to Trash")}
-          >
-            Delete
-          </Button>
-
-          <Button variant="ghost" onClick={selection.clear}>
-            Clear
-          </Button>
-        </section>
+        <BulkActions
+          selected={selected}
+          statuses={statuses}
+          projectId={projectId}
+          onApplied={setDone}
+        />
       ) : null}
+    </>
+  );
+}
+
+function BulkActions({
+  selected,
+  statuses,
+  projectId,
+  onApplied,
+}: {
+  readonly selected: readonly TaskDto[];
+  readonly statuses: readonly WorkflowStatusDto[] | undefined;
+  readonly projectId: string | undefined;
+  readonly onApplied: (message: string) => void;
+}) {
+  const selection = useSelection();
+  const bulk = useBulkTasks();
+  const tags = useTags();
+  const fieldId = useId();
+
+  function apply(action: BulkAction, describe: string) {
+    if (selected.length === 0 || bulk.isPending) return;
+    bulk.mutate(
+      { action, tasks: selected },
+      {
+        onSuccess: () => {
+          onApplied(`${selected.length} tasks ${describe}.`);
+          selection.clear();
+        },
+      },
+    );
+  }
+
+  return (
+    <>
+      <section
+        className="selection-toolbar"
+        aria-label={`Bulk actions, ${selectionLabel(selected.length)}`}
+        data-busy={bulk.isPending || undefined}
+      >
+        <strong className="selection-toolbar__count">
+          {selectionLabel(selected.length)}
+        </strong>
+
+        <Button
+          variant="ghost"
+          disabled={bulk.isPending}
+          onClick={() => apply({ kind: "complete" }, "completed")}
+        >
+          Complete
+        </Button>
+
+        {statuses && projectId ? (
+          <label className="selection-toolbar__control">
+            <span className="ml-visually-hidden">Move selected tasks to</span>
+            <Select
+              value=""
+              disabled={bulk.isPending}
+              onChange={(event) => {
+                const statusId = event.target.value;
+                if (statusId) apply({ kind: "move", projectId, statusId }, "moved");
+              }}
+            >
+              <option value="">Move to…</option>
+              {statuses.map((status) => (
+                <option key={status.id} value={status.id}>
+                  {status.name}
+                </option>
+              ))}
+            </Select>
+          </label>
+        ) : null}
+
+        <label className="selection-toolbar__control">
+          <span className="ml-visually-hidden">Set priority of selected tasks</span>
+          {/* A placeholder rather than a current value: a selection has many
+                priorities, and the control is a command, not a field. */}
+          <Select
+            id={`${fieldId}-priority`}
+            value=""
+            disabled={bulk.isPending}
+            onChange={(event) => {
+              const priority = event.target.value as Priority;
+              if (priority) apply({ kind: "setPriority", priority }, "reprioritised");
+            }}
+          >
+            <option value="">Priority…</option>
+            {PRIORITIES.map((priority) => (
+              <option key={priority} value={priority}>
+                {PRIORITY_LABELS[priority]}
+              </option>
+            ))}
+          </Select>
+        </label>
+
+        <label className="selection-toolbar__control">
+          <span className="ml-visually-hidden">Set due date of selected tasks</span>
+          <DueDateInput
+            id={`${fieldId}-due`}
+            value={null}
+            disabled={bulk.isPending}
+            onChange={(dueDate) =>
+              dueDate === null
+                ? undefined
+                : apply({ kind: "setDueDate", dueDate }, "rescheduled")
+            }
+          />
+        </label>
+
+        <label className="selection-toolbar__control">
+          <span className="ml-visually-hidden">Add a tag to selected tasks</span>
+          <Select
+            value=""
+            disabled={bulk.isPending || (tags.data?.data.length ?? 0) === 0}
+            onChange={(event) => {
+              const tagId = event.target.value;
+              if (tagId) apply({ kind: "addTag", tagId }, "tagged");
+            }}
+          >
+            <option value="">Add tag…</option>
+            {(tags.data?.data ?? []).map((tag) => (
+              <option key={tag.id} value={tag.id}>
+                {tag.name}
+              </option>
+            ))}
+          </Select>
+        </label>
+
+        <Button
+          variant="danger"
+          disabled={bulk.isPending}
+          onClick={() => apply({ kind: "delete" }, "moved to Trash")}
+        >
+          Delete
+        </Button>
+
+        <Button variant="ghost" onClick={selection.clear}>
+          Clear
+        </Button>
+      </section>
 
       {bulk.isError ? (
         <Alert tone="error" title="Nothing was changed">
@@ -233,6 +263,19 @@ export function SelectionToolbar({
   );
 }
 
+const TEXT_ENTRY_TYPES = new Set(["checkbox", "radio", "button", "submit", "reset"]);
+
+/** True while the focus is somewhere a keystroke means text, not a command. */
+export function isTyping(target: HTMLElement | null): boolean {
+  if (!target) return false;
+  if (target.isContentEditable) return true;
+  if (target.tagName === "TEXTAREA" || target.tagName === "SELECT") return true;
+  return (
+    target.tagName === "INPUT" &&
+    !TEXT_ENTRY_TYPES.has((target as HTMLInputElement).type)
+  );
+}
+
 /**
  * `X` toggles the focused row and `Cmd/Ctrl+A` takes the whole list, both only while the
  * focus is inside the list this is attached to. Bound here rather than globally: a
@@ -246,14 +289,9 @@ export function useSelectionKeys(container: HTMLElement | null) {
     if (!container || !selection.enabled) return;
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
-      if (
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.tagName === "SELECT" ||
-        target?.isContentEditable
-      ) {
-        return;
-      }
+      // A field being typed into keeps its own keys; a checkbox is not one, and it is
+      // exactly where the focus sits after picking a row.
+      if (isTyping(target)) return;
 
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a") {
         event.preventDefault();

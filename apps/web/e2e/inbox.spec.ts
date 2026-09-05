@@ -185,7 +185,10 @@ test("deleting moves a task to Trash and restoring returns it to the Inbox", asy
   await expect(page.getByRole("heading", { name: "The Trash is empty" })).toBeVisible();
 
   await openFullInbox(page);
-  await expect(page.getByText("Deleted by mistake")).toBeVisible();
+  // Scoped to the list: the undo toast names the task too (GAP-08).
+  await expect(
+    page.getByRole("list", { name: "Inbox tasks" }).getByText("Deleted by mistake"),
+  ).toBeVisible();
 });
 
 test("a filtered view can be copied from the URL and reopened", async ({ page }) => {

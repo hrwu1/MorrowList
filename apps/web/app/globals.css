@@ -2943,18 +2943,26 @@
     opacity: 1;
   }
 
+  /* The bulk bar floats at the bottom rather than sitting above the list. In the flow it
+     would appear on the first click and push every row down by its own height, so the
+     second click of a Shift-range would land on the wrong row — the exact gesture it
+     exists to serve. */
   .selection-toolbar {
     display: flex;
-    position: sticky;
-    top: 0.25rem;
-    z-index: 30;
+    position: fixed;
+    left: 50%;
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    z-index: 65;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
+    max-width: calc(100vw - 1.5rem);
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--accent);
     border-radius: var(--radius-md);
-    background: var(--accent-subtle);
+    background: var(--surface-overlay);
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-50%);
   }
   .selection-toolbar[data-busy] {
     opacity: 0.6;
@@ -3003,6 +3011,11 @@
   .undo-toast[data-tone="error"] {
     border-color: var(--danger);
     background: var(--danger-subtle);
+  }
+  /* Both can be open at once — a bulk change leaves an offer while the selection is
+     still there — so the toast stacks above the bar rather than under it. */
+  body:has(.selection-toolbar) .undo-toast {
+    bottom: max(4.1rem, calc(env(safe-area-inset-bottom) + 3.35rem));
   }
   .undo-toast__label {
     overflow: hidden;
