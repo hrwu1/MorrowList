@@ -1,0 +1,32 @@
+# The image is built from the repository root (infra/docker/Dockerfile). Keeping the
+# build context small keeps the install and build layers from being invalidated by files
+# the image never contains.
+node_modules
+**/node_modules
+.git
+.github
+.turbo
+**/.turbo
+**/dist
+**/.next
+**/out
+**/coverage
+**/*.tsbuildinfo
+
+# Secrets and local state never belong in a build context.
+.env
+.env.*
+!.env.example
+infra/compose/.env
+
+# Test and tooling output.
+**/playwright-report
+**/test-results
+**/*.log
+.DS_Store
+
+# Documentation and plans do not affect the build.
+docs
+.claude
+*.md
+!README.md

@@ -1,0 +1,127 @@
+name: Publish image
+
+# Multi-architecture production image (spec 31.4 steps 11-12, GAP-23). Self-hosters run
+# MorrowList on small ARM boxes as often as on x86, so both are published from one build.
+#
+# `main` publishes `edge`; a `v*` tag publishes the semantic version and moves `latest`.
+# Nothing is published from a pull request — the build still runs there, so a broken
+# Dockerfile fails review rather than release.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - "infra/docker/**"
+      - "infra/compose/**"
+      - "scripts/entrypoint.sh"
+      - "packages/database/src/migrate.ts"
+      - ".dockerignore"
+      - ".github/workflows/publish-image.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  image:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      # Required for the signed provenance attestation.
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # ARM64 is emulated here. It is slow, and it is the only way to produce both
+      # architectures without a second runner.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Sign in to the registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=edge,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=sha,format=long
+
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Attest the build provenance
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      # Proves the published image actually starts: migrate a throwaway database, then
+      # wait for the health probe and sign up over the API. amd64 only — the runner
+      # cannot execute the arm64 variant at a useful speed.
+      - name: Smoke-test the image against PostgreSQL
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          # GHCR rejects an upper-case path; the repository name may contain one.
+          image="$(printf '%s/%s' "$REGISTRY" "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')"
+          docker network create morrowlist-smoke
+          docker run -d --name smoke-db --network morrowlist-smoke \
+            -e POSTGRES_USER=morrowlist -e POSTGRES_PASSWORD=smoke \
+            -e POSTGRES_DB=morrowlist postgres:18-alpine
+          for _ in $(seq 1 30); do
+            docker exec smoke-db pg_isready -U morrowlist -d morrowlist && break
+            sleep 2
+          done
+          docker run -d --name smoke-app --network morrowlist-smoke -p 3000:3000 \
+            -e DATABASE_URL=postgresql://morrowlist:smoke@smoke-db:5432/morrowlist \
+            -e AUTH_SECRET=smoke-test-secret-value-at-least-32-chars \
+            -e APP_URL=http://127.0.0.1:3000 \
+            -e AUTH_TRUSTED_ORIGINS=http://127.0.0.1:3000 \
+            --platform linux/amd64 \
+            "${image}@${{ steps.build.outputs.digest }}"
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/api/v1/ready >/dev/null; then ready=1; break; fi
+            sleep 2
+          done
+          if [ "${ready:-0}" != "1" ]; then docker logs smoke-app; exit 1; fi
+          curl -fsS -X POST http://127.0.0.1:3000/api/auth/sign-up/email \
+            -H 'content-type: application/json' \
+            -H 'origin: http://127.0.0.1:3000' \
+            -d '{"name":"Smoke","email":"smoke@example.com","password":"correct-horse-battery-staple"}'
+          docker rm -f smoke-app smoke-db
+          docker network rm morrowlist-smoke

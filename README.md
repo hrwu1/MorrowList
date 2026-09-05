@@ -24,6 +24,18 @@ starts a matching database if you prefer containers. `pnpm setup:dev` installs w
 dependencies, creates `.env` when needed, checks PostgreSQL, builds workspace packages,
 and applies migrations. It is safe to rerun and never replaces an existing `.env`.
 
+## Running your own instance
+
+```bash
+cp infra/compose/.env.prod.example infra/compose/.env   # set AUTH_SECRET, POSTGRES_PASSWORD
+docker compose -f infra/compose/docker-compose.prod.yml --env-file infra/compose/.env up -d
+```
+
+Two containers, one of them PostgreSQL; migrations run on start and the reminder worker
+runs inside the web process. [`docs/runbooks/self-hosting.md`](docs/runbooks/self-hosting.md)
+covers configuration, upgrades, and backups. Measured performance at the reference scale
+of 10,000 live tasks is in [`docs/performance.md`](docs/performance.md).
+
 ## Repository layout
 
 ```text
