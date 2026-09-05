@@ -74,15 +74,29 @@ export function createFetchWebhookSender(
       } catch (error) {
         // A transport failure has no status; the message is the operator's only clue,
         // and it never contains the signature because the header map is not echoed.
-        return {
-          status: null,
-          error: error instanceof Error ? error.message : String(error),
-        };
+        return { status: null, error: describeTransportFailure(error) };
       } finally {
         clearTimeout(timer);
       }
     },
   };
+}
+
+/**
+ * Node's fetch reports every transport failure as the word "fetch failed" and hides the
+ * reason in `cause`. Unwrapping it is the difference between a delivery log that says
+ * nothing and one that says the endpoint refused the connection.
+ */
+export function describeTransportFailure(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const cause = (error as { cause?: unknown }).cause;
+  const detail = cause instanceof Error ? cause.message : null;
+  if (error.name === "AbortError" || error.name === "TimeoutError") {
+    return `no response within ${WEBHOOK_TIMEOUT_MS / 1000} seconds`;
+  }
+  return detail && detail !== error.message
+    ? `${error.message}: ${detail}`
+    : error.message;
 }
 
 /** Build the spec 19.6 envelope a subscriber receives. */

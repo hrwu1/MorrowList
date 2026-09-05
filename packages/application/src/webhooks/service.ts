@@ -349,9 +349,7 @@ export class WebhookService {
   private toCursor(query: { limit: number; cursor?: string | undefined }) {
     return {
       limit: query.limit,
-      after: query.cursor
-        ? decodeCursor(query.cursor, this.cursorSecret).i
-        : undefined,
+      after: query.cursor ? decodeCursor(query.cursor, this.cursorSecret).i : undefined,
     };
   }
 

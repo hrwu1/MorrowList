@@ -29,8 +29,10 @@ describe("usageText", () => {
     for (const command of program.commands) {
       expect(text, command.name()).toContain(command.name());
       for (const child of command.commands) {
-        expect(commandMap(program).join("\n"), `${command.name()} ${child.name()}`)
-          .toContain(child.name());
+        expect(
+          commandMap(program).join("\n"),
+          `${command.name()} ${child.name()}`,
+        ).toContain(child.name());
       }
     }
   });

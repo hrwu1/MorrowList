@@ -42,13 +42,13 @@ recognise (spec 20.1).
 
 ## Headers
 
-| Header              | Meaning                                                     |
-| ------------------- | ----------------------------------------------------------- |
-| `Morrow-Signature`  | `t=<unix seconds>,v1=<hex HMAC-SHA256>` — see below          |
-| `Morrow-Delivery`   | This delivery attempt's id; also in `delivery.id`            |
-| `Morrow-Event`      | The outbox event id. Absent on a test delivery               |
-| `Morrow-Event-Type` | The event type, so you can route before parsing              |
-| `Morrow-Attempt`    | 1 on the first try, up to 4                                  |
+| Header              | Meaning                                             |
+| ------------------- | --------------------------------------------------- |
+| `Morrow-Signature`  | `t=<unix seconds>,v1=<hex HMAC-SHA256>` — see below |
+| `Morrow-Delivery`   | This delivery attempt's id; also in `delivery.id`   |
+| `Morrow-Event`      | The outbox event id. Absent on a test delivery      |
+| `Morrow-Event-Type` | The event type, so you can route before parsing     |
+| `Morrow-Attempt`    | 1 on the first try, up to 4                         |
 
 ## Verifying a delivery
 
@@ -82,9 +82,7 @@ export function verifyMorrowSignature(secret, rawBody, signatureHeader) {
     .digest();
   const received = Buffer.from(fields.v1, "hex");
 
-  return (
-    received.length === expected.length && timingSafeEqual(received, expected)
-  );
+  return received.length === expected.length && timingSafeEqual(received, expected);
 }
 ```
 

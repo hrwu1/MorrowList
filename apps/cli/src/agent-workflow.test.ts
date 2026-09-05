@@ -20,9 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const ENTRY = fileURLToPath(new URL("./index.ts", import.meta.url));
 /** The CLI is run from source, so the test does not depend on a prior `tsup` build. */
-const TSX = fileURLToPath(
-  new URL("../node_modules/tsx/dist/cli.mjs", import.meta.url),
-);
+const TSX = fileURLToPath(new URL("../node_modules/tsx/dist/cli.mjs", import.meta.url));
 
 interface Recorded {
   readonly method: string;
@@ -184,7 +182,10 @@ describe("an agent working from `morrow usage` alone", { timeout: 60_000 }, () =
     // 2. List. The envelope is the shape the manual promised.
     const list = await morrow(["--json", "task", "list"]);
     expect(list.code).toBe(0);
-    const listed = JSON.parse(list.stdout) as { ok: boolean; data: { data: unknown[] } };
+    const listed = JSON.parse(list.stdout) as {
+      ok: boolean;
+      data: { data: unknown[] };
+    };
     expect(listed.ok).toBe(true);
     expect(listed.data.data).toHaveLength(1);
 

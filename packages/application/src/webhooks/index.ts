@@ -16,13 +16,18 @@ export {
 export {
   WEBHOOK_TIMEOUT_MS,
   createFetchWebhookSender,
+  describeTransportFailure,
   toEnvelope,
   webhookHeaders,
   type WebhookRequest,
   type WebhookResponse,
   type WebhookSender,
 } from "./sender.js";
-export { WEBHOOK_TEST_EVENT, WebhookService, type WebhookServiceOptions } from "./service.js";
+export {
+  WEBHOOK_TEST_EVENT,
+  WebhookService,
+  type WebhookServiceOptions,
+} from "./service.js";
 export {
   deriveSigningKey,
   generateWebhookSecret,

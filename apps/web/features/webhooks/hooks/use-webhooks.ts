@@ -1,9 +1,6 @@
 "use client";
 
-import type {
-  CreateWebhookRequest,
-  UpdateWebhookRequest,
-} from "@morrowlist/contracts";
+import type { CreateWebhookRequest, UpdateWebhookRequest } from "@morrowlist/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/api-client";
@@ -36,6 +33,10 @@ export function useWebhookDeliveries(id: string | null) {
     queryFn: () => apiClient.listWebhookDeliveries(id as string, { limit: 20 }),
     enabled: id !== null,
     refetchInterval: DELIVERY_POLL_MS,
+    // The global 30-second staleTime is right for task data, which only changes because
+    // of something this browser did. Deliveries change because a worker somewhere sent a
+    // POST, so opening the log must ask rather than answer from a cache.
+    staleTime: 0,
   });
 }
 

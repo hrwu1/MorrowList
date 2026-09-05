@@ -1089,8 +1089,7 @@ function outboxRepository(data: InMemoryData): OutboxRepository {
     async listUnpublished(workspaceId, limit = 100) {
       return data.outbox
         .filter(
-          (event) =>
-            event.workspaceId === workspaceId && !data.published.has(event.id),
+          (event) => event.workspaceId === workspaceId && !data.published.has(event.id),
         )
         .slice(0, limit);
     },
@@ -1098,7 +1097,8 @@ function outboxRepository(data: InMemoryData): OutboxRepository {
       return data.outbox
         .filter(
           (event) =>
-            !data.published.has(event.id) && event.availableAt.getTime() <= now.getTime(),
+            !data.published.has(event.id) &&
+            event.availableAt.getTime() <= now.getTime(),
         )
         .sort((left, right) => {
           const byTime = left.availableAt.getTime() - right.availableAt.getTime();
@@ -1184,7 +1184,8 @@ function webhookDeliveryRepository(data: InMemoryData): WebhookDeliveryRepositor
         )
         .sort((left, right) => {
           const byTime =
-            (left.nextAttemptAt?.getTime() ?? 0) - (right.nextAttemptAt?.getTime() ?? 0);
+            (left.nextAttemptAt?.getTime() ?? 0) -
+            (right.nextAttemptAt?.getTime() ?? 0);
           return byTime !== 0 ? byTime : left.id < right.id ? -1 : 1;
         })
         .slice(0, limit);

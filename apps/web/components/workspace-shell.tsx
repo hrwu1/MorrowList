@@ -347,14 +347,6 @@ export function WorkspaceShell({
             </Link>
             <Link
               className="workspace-nav__link workspace-nav__link--quiet"
-              href="/settings/webhooks"
-              aria-current={pathname === "/settings/webhooks" ? "page" : undefined}
-            >
-              <Icon name="settings" />
-              <span>Webhooks</span>
-            </Link>
-            <Link
-              className="workspace-nav__link workspace-nav__link--quiet"
               href="/settings/data"
               aria-current={pathname === "/settings/data" ? "page" : undefined}
             >

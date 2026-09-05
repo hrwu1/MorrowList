@@ -4,7 +4,15 @@ import type {
   CreatedWebhookSubscriptionDto,
   WebhookSubscriptionDto,
 } from "@morrowlist/contracts";
-import { Alert, Button, EmptyState, Field, Select, Spinner, TextInput } from "@morrowlist/ui";
+import {
+  Alert,
+  Button,
+  EmptyState,
+  Field,
+  Select,
+  Spinner,
+  TextInput,
+} from "@morrowlist/ui";
 import { useId, useState, type FormEvent } from "react";
 
 import {
@@ -40,9 +48,9 @@ export function WebhookSettingsPage() {
       <header className="page-header">
         <h1>Webhooks</h1>
         <p className="page-header__subtitle">
-          Every change in this workspace can be POSTed to an endpoint you control, signed
-          so you can prove it came from MorrowList. Failed deliveries retry after a
-          minute, an hour and six hours before they are set aside.
+          Every change in this workspace can be POSTed to an endpoint you control,
+          signed so you can prove it came from MorrowList. Failed deliveries retry after
+          a minute, an hour and six hours before they are set aside.
         </p>
       </header>
 

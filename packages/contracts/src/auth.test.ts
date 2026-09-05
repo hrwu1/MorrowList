@@ -12,7 +12,8 @@ describe("SCOPE_PRESETS", () => {
     for (const [name, scopes] of Object.entries(SCOPE_PRESETS)) {
       expect(scopes.length, name).toBeGreaterThan(0);
       expect(new Set(scopes).size, name).toBe(scopes.length);
-      for (const scope of scopes) expect(known.has(scope), `${name}: ${scope}`).toBe(true);
+      for (const scope of scopes)
+        expect(known.has(scope), `${name}: ${scope}`).toBe(true);
     }
   });
 

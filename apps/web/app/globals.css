@@ -4166,6 +4166,10 @@
     font-weight: 600;
   }
 
+  .workspace-settings__link a {
+    color: var(--accent-text);
+  }
+
   /* Webhook settings (GAP-18) */
   .webhook-settings {
     width: 100%;

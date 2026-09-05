@@ -12,15 +12,15 @@ See `docs/adr/pending-mcp-server.md` for why the surface is deliberately small.
 
 ## Tools
 
-| Tool             | What it does                                                        |
-| ---------------- | ------------------------------------------------------------------- |
-| `list_tasks`     | Tasks, filtered by project, status, priority, completion, due window |
-| `get_task`       | One task in full, including the version needed for a safe update     |
-| `create_task`    | Add a task, to a project or the Inbox                                |
-| `update_task`    | Change fields, optionally with `expectedVersion`                     |
-| `move_task`      | Move between projects and statuses, and reorder                      |
-| `complete_task`  | Mark done; spawns the next occurrence of a repeating task            |
-| `search`         | Full-text search with the `is:` / `due:` / `tag:` operator grammar   |
+| Tool            | What it does                                                         |
+| --------------- | -------------------------------------------------------------------- |
+| `list_tasks`    | Tasks, filtered by project, status, priority, completion, due window |
+| `get_task`      | One task in full, including the version needed for a safe update     |
+| `create_task`   | Add a task, to a project or the Inbox                                |
+| `update_task`   | Change fields, optionally with `expectedVersion`                     |
+| `move_task`     | Move between projects and statuses, and reorder                      |
+| `complete_task` | Mark done; spawns the next occurrence of a repeating task            |
+| `search`        | Full-text search with the `is:` / `due:` / `tag:` operator grammar   |
 
 `list_tasks`, `get_task` and `search` are marked read-only, so a client can auto-approve
 them and prompt only for the three that write.
@@ -71,11 +71,11 @@ Add this to `claude_desktop_config.json` (macOS:
 
 ## Configuration
 
-| Variable           | Meaning                                                       |
-| ------------------ | ------------------------------------------------------------- |
-| `MORROW_BASE_URL`  | API base URL. Default `http://localhost:3000/api/v1`           |
-| `MORROW_API_KEY`   | Required. The server exits with code 3 without one             |
-| `MORROW_WORKSPACE` | Workspace id. Only needed if the key reaches more than one     |
+| Variable           | Meaning                                                    |
+| ------------------ | ---------------------------------------------------------- |
+| `MORROW_BASE_URL`  | API base URL. Default `http://localhost:3000/api/v1`       |
+| `MORROW_API_KEY`   | Required. The server exits with code 3 without one         |
+| `MORROW_WORKSPACE` | Workspace id. Only needed if the key reaches more than one |
 
 These are the same variables `morrow` reads (spec 21.2), so a working CLI profile is a
 working MCP server.

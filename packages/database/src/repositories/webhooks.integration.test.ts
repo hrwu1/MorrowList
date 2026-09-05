@@ -90,7 +90,11 @@ beforeEach(async () => {
     scopes: new Set(),
     requestId: "req_webhooks_integration",
   };
-  tasks = new TaskService({ unitOfWork, clock: fixedClock(NOW), cursorSecret: CURSOR_SECRET });
+  tasks = new TaskService({
+    unitOfWork,
+    clock: fixedClock(NOW),
+    cursorSecret: CURSOR_SECRET,
+  });
   sender = recordingSender();
   webhooks = new WebhookService({
     unitOfWork,
@@ -171,7 +175,12 @@ describe("WebhookDispatcher against PostgreSQL", () => {
     // The header name is fixed by WEBHOOK_HEADERS in @morrowlist/contracts.
     const signature = webhookHeaders(request)["Morrow-Signature"]!;
     expect(
-      verifySignature(created.secret, request.body, signature, request.timestampSeconds),
+      verifySignature(
+        created.secret,
+        request.body,
+        signature,
+        request.timestampSeconds,
+      ),
     ).toBe(true);
 
     const { rows } = await handle.pool.query<{ published_at: Date | null }>(

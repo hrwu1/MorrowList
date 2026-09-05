@@ -359,7 +359,8 @@ export function formatWebhookDeliveryTable(
   if (deliveries.length === 0) return "No deliveries.";
   return deliveries
     .map((delivery) => {
-      const code = delivery.responseCode === null ? "---" : String(delivery.responseCode);
+      const code =
+        delivery.responseCode === null ? "---" : String(delivery.responseCode);
       const next = delivery.nextAttemptAt ? `  retry ${delivery.nextAttemptAt}` : "";
       const error = delivery.error ? `  ${delivery.error}` : "";
       return `${delivery.id}  ${delivery.status.padEnd(9)}  ${code}  attempt ${delivery.attempt}  ${delivery.eventType}${next}${error}`;

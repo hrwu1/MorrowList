@@ -1,7 +1,4 @@
-import type {
-  WebhookDeliveryDto,
-  WebhookSubscriptionDto,
-} from "@morrowlist/contracts";
+import type { WebhookDeliveryDto, WebhookSubscriptionDto } from "@morrowlist/contracts";
 
 import type { WebhookDelivery, WebhookSubscription } from "../ports/index.js";
 

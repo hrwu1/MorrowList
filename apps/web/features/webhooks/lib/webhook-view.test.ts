@@ -46,7 +46,9 @@ function endpoint(
 describe("describeDelivery", () => {
   it("says what happened rather than printing a status word", () => {
     expect(describeDelivery(delivery())).toBe("Delivered (200)");
-    expect(describeDelivery(delivery({ status: "pending", attempt: 0 }))).toBe("Queued");
+    expect(describeDelivery(delivery({ status: "pending", attempt: 0 }))).toBe(
+      "Queued",
+    );
     expect(describeDelivery(delivery({ status: "pending", attempt: 2 }))).toBe(
       "Attempt 2 failed, retrying",
     );

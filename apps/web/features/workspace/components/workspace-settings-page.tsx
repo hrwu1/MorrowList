@@ -1,6 +1,7 @@
 "use client";
 
 import { Alert, Button, Field, Spinner, TextInput } from "@morrowlist/ui";
+import Link from "next/link";
 import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { useDefaultWorkspace, useMe, useUpdateWorkspace } from "../hooks/use-workspace";
@@ -129,6 +130,19 @@ export function WorkspaceSettingsPage() {
           those fields in, and a chip under the field says what it read before you press
           Enter. A backslash keeps one word literal, as in &ldquo;\#12&rdquo;. This
           setting is kept on this device.
+        </p>
+      </section>
+
+      {/* Webhooks live behind this page rather than in the sidebar, which stays short
+          enough to hold the places a person actually goes (spec 9). */}
+      <section className="settings-form" aria-labelledby={`${id}-integrations`}>
+        <h2 id={`${id}-integrations`}>Integrations</h2>
+        <p className="task-detail__hint">
+          Send every change in this workspace to an endpoint you control, signed so you
+          can prove it came from MorrowList.
+        </p>
+        <p className="workspace-settings__link">
+          <Link href="/settings/webhooks">Webhooks</Link>
         </p>
       </section>
     </div>

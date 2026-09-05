@@ -48,7 +48,9 @@ function taskFixture(overrides: Partial<TaskDto> = {}): TaskDto {
     isBlocked: false,
     blocked: null,
     dayPlans: [],
-    tags: [{ id: "01996b30-0000-7000-8000-000000000005", name: "Focus", colorToken: "blue" }],
+    tags: [
+      { id: "01996b30-0000-7000-8000-000000000005", name: "Focus", colorToken: "blue" },
+    ],
     relations: [],
     version: 7,
     createdAt: "2026-09-01T09:00:00.000Z",
@@ -92,10 +94,7 @@ async function connect() {
   });
   const client = new Client({ name: "test", version: "0.0.0" });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  await Promise.all([
-    server.connect(serverTransport),
-    client.connect(clientTransport),
-  ]);
+  await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
   return client;
 }
 
@@ -142,7 +141,10 @@ describe("the advertised surface", () => {
     }
     // Read-only tools are flagged so a client can auto-approve them.
     expect(
-      tools.filter((entry) => entry.annotations?.readOnlyHint).map((e) => e.name).sort(),
+      tools
+        .filter((entry) => entry.annotations?.readOnlyHint)
+        .map((e) => e.name)
+        .sort(),
     ).toEqual(["get_task", "list_tasks", "search"]);
   });
 
@@ -275,7 +277,10 @@ describe("update_task, move_task and complete_task", () => {
         : {
             data: taskFixture(),
             warnings: [
-              { code: "WORKSPACE_WIP_LIMIT_EXCEEDED", message: "5 in progress, limit 3" },
+              {
+                code: "WORKSPACE_WIP_LIMIT_EXCEEDED",
+                message: "5 in progress, limit 3",
+              },
             ],
           };
     const client = await connect();

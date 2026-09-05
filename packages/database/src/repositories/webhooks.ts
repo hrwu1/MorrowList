@@ -10,7 +10,11 @@ import type { ActorKind } from "@morrowlist/domain";
 import { and, asc, desc, eq, gt, inArray, isNotNull, lte, sql } from "drizzle-orm";
 
 import type { Database } from "../client.js";
-import { outboxEvents, webhookDeliveries, webhookSubscriptions } from "../schema/index.js";
+import {
+  outboxEvents,
+  webhookDeliveries,
+  webhookSubscriptions,
+} from "../schema/index.js";
 
 /**
  * Webhook subscription and delivery persistence (GAP-18).
@@ -222,7 +226,11 @@ export function createWebhookDeliveryRepository(
       if (claimed.length === 0) return [];
 
       const rows = await db
-        .select({ delivery: webhookDeliveries, subscription: webhookSubscriptions, event: outboxEvents })
+        .select({
+          delivery: webhookDeliveries,
+          subscription: webhookSubscriptions,
+          event: outboxEvents,
+        })
         .from(webhookDeliveries)
         .innerJoin(
           webhookSubscriptions,
@@ -325,9 +333,7 @@ export function createWebhookDeliveryRepository(
             inArray(webhookDeliveries.outboxEventId, [...eventIds]),
           ),
         );
-      return rows
-        .map((row) => row.eventId)
-        .filter((id): id is string => id !== null);
+      return rows.map((row) => row.eventId).filter((id): id is string => id !== null);
     },
   };
 }

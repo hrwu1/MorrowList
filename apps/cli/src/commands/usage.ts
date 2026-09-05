@@ -44,9 +44,7 @@ export function commandMap(root: Command): string[] {
     // A leaf command has no verbs to list, so its own description stands in — trimmed,
     // because this map is read by something with a context window.
     const detail =
-      children.length > 0
-        ? children.join(" ")
-        : firstSentence(command.description());
+      children.length > 0 ? children.join(" ") : firstSentence(command.description());
     return `  ${command.name().padEnd(width)}  ${detail}`;
   });
 }

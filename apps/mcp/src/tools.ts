@@ -74,7 +74,10 @@ export interface McpTool<Shape extends z.ZodRawShape = z.ZodRawShape> {
   readonly description: string;
   readonly inputSchema: Shape;
   /** Hints the client shows the user before approving a call. */
-  readonly annotations: { readonly readOnlyHint: boolean; readonly idempotentHint?: boolean };
+  readonly annotations: {
+    readonly readOnlyHint: boolean;
+    readonly idempotentHint?: boolean;
+  };
   run(client: ApiClient, args: z.infer<z.ZodObject<Shape>>): Promise<unknown>;
 }
 
@@ -164,7 +167,9 @@ export const TOOLS: readonly McpTool[] = [
         .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
         .optional()
         .describe("HH:mm, needs dueDate"),
-      deadline: dateField.optional().describe("Hard date; due is when you plan to work"),
+      deadline: dateField
+        .optional()
+        .describe("Hard date; due is when you plan to work"),
       parentTaskId: idField.optional().describe("Makes this a subtask"),
       addToDay: dateField.optional().describe("Also add to My Day for this date"),
     },
@@ -244,7 +249,7 @@ export const TOOLS: readonly McpTool[] = [
     name: "search",
     title: "Search",
     description:
-      "Full-text search over task titles and descriptions, and project names. Supports operators in q: is:open is:done due:today due:overdue priority:high tag:name project:slug, plus \"quoted phrases\".",
+      'Full-text search over task titles and descriptions, and project names. Supports operators in q: is:open is:done due:today due:overdue priority:high tag:name project:slug, plus "quoted phrases".',
     inputSchema: {
       q: z.string().min(1).max(500),
       limit: z.number().int().min(1).max(200).optional().describe("Default 20"),

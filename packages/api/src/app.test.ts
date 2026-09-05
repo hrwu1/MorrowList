@@ -1731,9 +1731,9 @@ describe("webhook routes", () => {
       method: "DELETE",
     });
     expect(removed.status).toBe(204);
-    expect(
-      (await request(`/api/v1/webhooks/${created.id}/deliveries`)).status,
-    ).toBe(404);
+    expect((await request(`/api/v1/webhooks/${created.id}/deliveries`)).status).toBe(
+      404,
+    );
   });
 
   it("reports an unknown endpoint and an unknown delivery as 404", async () => {
