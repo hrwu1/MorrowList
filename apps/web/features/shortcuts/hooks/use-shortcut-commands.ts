@@ -165,7 +165,7 @@ export function useShortcutCommands(input: CommandsInput): readonly Command[] {
     navigate: (href) => router.push(href),
     announce: input.announce,
     openSearch: () => input.surface?.openSearch(),
-    openCapture: () => openQuickAdd(input.surface),
+    openCapture: () => input.surface?.openCapture(),
     openPalette: input.openPalette,
     openCheatSheet: input.openCheatSheet,
     currentTask,
@@ -215,22 +215,6 @@ function refocusTask(key: string): void {
     if (Date.now() < deadline) window.setTimeout(attempt, REFOCUS_INTERVAL_MS);
   };
   window.setTimeout(attempt, 0);
-}
-
-/**
- * Capture goes to the quick add that is already on screen when there is one — the board
- * and the list both render one — and to the Inbox tray otherwise. Either way this only
- * moves focus; the capture form itself is untouched.
- */
-function openQuickAdd(surface: ShortcutSurfaceActions | null): void {
-  const field = document.querySelector<HTMLInputElement>(
-    'form[aria-label="Quick add"] input:not([type="hidden"])',
-  );
-  if (field && field.offsetParent !== null) {
-    field.focus();
-    return;
-  }
-  surface?.openCapture();
 }
 
 /** The workspace's calendar date when a Today response has said one, else the browser's. */

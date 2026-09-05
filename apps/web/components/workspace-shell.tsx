@@ -202,6 +202,23 @@ export function WorkspaceShell({
                 <Icon name="search" />
                 <kbd aria-hidden="true">/</kbd>
               </button>
+              {/* A keyboard-first product has to say so somewhere a mouse can reach
+                  (spec 14). Beside the brand rather than in the nav: another nav row
+                  would push the sidebar past a laptop viewport. */}
+              {shortcutDialogs ? (
+                <button
+                  type="button"
+                  className="workspace-bell"
+                  // "Shortcuts", not "Keyboard shortcuts": an accessible name
+                  // containing "board" collides with the board controls under a
+                  // substring role query.
+                  aria-label="Shortcuts"
+                  title="Keyboard shortcuts (?)"
+                  onClick={shortcutDialogs.openCheatSheet}
+                >
+                  <Icon name="keyboard" />
+                </button>
+              ) : null}
               <Link
                 className="workspace-bell"
                 href={notificationsLink.href}
@@ -344,21 +361,6 @@ export function WorkspaceShell({
               <Icon name="settings" />
               <span>Workspace settings</span>
             </Link>
-            {/* A keyboard-first product has to say so somewhere a mouse can reach
-                (spec 14); the sheet itself is generated from the registry. */}
-            {shortcutDialogs ? (
-              <button
-                type="button"
-                className="workspace-nav__link workspace-nav__link--button workspace-nav__link--quiet"
-                onClick={shortcutDialogs.openCheatSheet}
-              >
-                <Icon name="keyboard" />
-                <span>Keyboard shortcuts</span>
-                <kbd className="workspace-nav__key" aria-hidden="true">
-                  ?
-                </kbd>
-              </button>
-            ) : null}
 
             <details className="workspace-account" key={`account-${pathname}`}>
               <summary>

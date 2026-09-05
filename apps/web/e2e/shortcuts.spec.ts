@@ -50,12 +50,15 @@ test("single keys capture, complete and navigate", async ({ page }) => {
   await signUp(page);
   await capture(page, "Water the plants");
 
-  // `c` opens capture. On the Inbox page a quick add is already on screen, so the key
-  // only moves focus into it; nothing about the capture form itself changes.
+  // `c` opens the global capture tray, the same one the sidebar button and `n` open,
+  // with focus in its quick add. Nothing about the capture form itself changes.
   await page.getByRole("heading", { level: 1, name: "Inbox", exact: true }).click();
   await page.keyboard.press("c");
-  await expect(page.getByPlaceholder("Add a task and press Enter")).toBeFocused();
-  await page.getByRole("heading", { level: 1, name: "Inbox", exact: true }).click();
+  const tray = page.getByRole("dialog", { name: "Inbox" });
+  await expect(tray).toBeVisible();
+  await expect(tray.getByPlaceholder("Add a task and press Enter")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(tray).toHaveCount(0);
 
   // `e` completes whichever task has focus, and says so out loud.
   await focusRow(page, "Water the plants");
