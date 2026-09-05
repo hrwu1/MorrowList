@@ -42,7 +42,8 @@ export const domainEventSchema = z.object({
 export const TASK_EVENTS = {
   /**
    * Payload: `{ taskId, taskNumber, projectId, statusId, priority, parentTaskId,
-   * seriesId }` plus `spawnedFrom` when completion of a repeating task created it.
+   * seriesId }` plus `spawnedFrom` when completion of a repeating task created it, or
+   * `importedFrom` (`{ source, id }`) when an import did (GAP-07).
    */
   created: "task.created",
   updated: "task.updated",
@@ -99,6 +100,11 @@ export const WORKSPACE_EVENTS = {
   digestSent: "workspace.digest_sent",
   /** Payload: `{ workspaceId, userId, changes }`. */
   notificationPreferencesUpdated: "workspace.notification_preferences_updated",
+  /**
+   * A Trello board or a CSV became a project (GAP-07). Payload:
+   * `{ workspaceId, source, projectId, projectName, counts }`.
+   */
+  imported: "workspace.imported",
 } as const;
 
 export const PROJECT_EVENTS = {

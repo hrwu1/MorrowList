@@ -5,6 +5,7 @@ export {
   type ActorRef,
 } from "./shared/actor.js";
 export { fixedClock, systemClock, type Clock } from "./shared/clock.js";
+export { encodeCsvField, formatCsv, parseCsv } from "./shared/csv.js";
 export {
   DomainError,
   ValidationError,
@@ -239,3 +240,29 @@ export {
   type SearchFilters,
   type SearchQuery,
 } from "./search/query.js";
+
+export {
+  ImportFormatError,
+  MAX_IMPORT_TASKS,
+  SYNTHETIC_STATUS_PREFIX,
+  countSubtasks,
+  defaultPlannedStatus,
+  guessStatusCategory,
+  normalizePlannedStatuses,
+  plannedTagNames,
+  readPlainDate,
+  readPriority,
+  readTagNames,
+  taskCountByStatus,
+  type ImportIssue,
+  type ImportPlan,
+  type PlannedStatus,
+  type PlannedSubtask,
+  type PlannedTask,
+} from "./import/plan.js";
+export { planFromCsv, type CsvImportOptions } from "./import/csv.js";
+export {
+  planFromTrelloBoard,
+  planFromTrelloJson,
+  type TrelloImportOptions,
+} from "./import/trello.js";
