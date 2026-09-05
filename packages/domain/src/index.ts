@@ -140,6 +140,19 @@ export {
   type Weekday,
 } from "./task/recurrence.js";
 export {
+  CAPTURE_EXAMPLES,
+  CAPTURE_EXAMPLE_PROJECTS,
+  CAPTURE_EXAMPLE_TAGS,
+  CAPTURE_EXAMPLE_TODAY,
+  parseCapture,
+  removeSpan,
+  type CaptureExample,
+  type CaptureOptions,
+  type CaptureResult,
+  type CaptureSpan,
+  type CaptureSpanKind,
+} from "./task/capture.js";
+export {
   DAY_PLAN_SOURCES,
   TODAY_REASONS,
   todayReasons,
