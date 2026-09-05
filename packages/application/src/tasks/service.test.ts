@@ -2192,3 +2192,241 @@ describe("TaskService.get by id", () => {
     ).resolves.toMatchObject({ id: numericTail });
   });
 });
+
+describe("TaskService.batch (GAP-08, spec 10.4)", () => {
+  /** Sequential: each create is its own transaction, and they must not interleave. */
+  async function threeInboxTasks() {
+    const created = [];
+    for (const title of ["First", "Second", "Third"]) {
+      created.push(
+        await service.create(seeded.context, {
+          workspaceId: seeded.workspace.id,
+          title,
+        }),
+      );
+    }
+    return created;
+  }
+
+  it("applies every operation and returns one result per entry, in request order", async () => {
+    const [first, second, third] = await threeInboxTasks();
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const tag = await new TagService({
+      unitOfWork,
+      clock: fixedClock(NOW),
+    }).create(seeded.context, seeded.workspace.id, { name: "Focus" });
+
+    const result = await service.batch(seeded.context, seeded.workspace.id, {
+      operations: [
+        { op: "complete", taskId: first!.id, expectedVersion: first!.version },
+        {
+          op: "move",
+          taskId: second!.id,
+          expectedVersion: second!.version,
+          projectId: seeded.project.id,
+          statusId: ready.id,
+        },
+        { op: "setPriority", taskId: third!.id, priority: "high" },
+        { op: "addTag", taskId: third!.id, tagId: tag.id },
+        { op: "setDueDate", taskId: third!.id, dueDate: "2026-09-15" },
+      ],
+    });
+
+    expect(result.data.map((item) => item.op)).toEqual([
+      "complete",
+      "move",
+      "setPriority",
+      "addTag",
+      "setDueDate",
+    ]);
+    expect(result.data[0]?.data.isCompleted).toBe(true);
+    expect(result.data[1]?.data.statusId).toBe(ready.id);
+    expect(result.data[2]?.data.priority).toBe("high");
+    expect(result.data[3]?.data.tags.map((entry) => entry.name)).toEqual(["Focus"]);
+    expect(result.data[4]?.data.dueDate).toBe("2026-09-15");
+    // Each entry answers with the task as it stands after that entry ran.
+    expect(result.data[4]?.data.version).toBeGreaterThan(
+      result.data[2]?.data.version as number,
+    );
+  });
+
+  it("records the ordinary per-task rows plus one batch_applied summary", async () => {
+    const [first, second] = await threeInboxTasks();
+    const before = unitOfWork.data.activity.length;
+
+    await service.batch(seeded.context, seeded.workspace.id, {
+      operations: [
+        { op: "complete", taskId: first!.id },
+        { op: "complete", taskId: second!.id },
+      ],
+    });
+
+    const recorded = unitOfWork.data.activity.slice(before);
+    expect(recorded.map((event) => event.eventType)).toEqual([
+      "task.completed",
+      "task.completed",
+      "task.batch_applied",
+    ]);
+    const summary = recorded.at(-1);
+    // Anchored to the batch's first task so it is reachable from that task's history.
+    expect(summary?.aggregateId).toBe(first!.id);
+    expect(summary?.summary).toBe("Bulk change: 2 tasks completed");
+    expect(summary?.payload).toMatchObject({ count: 2 });
+    // Every row of the batch shares the request's correlation id.
+    for (const event of recorded) {
+      expect(event.correlationId).toBe(seeded.context.requestId);
+    }
+    expect(unitOfWork.data.outbox.at(-1)?.eventType).toBe("task.batch_applied");
+  });
+
+  it("rolls the whole batch back when one entry fails, and names that entry", async () => {
+    const [first, second] = await threeInboxTasks();
+    const activityBefore = unitOfWork.data.activity.length;
+
+    await expect(
+      service.batch(seeded.context, seeded.workspace.id, {
+        operations: [
+          { op: "complete", taskId: first!.id },
+          // A stale version on the second entry: nothing at all may be committed.
+          { op: "complete", taskId: second!.id, expectedVersion: 99 },
+        ],
+      }),
+    ).rejects.toMatchObject({
+      code: "TASK_VERSION_CONFLICT",
+      details: { operationIndex: 1, operation: "complete", taskId: second!.id },
+    });
+
+    expect(
+      (await service.get(seeded.context, seeded.workspace.id, first!.id)).isCompleted,
+    ).toBe(false);
+    expect(unitOfWork.data.activity).toHaveLength(activityBefore);
+    expect(unitOfWork.data.outbox.at(-1)?.eventType).not.toBe("task.batch_applied");
+  });
+
+  it("rolls back the tasks, activity, and outbox together when the commit fails", async () => {
+    // EVT-001, for the bulk path: no half-written history behind a failed batch.
+    const [first] = await threeInboxTasks();
+    const activityBefore = unitOfWork.data.activity.length;
+    unitOfWork.failNextCommit();
+
+    await expect(
+      service.batch(seeded.context, seeded.workspace.id, {
+        operations: [{ op: "complete", taskId: first!.id }],
+      }),
+    ).rejects.toThrow(/simulated commit failure/);
+
+    expect(
+      (await service.get(seeded.context, seeded.workspace.id, first!.id)).isCompleted,
+    ).toBe(false);
+    expect(unitOfWork.data.activity).toHaveLength(activityBefore);
+  });
+
+  it("keeps single-item semantics: a blocked task still refuses to complete", async () => {
+    const [blocker, blocked] = await threeInboxTasks();
+    await service.addRelation(seeded.context, seeded.workspace.id, blocker!.id, {
+      type: "blocks",
+      targetTaskId: blocked!.id,
+    });
+
+    await expect(
+      service.batch(seeded.context, seeded.workspace.id, {
+        operations: [{ op: "complete", taskId: blocked!.id }],
+      }),
+    ).rejects.toMatchObject({ code: "TASK_BLOCKED", details: { operationIndex: 0 } });
+
+    // The acknowledgement travels per entry, exactly as it does on the single endpoint.
+    const acknowledged = await service.batch(seeded.context, seeded.workspace.id, {
+      operations: [{ op: "complete", taskId: blocked!.id, acknowledgeBlocked: true }],
+    });
+    expect(acknowledged.data[0]?.data.isCompleted).toBe(true);
+  });
+
+  it("undoes itself: the inverse batch puts every task back", async () => {
+    const [first, second] = await threeInboxTasks();
+
+    const done = await service.batch(seeded.context, seeded.workspace.id, {
+      operations: [
+        { op: "complete", taskId: first!.id },
+        { op: "delete", taskId: second!.id },
+      ],
+    });
+
+    await service.batch(seeded.context, seeded.workspace.id, {
+      operations: [
+        {
+          op: "reopen",
+          taskId: first!.id,
+          expectedVersion: done.data[0]?.data.version as number,
+        },
+        {
+          op: "restore",
+          taskId: second!.id,
+          expectedVersion: done.data[1]?.data.version as number,
+        },
+      ],
+    });
+
+    const listed = await service.list(seeded.context, listQuery());
+    expect(listed.data.map((task) => task.title).sort()).toEqual([
+      "First",
+      "Second",
+      "Third",
+    ]);
+  });
+
+  it("refuses an undo whose task moved on, rather than overwriting it", async () => {
+    // Spec 24.3: a stale version never wins. This is what makes the undo toast report
+    // a conflict instead of quietly reverting somebody else's newer change.
+    const [first] = await threeInboxTasks();
+    const done = await service.batch(seeded.context, seeded.workspace.id, {
+      operations: [{ op: "complete", taskId: first!.id }],
+    });
+    const staleVersion = done.data[0]?.data.version as number;
+    await service.update(seeded.context, seeded.workspace.id, first!.id, {
+      title: "Edited in another tab",
+    });
+
+    await expect(
+      service.batch(seeded.context, seeded.workspace.id, {
+        operations: [
+          { op: "reopen", taskId: first!.id, expectedVersion: staleVersion },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: "TASK_VERSION_CONFLICT" });
+    expect(
+      (await service.get(seeded.context, seeded.workspace.id, first!.id)).title,
+    ).toBe("Edited in another tab");
+  });
+
+  it("reports the workspace in-progress limit once, not once per task", async () => {
+    const inProgress = statusByCategory(seeded.statuses, "in_progress");
+    unitOfWork.data.workspaces.set(seeded.workspace.id, {
+      ...seeded.workspace,
+      inProgressLimit: 1,
+    });
+    const [first, second, third] = await threeInboxTasks();
+
+    const result = await service.batch(seeded.context, seeded.workspace.id, {
+      operations: [first, second, third].map((task) => ({
+        op: "move" as const,
+        taskId: task!.id,
+        projectId: seeded.project.id,
+        statusId: inProgress.id,
+      })),
+    });
+
+    expect(result.data).toHaveLength(3);
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings[0]?.code).toBe("IN_PROGRESS_LIMIT_EXCEEDED");
+  });
+
+  it("rejects a workspace the caller cannot reach", async () => {
+    const [first] = await threeInboxTasks();
+    await expect(
+      service.batch(seeded.context, uuidv7(), {
+        operations: [{ op: "complete", taskId: first!.id }],
+      }),
+      // Reported as not-found so the response never confirms it exists (spec 22.5).
+    ).rejects.toMatchObject({ code: "WORKSPACE_NOT_FOUND" });
+  });
+});

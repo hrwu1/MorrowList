@@ -77,6 +77,14 @@ export const TASK_EVENTS = {
   reminderSent: "task.reminder_sent",
   /** Payload: `{ taskId, notificationId, remindAt }`. */
   reminderSnoozed: "task.reminder_snoozed",
+  /**
+   * One administrative summary for a bulk edit (GAP-08, spec 10.4), written once per
+   * `POST /tasks/batch` beside the ordinary per-task rows the individual operations
+   * record. It is anchored to the batch's first task so it is reachable from that task's
+   * history; the correlation id on every row of the transaction is what groups them.
+   * Payload: `{ taskIds, operations: [{ op, taskId }], count }`.
+   */
+  batchApplied: "task.batch_applied",
 } as const;
 
 export const TAG_EVENTS = {

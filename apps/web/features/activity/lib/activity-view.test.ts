@@ -71,6 +71,7 @@ const CATALOGUE: Record<string, Partial<ActivityEntryDto>> = {
     summary: "Sent reminder for ML-1",
   },
   [TASK_EVENTS.reminderSnoozed]: { summary: "Snoozed reminder for 60 minutes" },
+  [TASK_EVENTS.batchApplied]: { summary: "Bulk change: 12 tasks completed" },
   [PROJECT_EVENTS.created]: {
     aggregateType: "project",
     summary: "Created project Launch",

@@ -6,6 +6,7 @@ exports[`describeEntry > renders a readable line for every event type in the cat
   "project.created": "Created project Launch",
   "project.restored": "Restored project",
   "project.updated": "Updated project",
+  "task.batch_applied": "Bulk change: 12 tasks completed",
   "task.blocked": "Marked task blocked: waiting on vendor",
   "task.completed": "Completed task",
   "task.created": "Created task ML-1",

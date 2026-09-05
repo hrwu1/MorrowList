@@ -122,6 +122,13 @@ async function taskWithFullHistory(): Promise<TaskDto> {
     },
   });
   task = await tasks.skipOccurrence(seeded.context, workspaceId, task.id);
+  // A bulk edit writes its ordinary per-task row plus one summary anchored to the
+  // batch's first task, which is this one (GAP-08).
+  task = (
+    await tasks.batch(seeded.context, workspaceId, {
+      operations: [{ op: "setPriority", taskId: task.id, priority: "urgent" }],
+    })
+  ).data[0]!.data;
   task = await tasks.delete(seeded.context, workspaceId, task.id);
   task = await tasks.restore(seeded.context, workspaceId, task.id);
   // Skipping moved the due date to 08-30, so the reminder (11:30Z that day) fires as
@@ -148,6 +155,8 @@ describe("ActivityService.listForTask", () => {
       TASK_EVENTS.reminderSent,
       TASK_EVENTS.restored,
       TASK_EVENTS.deleted,
+      TASK_EVENTS.batchApplied,
+      TASK_EVENTS.updated,
       TASK_EVENTS.occurrenceSkipped,
       TASK_EVENTS.updated,
       TASK_EVENTS.unblocked,
@@ -262,8 +271,8 @@ describe("ActivityService.listForTask", () => {
       seen.push(...next.data);
       cursor = next.page.nextCursor;
     }
-    expect(seen).toHaveLength(22);
-    expect(new Set(seen.map((entry) => entry.id)).size).toBe(22);
+    expect(seen).toHaveLength(24);
+    expect(new Set(seen.map((entry) => entry.id)).size).toBe(24);
 
     const [body] = (first.page.nextCursor as string).split(".");
     await expect(

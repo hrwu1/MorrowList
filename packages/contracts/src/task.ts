@@ -382,6 +382,61 @@ export const taskCommandResponseSchema = z.object({
 });
 export const taskListResponseSchema = paginated(taskSchema);
 
+/**
+ * Bulk operations (spec 10.4, GAP-08). `POST /tasks/batch` applies every operation in one
+ * transaction, so bulk editing never invents its own semantics: each entry is the same
+ * single-item command the individual endpoints run, with the same optimistic-concurrency
+ * check. A failure anywhere rolls the whole batch back and names the entry that failed.
+ */
+export const MAX_BATCH_OPERATIONS = 200;
+
+const batchTargetSchema = z.object({
+  taskId: uuidSchema,
+  expectedVersion: z.number().int().positive().optional(),
+});
+
+export const batchOperationSchema = z.discriminatedUnion("op", [
+  batchTargetSchema.extend({
+    op: z.literal("complete"),
+    acknowledgeBlocked: z.boolean().optional(),
+  }),
+  batchTargetSchema.extend({ op: z.literal("reopen") }),
+  batchTargetSchema.extend({
+    op: z.literal("move"),
+    /** Null moves the task back to the Inbox (spec 11.5). */
+    projectId: uuidSchema.nullable(),
+    statusId: uuidSchema.nullish(),
+    beforeTaskId: uuidSchema.nullish(),
+    afterTaskId: uuidSchema.nullish(),
+  }),
+  batchTargetSchema.extend({ op: z.literal("delete") }),
+  batchTargetSchema.extend({ op: z.literal("restore") }),
+  batchTargetSchema.extend({ op: z.literal("addTag"), tagId: uuidSchema }),
+  batchTargetSchema.extend({ op: z.literal("removeTag"), tagId: uuidSchema }),
+  batchTargetSchema.extend({ op: z.literal("setPriority"), priority: prioritySchema }),
+  batchTargetSchema.extend({
+    op: z.literal("setDueDate"),
+    /** Null clears the due date, and its time with it (spec 8.2 invariant 3). */
+    dueDate: plainDateSchema.nullable(),
+  }),
+]);
+
+export const batchTasksRequestSchema = z.object({
+  operations: z.array(batchOperationSchema).min(1).max(MAX_BATCH_OPERATIONS),
+});
+
+/** One entry's outcome, in request order, with the task as it now stands. */
+export const batchResultItemSchema = z.object({
+  op: z.string(),
+  taskId: uuidSchema,
+  data: taskSchema,
+});
+
+export const batchTasksResponseSchema = z.object({
+  data: z.array(batchResultItemSchema),
+  warnings: z.array(wipWarningSchema),
+});
+
 export type TaskDto = z.infer<typeof taskSchema>;
 export type WipWarningDto = z.infer<typeof wipWarningSchema>;
 export type TaskCommandResponse = z.infer<typeof taskCommandResponseSchema>;
@@ -411,3 +466,13 @@ export type CompleteTaskRequest = z.infer<typeof completeTaskRequestSchema>;
 export type AddTaskToDayRequest = z.infer<typeof addTaskToDayRequestSchema>;
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;
 export type TaskListResponse = z.infer<typeof taskListResponseSchema>;
+export type BatchOperation = z.infer<typeof batchOperationSchema>;
+export type BatchOperationKind = BatchOperation["op"];
+export type BatchTasksRequest = z.infer<typeof batchTasksRequestSchema>;
+export type BatchResultItemDto = z.infer<typeof batchResultItemSchema>;
+export type BatchTasksResponse = z.infer<typeof batchTasksResponseSchema>;
+/** The unwrapped form of `BatchTasksResponse`: the per-item results with any warnings. */
+export interface BatchTasksResult {
+  readonly data: readonly BatchResultItemDto[];
+  readonly warnings: readonly WipWarningDto[];
+}

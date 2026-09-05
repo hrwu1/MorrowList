@@ -1,6 +1,10 @@
 import type {
   AddTaskRelationRequest,
   AddTaskToDayRequest,
+  BatchOperation,
+  BatchResultItemDto,
+  BatchTasksRequest,
+  BatchTasksResult,
   CompleteTaskRequest,
   CreateTaskRequest,
   ListTasksQuery,
@@ -312,7 +316,22 @@ export class TaskService {
     assertWorkspaceAccess(context, workspaceId);
     assertScope(context, SCOPES.tasksWrite);
 
-    return this.mutate(context, workspaceId, taskId, request.expectedVersion, {
+    return this.mutate(
+      context,
+      workspaceId,
+      taskId,
+      request.expectedVersion,
+      this.updateStep(context, workspaceId, request),
+    );
+  }
+
+  /** The field-edit policy, shared by `PATCH /tasks/{id}` and the bulk field operations. */
+  private updateStep(
+    context: ActorContext,
+    workspaceId: string,
+    request: UpdateTaskRequest,
+  ): MutationStep {
+    return {
       eventType: TASK_EVENTS.updated,
       summarize: () => "Updated task fields",
       apply: async (task, tx, workspace) =>
@@ -359,7 +378,7 @@ export class TaskService {
           },
           { actor: actorRef(context), clock: this.clock },
         ),
-    });
+    };
   }
 
   /**
@@ -381,50 +400,59 @@ export class TaskService {
       workspaceId,
       taskId,
       request.expectedVersion,
-      {
-        eventType: TASK_EVENTS.moved,
-        summarize: (next) =>
-          next.projectId === null
-            ? "Moved task to Inbox"
-            : "Moved task to another status",
-        apply: async (task, tx) => {
-          if (request.projectId === null && request.statusId != null) {
-            throw new DomainError(
-              "VALIDATION_FAILED",
-              "An Inbox destination cannot have a workflow status.",
-              { projectId: null, statusId: request.statusId },
-            );
-          }
-
-          const destination =
-            request.projectId === null
-              ? null
-              : await this.resolveDestination(
-                  tx,
-                  workspaceId,
-                  request.projectId,
-                  request.statusId ?? null,
-                );
-          const scope: RankScope = {
-            workspaceId,
-            projectId: destination?.id ?? null,
-            statusId: destination?.status.id ?? null,
-          };
-          const rank = await this.resolveOrderingRank(tx, task.id, scope, request);
-
-          return applyTaskMove(
-            task,
-            {
-              destination: destination
-                ? { projectId: destination.id, status: destination.status }
-                : null,
-              rank,
-            },
-            { actor: actorRef(context), clock: this.clock },
-          );
-        },
-      },
+      this.moveStep(context, workspaceId, request),
     );
+  }
+
+  /** The move policy, shared by `POST /tasks/{id}/move` and the bulk `move` operation. */
+  private moveStep(
+    context: ActorContext,
+    workspaceId: string,
+    request: MoveTaskRequest,
+  ): MutationStep {
+    return {
+      eventType: TASK_EVENTS.moved,
+      summarize: (next) =>
+        next.projectId === null
+          ? "Moved task to Inbox"
+          : "Moved task to another status",
+      apply: async (task, tx) => {
+        if (request.projectId === null && request.statusId != null) {
+          throw new DomainError(
+            "VALIDATION_FAILED",
+            "An Inbox destination cannot have a workflow status.",
+            { projectId: null, statusId: request.statusId },
+          );
+        }
+
+        const destination =
+          request.projectId === null
+            ? null
+            : await this.resolveDestination(
+                tx,
+                workspaceId,
+                request.projectId,
+                request.statusId ?? null,
+              );
+        const scope: RankScope = {
+          workspaceId,
+          projectId: destination?.id ?? null,
+          statusId: destination?.status.id ?? null,
+        };
+        const rank = await this.resolveOrderingRank(tx, task.id, scope, request);
+
+        return applyTaskMove(
+          task,
+          {
+            destination: destination
+              ? { projectId: destination.id, status: destination.status }
+              : null,
+            rank,
+          },
+          { actor: actorRef(context), clock: this.clock },
+        );
+      },
+    };
   }
 
   /** Reorder a task inside its current Inbox or project-status rank scope. */
@@ -530,8 +558,26 @@ export class TaskService {
     assertWorkspaceAccess(context, workspaceId);
     assertScope(context, SCOPES.tasksWrite);
 
+    return this.mutate(
+      context,
+      workspaceId,
+      taskId,
+      request.expectedVersion,
+      this.completeStep(context, workspaceId, request),
+    );
+  }
+
+  /**
+   * The completion policy, shared by `POST /tasks/{id}/complete` and the bulk `complete`
+   * operation. One step per task: the spawned occurrence it remembers is that task's.
+   */
+  private completeStep(
+    context: ActorContext,
+    workspaceId: string,
+    request: CompleteTaskRequest,
+  ): MutationStep {
     let spawned: Task | null = null;
-    return this.mutate(context, workspaceId, taskId, request.expectedVersion, {
+    return {
       eventType: TASK_EVENTS.completed,
       summarize: (_next, _previous, workspace) =>
         spawned
@@ -572,7 +618,7 @@ export class TaskService {
         }
         return { ...completed, recurrence: null };
       },
-    });
+    };
   }
 
   /**
@@ -616,7 +662,18 @@ export class TaskService {
     assertWorkspaceAccess(context, workspaceId);
     assertScope(context, SCOPES.tasksWrite);
 
-    return this.mutateWithWarnings(context, workspaceId, taskId, expectedVersion, {
+    return this.mutateWithWarnings(
+      context,
+      workspaceId,
+      taskId,
+      expectedVersion,
+      this.reopenStep(context),
+    );
+  }
+
+  /** The reopen policy, shared by the endpoint and the bulk `reopen` operation. */
+  private reopenStep(context: ActorContext): MutationStep {
+    return {
       eventType: TASK_EVENTS.reopened,
       summarize: () => "Reopened task",
       apply: async (task, tx) => {
@@ -643,7 +700,7 @@ export class TaskService {
           { actor: actorRef(context), clock: this.clock },
         );
       },
-    });
+    };
   }
 
   /** Soft delete: the task moves to Trash and stays restorable (spec 8.6). */
@@ -661,14 +718,18 @@ export class TaskService {
       workspaceId,
       taskId,
       expectedVersion,
-      {
-        eventType: TASK_EVENTS.deleted,
-        summarize: () => "Moved task to Trash",
-        apply: (task) =>
-          deleteTask(task, { actor: actorRef(context), clock: this.clock }),
-      },
+      this.deleteStep(context),
       { allowDeleted: true },
     );
+  }
+
+  private deleteStep(context: ActorContext): MutationStep {
+    return {
+      eventType: TASK_EVENTS.deleted,
+      summarize: () => "Moved task to Trash",
+      apply: (task) =>
+        deleteTask(task, { actor: actorRef(context), clock: this.clock }),
+    };
   }
 
   async restore(
@@ -685,14 +746,155 @@ export class TaskService {
       workspaceId,
       taskId,
       expectedVersion,
-      {
-        eventType: TASK_EVENTS.restored,
-        summarize: () => "Restored task from Trash",
-        apply: (task) =>
-          restoreTask(task, { actor: actorRef(context), clock: this.clock }),
-      },
+      this.restoreStep(context),
       { allowDeleted: true },
     );
+  }
+
+  private restoreStep(context: ActorContext): MutationStep {
+    return {
+      eventType: TASK_EVENTS.restored,
+      summarize: () => "Restored task from Trash",
+      apply: (task) =>
+        restoreTask(task, { actor: actorRef(context), clock: this.clock }),
+    };
+  }
+
+  /**
+   * Apply up to 200 operations as one unit of work (spec 10.4, GAP-08).
+   *
+   * Bulk editing must not change single-item semantics, so every entry runs the same
+   * policy its own endpoint runs — the same version check, the same rank resolution, the
+   * same blocked-task guard — and records the same per-task activity row. What bulk adds
+   * is atomicity: one failure rolls the whole batch back and names the entry that failed,
+   * so the user never has to work out which half of a selection went through. One
+   * `task.batch_applied` summary row is written beside the per-task rows, and every row of
+   * the transaction shares the request's correlation id.
+   */
+  async batch(
+    context: ActorContext,
+    workspaceId: string,
+    request: BatchTasksRequest,
+  ): Promise<BatchTasksResult> {
+    assertWorkspaceAccess(context, workspaceId);
+    assertScope(context, SCOPES.tasksWrite);
+
+    return this.unitOfWork.execute(async (tx) => {
+      const workspace = await this.requireWorkspace(tx, workspaceId);
+      const data: BatchResultItemDto[] = [];
+      const warnings: WipWarningDto[] = [];
+
+      for (const [index, operation] of request.operations.entries()) {
+        const result = await this.applyBatchOperation(
+          tx,
+          context,
+          workspace,
+          operation,
+          index,
+        );
+        data.push({ op: operation.op, taskId: operation.taskId, data: result.task });
+        warnings.push(...result.warnings);
+      }
+
+      const anchor = data[0] as BatchResultItemDto;
+      await recordEvent(tx, context, this.clock, {
+        workspaceId,
+        aggregateType: "task",
+        aggregateId: anchor.taskId,
+        eventType: TASK_EVENTS.batchApplied,
+        summary: describeBatch(request.operations),
+        payload: {
+          count: request.operations.length,
+          taskIds: [...new Set(request.operations.map((entry) => entry.taskId))],
+          operations: request.operations.map((entry) => ({
+            op: entry.op,
+            taskId: entry.taskId,
+          })),
+        },
+      });
+
+      // The workspace limit is one condition, not one per task: reporting it once keeps
+      // a 50-card move from stacking 50 identical warnings.
+      return { data, warnings: warnings.slice(0, 1) };
+    });
+  }
+
+  /** One batch entry, dispatched to the same policy its single-item endpoint uses. */
+  private async applyBatchOperation(
+    tx: TransactionContext,
+    context: ActorContext,
+    workspace: Workspace,
+    operation: BatchOperation,
+    index: number,
+  ): Promise<TaskCommandResult> {
+    const workspaceId = workspace.id;
+    const run = (step: MutationStep, options: { allowDeleted?: boolean } = {}) =>
+      this.mutateIn(
+        tx,
+        context,
+        workspace,
+        operation.taskId,
+        operation.expectedVersion,
+        step,
+        options,
+      );
+    const withoutWarnings = async (
+      task: Promise<TaskDto>,
+    ): Promise<TaskCommandResult> => ({
+      task: await task,
+      warnings: [],
+    });
+
+    try {
+      switch (operation.op) {
+        case "complete":
+          return await run(
+            this.completeStep(context, workspaceId, {
+              ...(operation.acknowledgeBlocked ? { acknowledgeBlocked: true } : {}),
+            }),
+          );
+        case "reopen":
+          return await run(this.reopenStep(context));
+        case "move":
+          return await run(
+            this.moveStep(context, workspaceId, {
+              projectId: operation.projectId,
+              statusId: operation.statusId,
+              beforeTaskId: operation.beforeTaskId,
+              afterTaskId: operation.afterTaskId,
+            }),
+          );
+        case "delete":
+          return await run(this.deleteStep(context), { allowDeleted: true });
+        case "restore":
+          return await run(this.restoreStep(context), { allowDeleted: true });
+        case "addTag":
+          return await withoutWarnings(
+            this.addTagIn(tx, context, workspace, operation.taskId, operation.tagId),
+          );
+        case "removeTag":
+          return await withoutWarnings(
+            this.removeTagIn(tx, context, workspace, operation.taskId, operation.tagId),
+          );
+        case "setPriority":
+          return await run(
+            this.updateStep(context, workspaceId, { priority: operation.priority }),
+          );
+        case "setDueDate":
+          return await run(
+            this.updateStep(
+              context,
+              workspaceId,
+              // Clearing the date clears the time with it (spec 8.2 invariant 3).
+              operation.dueDate === null
+                ? { dueDate: null, dueTime: null }
+                : { dueDate: operation.dueDate },
+            ),
+          );
+      }
+    } catch (error) {
+      throw batchFailure(error, index, operation);
+    }
   }
 
   /**
@@ -712,31 +914,42 @@ export class TaskService {
 
     return this.unitOfWork.execute(async (tx) => {
       const workspace = await this.requireWorkspace(tx, workspaceId);
-      const task = await this.requireTask(tx, workspaceId, taskId);
-      const tag = await this.requireTag(tx, workspaceId, tagId);
-      const current = await this.tagsOf(tx, task);
-
-      if (current.some((candidate) => candidate.id === tag.id)) {
-        return this.toDto(tx, workspace, task);
-      }
-      if (current.length >= MAX_TAGS_PER_TASK) {
-        throw new ValidationError(
-          `A task can carry at most ${MAX_TAGS_PER_TASK} tags.`,
-          { taskId, maxTags: MAX_TAGS_PER_TASK },
-        );
-      }
-
-      await tx.tasks.addTag(taskId, tagId, this.clock.now());
-      await recordEvent(tx, context, this.clock, {
-        workspaceId,
-        aggregateType: "task",
-        aggregateId: taskId,
-        eventType: TASK_EVENTS.tagAdded,
-        summary: `Added tag ${tag.name}`,
-        payload: { taskId, tagId, tagName: tag.name },
-      });
-      return this.toDto(tx, workspace, task);
+      return this.addTagIn(tx, context, workspace, taskId, tagId);
     });
+  }
+
+  private async addTagIn(
+    tx: TransactionContext,
+    context: ActorContext,
+    workspace: Workspace,
+    taskId: string,
+    tagId: string,
+  ): Promise<TaskDto> {
+    const workspaceId = workspace.id;
+    const task = await this.requireTask(tx, workspaceId, taskId);
+    const tag = await this.requireTag(tx, workspaceId, tagId);
+    const current = await this.tagsOf(tx, task);
+
+    if (current.some((candidate) => candidate.id === tag.id)) {
+      return this.toDto(tx, workspace, task);
+    }
+    if (current.length >= MAX_TAGS_PER_TASK) {
+      throw new ValidationError(`A task can carry at most ${MAX_TAGS_PER_TASK} tags.`, {
+        taskId,
+        maxTags: MAX_TAGS_PER_TASK,
+      });
+    }
+
+    await tx.tasks.addTag(taskId, tagId, this.clock.now());
+    await recordEvent(tx, context, this.clock, {
+      workspaceId,
+      aggregateType: "task",
+      aggregateId: taskId,
+      eventType: TASK_EVENTS.tagAdded,
+      summary: `Added tag ${tag.name}`,
+      payload: { taskId, tagId, tagName: tag.name },
+    });
+    return this.toDto(tx, workspace, task);
   }
 
   async removeTag(
@@ -750,27 +963,38 @@ export class TaskService {
 
     return this.unitOfWork.execute(async (tx) => {
       const workspace = await this.requireWorkspace(tx, workspaceId);
-      const task = await this.requireTask(tx, workspaceId, taskId);
-      const current = await this.tagsOf(tx, task);
-      const tag = current.find((candidate) => candidate.id === tagId);
-      if (!tag) {
-        // Not carried: nothing to remove, nothing to record. An unknown tag id is still
-        // reported so a client cannot mistake a typo for success.
-        await this.requireTag(tx, workspaceId, tagId);
-        return this.toDto(tx, workspace, task);
-      }
-
-      await tx.tasks.removeTag(taskId, tagId);
-      await recordEvent(tx, context, this.clock, {
-        workspaceId,
-        aggregateType: "task",
-        aggregateId: taskId,
-        eventType: TASK_EVENTS.tagRemoved,
-        summary: `Removed tag ${tag.name}`,
-        payload: { taskId, tagId, tagName: tag.name },
-      });
-      return this.toDto(tx, workspace, task);
+      return this.removeTagIn(tx, context, workspace, taskId, tagId);
     });
+  }
+
+  private async removeTagIn(
+    tx: TransactionContext,
+    context: ActorContext,
+    workspace: Workspace,
+    taskId: string,
+    tagId: string,
+  ): Promise<TaskDto> {
+    const workspaceId = workspace.id;
+    const task = await this.requireTask(tx, workspaceId, taskId);
+    const current = await this.tagsOf(tx, task);
+    const tag = current.find((candidate) => candidate.id === tagId);
+    if (!tag) {
+      // Not carried: nothing to remove, nothing to record. An unknown tag id is still
+      // reported so a client cannot mistake a typo for success.
+      await this.requireTag(tx, workspaceId, tagId);
+      return this.toDto(tx, workspace, task);
+    }
+
+    await tx.tasks.removeTag(taskId, tagId);
+    await recordEvent(tx, context, this.clock, {
+      workspaceId,
+      aggregateType: "task",
+      aggregateId: taskId,
+      eventType: TASK_EVENTS.tagRemoved,
+      summary: `Removed tag ${tag.name}`,
+      payload: { taskId, tagId, tagName: tag.name },
+    });
+    return this.toDto(tx, workspace, task);
   }
 
   /**
@@ -1002,53 +1226,78 @@ export class TaskService {
     step: MutationStep,
     options: { allowDeleted?: boolean } = {},
   ): Promise<TaskCommandResult> {
-    return this.unitOfWork.execute(async (tx) => {
-      const workspace = await this.requireWorkspace(tx, workspaceId);
-      const previous = await this.requireTask(tx, workspaceId, taskId, options);
+    return this.unitOfWork.execute(async (tx) =>
+      this.mutateIn(
+        tx,
+        context,
+        await this.requireWorkspace(tx, workspaceId),
+        taskId,
+        expectedVersion,
+        step,
+        options,
+      ),
+    );
+  }
 
-      assertExpectedVersion(previous, expectedVersion);
+  /**
+   * The mutation pipeline inside a transaction the caller already owns. A single-item
+   * command opens its own; a batch runs many of these in one, which is what lets bulk
+   * editing reuse the single-item semantics without a second copy of them (spec 10.4).
+   */
+  private async mutateIn(
+    tx: TransactionContext,
+    context: ActorContext,
+    workspace: Workspace,
+    taskId: string,
+    expectedVersion: number | undefined,
+    step: MutationStep,
+    options: { allowDeleted?: boolean } = {},
+  ): Promise<TaskCommandResult> {
+    const workspaceId = workspace.id;
+    const previous = await this.requireTask(tx, workspaceId, taskId, options);
 
-      const next = await step.apply(previous, tx, workspace);
-      if (next === previous) {
-        // The policy decided nothing material changed: no version bump, no event.
-        return { task: await this.toDto(tx, workspace, previous), warnings: [] };
-      }
+    assertExpectedVersion(previous, expectedVersion);
 
-      const persisted = await tx.tasks.update(next, previous.version);
-      if (!persisted) {
-        // The row moved between the read and the write inside this transaction.
-        const current = await tx.tasks.findById(workspaceId, taskId);
-        throw new DomainError(
-          "TASK_VERSION_CONFLICT",
-          "The task changed after you loaded it.",
-          {
-            taskId,
-            expectedVersion: previous.version,
-            actualVersion: current?.version ?? null,
-          },
-        );
-      }
+    const next = await step.apply(previous, tx, workspace);
+    if (next === previous) {
+      // The policy decided nothing material changed: no version bump, no event.
+      return { task: await this.toDto(tx, workspace, previous), warnings: [] };
+    }
 
-      await syncIntervals(tx, previous, next);
-      await recordEvent(tx, context, this.clock, {
-        workspaceId,
-        aggregateType: "task",
-        aggregateId: taskId,
-        eventType: step.eventType,
-        summary: step.summarize(next, previous, workspace),
-        payload: step.payload
-          ? step.payload(next, previous)
-          : { taskId, changes: materialChanges(next, previous) },
-      });
-      // The reminder follows the task in the same transaction: a new due instant
-      // reschedules it; completion or trashing cancels it; restore or reopen brings it back.
-      await recomputeReminder(tx, next, workspace.timezone, this.clock.now());
+    const persisted = await tx.tasks.update(next, previous.version);
+    if (!persisted) {
+      // The row moved between the read and the write inside this transaction.
+      const current = await tx.tasks.findById(workspaceId, taskId);
+      throw new DomainError(
+        "TASK_VERSION_CONFLICT",
+        "The task changed after you loaded it.",
+        {
+          taskId,
+          expectedVersion: previous.version,
+          actualVersion: current?.version ?? null,
+        },
+      );
+    }
 
-      return {
-        task: await this.toDto(tx, workspace, next),
-        warnings: await this.wipWarnings(tx, workspace, next, previous),
-      };
+    await syncIntervals(tx, previous, next);
+    await recordEvent(tx, context, this.clock, {
+      workspaceId,
+      aggregateType: "task",
+      aggregateId: taskId,
+      eventType: step.eventType,
+      summary: step.summarize(next, previous, workspace),
+      payload: step.payload
+        ? step.payload(next, previous)
+        : { taskId, changes: materialChanges(next, previous) },
     });
+    // The reminder follows the task in the same transaction: a new due instant
+    // reschedules it; completion or trashing cancels it; restore or reopen brings it back.
+    await recomputeReminder(tx, next, workspace.timezone, this.clock.now());
+
+    return {
+      task: await this.toDto(tx, workspace, next),
+      warnings: await this.wipWarnings(tx, workspace, next, previous),
+    };
   }
 
   /**
@@ -1372,6 +1621,48 @@ interface MutationStep {
   ) => Task | Promise<Task>;
   /** Event payload; defaults to the field-level diff (spec 18.2). */
   readonly payload?: (next: Task, previous: Task) => Record<string, unknown>;
+}
+
+const BATCH_VERBS: Record<BatchOperation["op"], string> = {
+  complete: "completed",
+  reopen: "reopened",
+  move: "moved",
+  delete: "trashed",
+  restore: "restored",
+  addTag: "tagged",
+  removeTag: "untagged",
+  setPriority: "reprioritised",
+  setDueDate: "rescheduled",
+};
+
+/** "Bulk change: 12 tasks completed" — one readable line for the whole batch. */
+function describeBatch(operations: readonly BatchOperation[]): string {
+  const kinds = [...new Set(operations.map((operation) => operation.op))];
+  const tasks = new Set(operations.map((operation) => operation.taskId)).size;
+  const subject = `${tasks} ${tasks === 1 ? "task" : "tasks"}`;
+  const verb =
+    kinds.length === 1
+      ? BATCH_VERBS[kinds[0] as BatchOperation["op"]]
+      : `changed in ${operations.length} operations`;
+  return `Bulk change: ${subject} ${verb}`;
+}
+
+/**
+ * Say which entry of a batch failed. The batch is already rolling back; the caller's
+ * problem is working out what to fix, and "operation 37 on ML-142" is the answer.
+ */
+function batchFailure(
+  error: unknown,
+  index: number,
+  operation: BatchOperation,
+): unknown {
+  if (!(error instanceof DomainError)) return error;
+  return new DomainError(error.code, error.message, {
+    ...error.details,
+    operationIndex: index,
+    operation: operation.op,
+    taskId: operation.taskId,
+  });
 }
 
 function parentChangePayload(next: Task, previous: Task): Record<string, unknown> {
