@@ -5,7 +5,9 @@ import { ApiError, toErrorBody } from "./errors.js";
 import { authenticate } from "./middleware/authenticate.js";
 import { requestContext } from "./middleware/request-context.js";
 import { bodyLimit } from "./middleware/validate.js";
+import { exportRoutes } from "./routes/exports.js";
 import { healthRoutes } from "./routes/health.js";
+import { importRoutes } from "./routes/imports.js";
 import { meRoutes } from "./routes/me.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { projectRoutes } from "./routes/projects.js";
@@ -23,12 +25,21 @@ import { workspaceRoutes } from "./routes/workspace.js";
 
 export const API_BASE_PATH = "/api/v1";
 const MAX_BODY_BYTES = 1_000_000;
+/** An import carries a whole exported board or spreadsheet, so it gets its own cap. */
+const MAX_IMPORT_BODY_BYTES = 10_000_000;
 
 export function createApiApp(deps: ApiDependencies) {
   const app = new Hono<ApiEnv>().basePath(API_BASE_PATH);
 
   app.use("*", requestContext(deps.logger));
-  app.use("*", bodyLimit(MAX_BODY_BYTES));
+  app.use(
+    "*",
+    bodyLimit((path) =>
+      path.startsWith(`${API_BASE_PATH}/imports`)
+        ? MAX_IMPORT_BODY_BYTES
+        : MAX_BODY_BYTES,
+    ),
+  );
 
   // Probes stay unauthenticated so an orchestrator can reach them.
   app.route("/", healthRoutes(deps));
@@ -54,7 +65,11 @@ export function createApiApp(deps: ApiDependencies) {
   app.use("/tags/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/statuses/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/workspaces/*", authenticate(deps.auth, listWorkspaceIds));
+  app.use("/exports/*", authenticate(deps.auth, listWorkspaceIds));
+  app.use("/imports/*", authenticate(deps.auth, listWorkspaceIds));
 
+  app.route("/", exportRoutes(deps));
+  app.route("/", importRoutes(deps));
   app.route("/", meRoutes(deps));
   app.route("/", notificationRoutes(deps));
   app.route("/", projectRoutes(deps));

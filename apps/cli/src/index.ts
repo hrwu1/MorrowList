@@ -1,6 +1,7 @@
 import { Command } from "commander";
 
 import { authCommand } from "./commands/auth.js";
+import { exportCommand, importCommand } from "./commands/data.js";
 import { notificationsCommand } from "./commands/notifications.js";
 import { projectCommand } from "./commands/project.js";
 import { relationCommand } from "./commands/relation.js";
@@ -45,6 +46,8 @@ program.addCommand(workspaceCommand());
 program.addCommand(searchCommand());
 program.addCommand(viewCommand());
 program.addCommand(notificationsCommand());
+program.addCommand(exportCommand());
+program.addCommand(importCommand());
 
 try {
   await program.parseAsync(process.argv);

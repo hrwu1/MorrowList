@@ -2,6 +2,7 @@ import type {
   ActivityEntryDto,
   FlowSummaryDto,
   DateWarning,
+  ImportResultDto,
   SavedViewDto,
   SearchResponse,
   NotificationDto,
@@ -384,4 +385,48 @@ const DATE_WARNING_TEXT: Record<DateWarning, string> = {
 /** The soft date-order warnings the API attaches (GAP-16), spelled out. */
 export function describeDateWarning(warning: DateWarning): string {
   return DATE_WARNING_TEXT[warning] ?? warning;
+}
+
+/**
+ * What an import did, or would do. The counts first, then the columns and tags a person
+ * needs to check, then every row the mapping refused — never a silent drop.
+ */
+export function formatImportPreview(result: ImportResultDto): string {
+  const { preview } = result;
+  const lines = [
+    result.dryRun
+      ? `Dry run: ${preview.projectName} would be created from ${preview.source}.`
+      : `Imported ${preview.projectName} from ${preview.source}.`,
+    `  columns    ${preview.counts.statuses}`,
+    `  tasks      ${preview.counts.tasks}`,
+    `  subtasks   ${preview.counts.subtasks}`,
+    `  tags       ${preview.counts.tags}`,
+  ];
+  if (preview.statuses.length > 0) {
+    const width = Math.max(...preview.statuses.map((status) => status.name.length));
+    lines.push(
+      "",
+      "Columns",
+      ...preview.statuses.map(
+        (status) =>
+          `  ${status.name.padEnd(width)}  ${status.category.padEnd(11)}  ${status.taskCount} task${status.taskCount === 1 ? "" : "s"}`,
+      ),
+    );
+  }
+  if (preview.tags.length > 0) lines.push("", `Tags  #${preview.tags.join(" #")}`);
+  if (preview.ignoredFields.length > 0) {
+    lines.push("", `Not imported  ${preview.ignoredFields.join(", ")}`);
+  }
+  if (preview.issues.length > 0) {
+    lines.push(
+      "",
+      `Skipped ${preview.issues.length} row${preview.issues.length === 1 ? "" : "s"}`,
+      ...preview.issues.map(
+        (issue) =>
+          `  row ${issue.row}  ${issue.title ?? "(no title)"}: ${issue.reason}`,
+      ),
+    );
+  }
+  if (result.projectId) lines.push("", `project  ${result.projectId}`);
+  return lines.join("\n");
 }

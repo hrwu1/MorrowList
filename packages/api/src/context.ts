@@ -1,7 +1,9 @@
 import type {
   ActivityService,
   ActorContext,
+  ExportService,
   FlowService,
+  ImportService,
   NotificationService,
   ProjectService,
   SavedViewService,
@@ -29,6 +31,8 @@ export interface ApiDependencies {
   readonly taskService: TaskService;
   readonly activityService: ActivityService;
   readonly flowService: FlowService;
+  readonly exportService: ExportService;
+  readonly importService: ImportService;
   readonly viewService: ViewService;
   readonly tagService: TagService;
   readonly searchService: SearchService;

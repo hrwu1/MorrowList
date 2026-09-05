@@ -11,7 +11,12 @@ import {
   createSavedViewRequestSchema,
   createTaskRequestSchema,
   errorResponseSchema,
+  exportTasksCsvQuerySchema,
+  exportWorkspaceQuerySchema,
   flowQuerySchema,
+  importQuerySchema,
+  importRequestSchema,
+  importResultSchema,
   flowResponseSchema,
   listNotificationsQuerySchema,
   listProjectsQuerySchema,
@@ -58,6 +63,7 @@ import {
   updateWorkspaceRequestSchema,
   workflowStatusListResponseSchema,
   workflowStatusResponseSchema,
+  workspaceExportSchema,
   workspaceResponseSchema,
 } from "@morrowlist/contracts";
 import { z } from "zod";
@@ -122,6 +128,9 @@ const registry = {
   PushSubscriptionRequest: pushSubscriptionRequestSchema,
   PushSubscription: pushSubscriptionResponseSchema,
   ErrorResponse: errorResponseSchema,
+  WorkspaceExport: workspaceExportSchema,
+  ImportRequest: importRequestSchema,
+  ImportResult: importResultSchema,
 } as const;
 
 function ref(name: keyof typeof registry) {
@@ -240,6 +249,71 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
           responses: {
             "200": { description: "Dependencies are reachable" },
             "503": { description: "A dependency is unavailable" },
+          },
+        },
+      },
+      "/exports/workspace.json": {
+        get: {
+          summary: "Download the whole workspace as a versioned JSON archive",
+          description:
+            "The archive of spec 30.2: workspace, projects, statuses, tasks (trashed ones included), tags, task tags, relations, My Day history, the caller's saved views, and activity. No password hash, session token, API key, or push registration key can appear. Derived tables are absent: flow intervals are rebuilt by the flow backfill and reminders are recomputed from each task's own offset. Streamed as an attachment.",
+          parameters: [
+            workspaceIdParam,
+            ...queryParameters(exportWorkspaceQuerySchema),
+          ],
+          responses: {
+            "200": {
+              description: "The archive",
+              ...jsonContent(ref("WorkspaceExport")),
+            },
+            ...notFound,
+            ...commonErrors,
+          },
+        },
+      },
+      "/exports/tasks.csv": {
+        get: {
+          summary: "Download tasks as CSV",
+          description:
+            "Takes the same filters as GET /tasks, without paging: every match is written. Columns: key, title, description, status, priority, dueDate, deadline, deferUntil, tags, parentKey, completed — the ones POST /imports/csv reads back.",
+          parameters: [workspaceIdParam, ...queryParameters(exportTasksCsvQuerySchema)],
+          responses: {
+            "200": {
+              description: "The task CSV",
+              content: { "text/csv": { schema: { type: "string" } } },
+            },
+            ...notFound,
+            ...commonErrors,
+          },
+        },
+      },
+      "/imports/{source}": {
+        post: {
+          summary: "Import a Trello board or a CSV as a new project",
+          description:
+            "`source` is `trello` (a board's JSON export) or `csv`. With `dryRun=true` nothing is written and the preview reports the columns, tags, counts, ignored fields and rejected rows; without it the same plan runs as one transaction and `projectId` names the project it created. The project name must be free.",
+          parameters: [
+            {
+              name: "source",
+              in: "path",
+              required: true,
+              schema: { type: "string", enum: ["trello", "csv"] },
+            },
+            workspaceIdParam,
+            ...queryParameters(importQuerySchema),
+          ],
+          requestBody: { required: true, ...jsonContent(ref("ImportRequest")) },
+          responses: {
+            "200": {
+              description: "The dry-run preview; nothing was written",
+              ...jsonContent(ref("ImportResult")),
+            },
+            "201": {
+              description: "The imported project",
+              ...jsonContent(ref("ImportResult")),
+            },
+            ...notFound,
+            ...commonErrors,
           },
         },
       },

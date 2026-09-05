@@ -1,6 +1,8 @@
 import {
   ActivityService,
+  ExportService,
   FlowService,
+  ImportService,
   NotificationService,
   ProjectService,
   SavedViewService,
@@ -86,6 +88,8 @@ beforeEach(async () => {
     }),
     activityService: new ActivityService({ unitOfWork, cursorSecret: "test-secret" }),
     flowService: new FlowService({ unitOfWork, clock: fixedClock(NOW) }),
+    exportService: new ExportService({ unitOfWork, clock: fixedClock(NOW) }),
+    importService: new ImportService({ unitOfWork, clock: fixedClock(NOW) }),
     viewService: new ViewService({ unitOfWork, clock: fixedClock(NOW) }),
     tagService: new TagService({ unitOfWork, clock: fixedClock(NOW) }),
     searchService: new SearchService({
@@ -1572,5 +1576,150 @@ describe("notifications", () => {
     expect(
       (await request("/api/v1/me/push-subscriptions", { method: "DELETE" })).status,
     ).toBe(422);
+  });
+});
+
+describe("export and import endpoints (GAP-07)", () => {
+  const trelloBoard = JSON.stringify({
+    name: "Product Roadmap",
+    lists: [
+      { id: "l1", name: "Backlog", pos: 1 },
+      { id: "l2", name: "Done", pos: 2 },
+    ],
+    labels: [{ id: "lb1", name: "research", color: "green" }],
+    cards: [
+      {
+        id: "c1",
+        name: "Interview users",
+        desc: "",
+        idList: "l1",
+        idLabels: ["lb1"],
+        due: "2026-09-14T12:00:00.000Z",
+        closed: false,
+      },
+    ],
+    checklists: [
+      {
+        id: "ch1",
+        idCard: "c1",
+        pos: 1,
+        checkItems: [{ id: "ci1", name: "Write the screener", state: "complete" }],
+      },
+    ],
+  });
+
+  it("streams the archive as a downloadable file", async () => {
+    await jsonRequest("/api/v1/tasks", "POST", { title: "Draft the brief" });
+
+    const response = await request("/api/v1/exports/workspace.json");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(response.headers.get("content-disposition")).toMatch(
+      /^attachment; filename="morrowlist-.+\.json"$/,
+    );
+    const archive = JSON.parse(await response.text());
+    expect(archive.format).toBe("morrowlist-export");
+    expect(archive.schemaVersion).toBe(1);
+    expect(archive.tasks.map((task: { title: string }) => task.title)).toEqual([
+      "Draft the brief",
+    ]);
+    // The sections are written in the documented order, even when streamed.
+    expect(Object.keys(archive).slice(4)).toEqual([
+      "projects",
+      "statuses",
+      "tasks",
+      "tags",
+      "taskTags",
+      "relations",
+      "dayPlans",
+      "savedViews",
+      "activity",
+    ]);
+  });
+
+  it("drops history from the archive on request and rejects an unknown scope", async () => {
+    await jsonRequest("/api/v1/tasks", "POST", { title: "Draft the brief" });
+
+    const none = await request("/api/v1/exports/workspace.json?activity=none");
+    expect(JSON.parse(await none.text()).activity).toEqual([]);
+
+    const bad = await request("/api/v1/exports/workspace.json?activity=everything");
+    expect(bad.status).toBe(422);
+  });
+
+  it("answers the task CSV as a downloadable file, honouring the list filters", async () => {
+    await jsonRequest("/api/v1/tasks", "POST", { title: "Draft the brief" });
+    await jsonRequest("/api/v1/tasks", "POST", { title: "Something urgent" });
+
+    const response = await request("/api/v1/exports/tasks.csv");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/csv");
+    expect(response.headers.get("content-disposition")).toMatch(/\.csv"$/);
+    const body = await response.text();
+    expect(body.split("\r\n")[0]).toBe(
+      "key,title,description,status,priority,dueDate,deadline,deferUntil,tags,parentKey,completed",
+    );
+    expect(body).toContain("Draft the brief");
+
+    const filtered = await request("/api/v1/exports/tasks.csv?priority=urgent");
+    expect(await filtered.text()).not.toContain("Draft the brief");
+  });
+
+  it("previews a Trello import without writing, then applies it", async () => {
+    const preview = await jsonRequest("/api/v1/imports/trello?dryRun=true", "POST", {
+      content: trelloBoard,
+    });
+
+    expect(preview.status).toBe(200);
+    const previewBody = await preview.json();
+    expect(previewBody.data.dryRun).toBe(true);
+    expect(previewBody.data.projectId).toBeNull();
+    expect(previewBody.data.preview.counts).toMatchObject({ tasks: 1, subtasks: 1 });
+    expect(unitOfWork.data.tasks.size).toBe(0);
+
+    const applied = await jsonRequest("/api/v1/imports/trello", "POST", {
+      content: trelloBoard,
+      projectName: "Roadmap",
+    });
+
+    expect(applied.status).toBe(201);
+    const appliedBody = await applied.json();
+    expect(appliedBody.data.projectId).not.toBeNull();
+    expect(appliedBody.data.preview.projectName).toBe("Roadmap");
+    expect(unitOfWork.data.tasks.size).toBe(2);
+  });
+
+  it("reports an unreadable file as a validation failure and an unknown source as 404", async () => {
+    const broken = await jsonRequest("/api/v1/imports/trello", "POST", {
+      content: "not json at all",
+    });
+    expect(broken.status).toBe(422);
+    expect((await broken.json()).error.code).toBe("VALIDATION_FAILED");
+
+    const unknown = await jsonRequest("/api/v1/imports/asana", "POST", {
+      content: "{}",
+    });
+    expect(unknown.status).toBe(404);
+
+    const empty = await jsonRequest("/api/v1/imports/csv", "POST", { content: "" });
+    expect(empty.status).toBe(422);
+  });
+
+  it("allows an import body far larger than an ordinary request", async () => {
+    const oversizedTask = await request("/api/v1/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json", "content-length": "2000000" },
+      body: JSON.stringify({ title: "Too big" }),
+    });
+    expect(oversizedTask.status).toBe(422);
+
+    const importedBody = await request("/api/v1/imports/csv", {
+      method: "POST",
+      headers: { "content-type": "application/json", "content-length": "2000000" },
+      body: JSON.stringify({ content: "title\nFrom a big file" }),
+    });
+    expect(importedBody.status).toBe(201);
   });
 });

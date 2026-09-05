@@ -42,9 +42,16 @@ function parseWith<T extends z.ZodType>(schema: T, value: unknown): z.infer<T> {
   return result.data;
 }
 
-/** Rejects an oversized body before it is parsed (spec 26.1). */
-export function bodyLimit(maxBytes: number): MiddlewareHandler<ApiEnv> {
+/**
+ * Rejects an oversized body before it is parsed (spec 26.1). The limit may depend on the
+ * path, because uploading a Trello board is not the same kind of request as editing a
+ * task and one cap cannot serve both (GAP-07).
+ */
+export function bodyLimit(
+  limit: number | ((path: string) => number),
+): MiddlewareHandler<ApiEnv> {
   return async (c, next) => {
+    const maxBytes = typeof limit === "number" ? limit : limit(c.req.path);
     const declared = c.req.header("content-length");
     if (declared && Number(declared) > maxBytes) {
       throw new ApiError("VALIDATION_FAILED", "Request body is too large.", {

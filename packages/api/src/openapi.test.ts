@@ -93,3 +93,30 @@ describe("board OpenAPI surface", () => {
     });
   });
 });
+
+describe("data portability surface (GAP-07)", () => {
+  it("publishes the archive, the task CSV, and the importers", () => {
+    const document = buildOpenApiDocument() as {
+      paths: Record<string, Record<string, { parameters?: { name: string }[] }>>;
+      components: { schemas: Record<string, unknown> };
+    };
+
+    const archive = document.paths["/exports/workspace.json"]?.get;
+    expect(archive).toBeDefined();
+    expect(archive?.parameters?.map((parameter) => parameter.name)).toContain(
+      "activity",
+    );
+
+    const csv = document.paths["/exports/tasks.csv"]?.get;
+    expect(csv).toBeDefined();
+    // The CSV takes the list filters, without paging.
+    const csvParameters = csv?.parameters?.map((parameter) => parameter.name) ?? [];
+    expect(csvParameters).toContain("priority");
+    expect(csvParameters).not.toContain("cursor");
+
+    expect(document.paths["/imports/{source}"]).toHaveProperty("post");
+    expect(document.components.schemas).toHaveProperty("WorkspaceExport");
+    expect(document.components.schemas).toHaveProperty("ImportRequest");
+    expect(document.components.schemas).toHaveProperty("ImportResult");
+  });
+});

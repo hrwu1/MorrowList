@@ -12,9 +12,14 @@ import type {
   CreateTaskRequest,
   ErrorCode,
   ErrorResponse,
+  ExportTasksCsvQuery,
+  ExportWorkspaceQuery,
   FlowQuery,
   FlowResponse,
   FlowSummaryDto,
+  ImportRequest,
+  ImportResultDto,
+  ImportSource,
   ListNotificationsQuery,
   ListProjectsQuery,
   ListStatusesQuery,
@@ -62,6 +67,7 @@ import type {
   WorkflowStatusListResponse,
   WorkflowStatusResponse,
   WorkspaceDto,
+  WorkspaceExport,
   WorkspaceResponse,
 } from "@morrowlist/contracts";
 
@@ -850,6 +856,56 @@ export class ApiClient {
     );
   }
 
+  /**
+   * The whole workspace as the versioned archive of spec 30.2 (GAP-07). Parsed here
+   * rather than streamed: a caller that wants the raw file downloads the URL directly.
+   */
+  async exportWorkspace(
+    query: Partial<ExportWorkspaceQuery> = {},
+    options: RequestOptions = {},
+  ): Promise<WorkspaceExport> {
+    return this.send<WorkspaceExport>(
+      "GET",
+      `/exports/workspace.json${this.queryString(query, options)}`,
+      undefined,
+      options,
+    );
+  }
+
+  /** Tasks as CSV text, through the same filters as `listTasks`. */
+  async exportTasksCsv(
+    query: Partial<ExportTasksCsvQuery> = {},
+    options: RequestOptions = {},
+  ): Promise<string> {
+    return this.sendText(
+      "GET",
+      `/exports/tasks.csv${this.queryString(query, options)}`,
+      options,
+    );
+  }
+
+  /**
+   * Import a Trello board's JSON or a CSV as a new project. `dryRun` returns the same
+   * preview without writing anything, so a caller can show it before committing.
+   */
+  async importData(
+    source: ImportSource,
+    body: ImportRequest & { readonly dryRun?: boolean },
+    options: RequestOptions = {},
+  ): Promise<ImportResultDto> {
+    const { dryRun, ...payload } = body;
+    const response = await this.send<{ data: ImportResultDto }>(
+      "POST",
+      `/imports/${encodeURIComponent(source)}${this.queryString(
+        dryRun ? { dryRun: true } : {},
+        options,
+      )}`,
+      payload,
+      options,
+    );
+    return response.data;
+  }
+
   private queryString(query: Record<string, unknown>, options: RequestOptions): string {
     const params = new URLSearchParams();
     const workspaceId = options.workspaceId ?? this.options.workspaceId;
@@ -890,6 +946,28 @@ export class ApiClient {
     if (!response.ok) throw await this.toError(response);
     if (response.status === 204) return undefined as T;
     return (await response.json()) as T;
+  }
+
+  /** A text response — the CSV export — rather than the JSON envelope. */
+  private async sendText(
+    method: string,
+    path: string,
+    options: RequestOptions,
+  ): Promise<string> {
+    const headers = new Headers({ accept: "text/csv" });
+    if (this.options.apiKey) {
+      headers.set("authorization", `Bearer ${this.options.apiKey}`);
+    }
+    if (this.options.requestId) headers.set("x-request-id", this.options.requestId);
+
+    const response = await this.doFetch(`${this.baseUrl}${path}`, {
+      method,
+      headers,
+      credentials: "include",
+      ...(options.signal ? { signal: options.signal } : {}),
+    });
+    if (!response.ok) throw await this.toError(response);
+    return response.text();
   }
 
   private async toError(response: Response): Promise<ApiClientError> {
