@@ -134,8 +134,9 @@ test("a Trello board previews, then imports as a board with columns, tags and su
   await expect(
     preview.getByRole("heading", { name: /Website Relaunch/ }),
   ).toBeVisible();
-  // Lists became columns with a guessed category, and labels became tags.
-  await expect(preview.getByText("backlog · 3 tasks")).toBeVisible();
+  // Lists became columns with a guessed category, and labels became tags. The count is
+  // cards, not subtasks, so it is the number the column will show.
+  await expect(preview.getByText("backlog · 1 task")).toBeVisible();
   await expect(preview.getByText("in progress · 1 task")).toBeVisible();
   await expect(preview.getByText("Tags: research")).toBeVisible();
   await expect(
@@ -166,6 +167,14 @@ test("a Trello board previews, then imports as a board with columns, tags and su
     page
       .getByRole("region", { name: "Doing" })
       .getByRole("link", { name: "Rewrite the pricing copy" }),
+  ).toBeVisible();
+
+  // A card's checklist stays in the card's column rather than scattering.
+  await page.goto(`${new URL(page.url()).pathname}?subtasks=show`);
+  await expect(
+    page
+      .getByRole("region", { name: "Backlog" })
+      .getByRole("link", { name: "Send the invitations" }),
   ).toBeVisible();
 
   // Labels became tags and checklist items became subtasks.
