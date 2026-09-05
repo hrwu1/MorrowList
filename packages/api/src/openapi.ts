@@ -4,6 +4,8 @@ import {
   addTaskRelationRequestSchema,
   addTaskToDayRequestSchema,
   archiveStatusRequestSchema,
+  batchTasksRequestSchema,
+  batchTasksResponseSchema,
   completeTaskRequestSchema,
   createProjectRequestSchema,
   createTagRequestSchema,
@@ -81,6 +83,8 @@ const registry = {
   Task: taskResponseSchema.shape.data,
   TaskCommandResult: taskCommandResponseSchema,
   TaskList: taskListResponseSchema,
+  BatchTasksRequest: batchTasksRequestSchema,
+  BatchTasksResult: batchTasksResponseSchema,
   ProjectDetail: projectResponseSchema,
   Project: z.object({ data: projectSchema }),
   ProjectList: projectListResponseSchema,
@@ -814,6 +818,24 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
           requestBody: { required: true, ...jsonContent(ref("CreateTaskRequest")) },
           responses: {
             "201": { description: "The created task", ...jsonContent(ref("Task")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/tasks/batch": {
+        post: {
+          summary: "Apply up to 200 task operations in one transaction",
+          description:
+            "Bulk editing runs the same single-item command policies, with the same optimistic-concurrency checks, inside one unit of work (spec 10.4). Results come back in request order. Any failure rolls the whole batch back and reports the failing entry in the error details as operationIndex, operation, and taskId.",
+          parameters: [workspaceIdParam],
+          requestBody: { required: true, ...jsonContent(ref("BatchTasksRequest")) },
+          responses: {
+            "200": {
+              description: "One result per operation, plus any limit warnings",
+              ...jsonContent(ref("BatchTasksResult")),
+            },
+            ...conflict,
+            ...notFound,
             ...commonErrors,
           },
         },

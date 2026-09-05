@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 
 import { ApiClient, ApiClientError } from "@morrowlist/api-client";
-import type { RecurrenceRuleDto } from "@morrowlist/contracts";
+import type {
+  BatchResultItemDto,
+  RecurrenceRuleDto,
+  TaskDto,
+} from "@morrowlist/contracts";
+import { MAX_BATCH_OPERATIONS } from "@morrowlist/contracts";
 import { parseRecurrencePhrase, weekdayOf, type PlainDate } from "@morrowlist/domain";
 import type { Command } from "commander";
 
@@ -101,4 +106,64 @@ export function usageFailure(message: string, json: boolean): never {
   if (json) printJson({ ok: false, error: { code: "USAGE", message } });
   else printError(`error: ${message}`);
   process.exit(EXIT.usage);
+}
+
+/**
+ * Bulk commands (GAP-08, spec 10.4). `--where` picks the tasks with the same operator
+ * grammar `task list` accepts, `--dry-run` prints what would change and touches nothing,
+ * and `--yes` is the deliberate confirmation: a scripted bulk edit should never happen by
+ * a typo in a query. The server applies the whole selection in one transaction, so the
+ * answer is all of it or none of it.
+ */
+export interface BulkOptions {
+  readonly where?: string | undefined;
+  readonly yes?: boolean | undefined;
+  readonly dryRun?: boolean | undefined;
+}
+
+export const BULK_LIMIT = MAX_BATCH_OPERATIONS;
+
+/**
+ * Refuse to run unless the selection is non-empty, within the batch limit, and confirmed.
+ * `--dry-run` skips the confirmation because it changes nothing.
+ */
+export function assertBulkConfirmed(
+  tasks: readonly TaskDto[],
+  options: BulkOptions,
+  json: boolean,
+): void {
+  if (tasks.length === 0) {
+    usageFailure("No task matches --where; nothing to do.", json);
+  }
+  if (tasks.length > BULK_LIMIT) {
+    usageFailure(
+      `--where matches ${tasks.length} tasks; one batch takes at most ${BULK_LIMIT}. Narrow the query.`,
+      json,
+    );
+  }
+  if (!options.dryRun && !options.yes) {
+    usageFailure(
+      `--where matches ${tasks.length} task${tasks.length === 1 ? "" : "s"}; pass --yes to apply, or --dry-run to list them.`,
+      json,
+    );
+  }
+}
+
+/** What a `--dry-run` prints: the verb and the tasks it would have been applied to. */
+export function formatBulkPlan(verb: string, tasks: readonly TaskDto[]): string {
+  return [
+    `Would ${verb} ${tasks.length} task${tasks.length === 1 ? "" : "s"}:`,
+    ...tasks.map((task) => `  ${task.key}  ${task.title}`),
+  ].join("\n");
+}
+
+/** What a completed batch prints: one line per entry, in the order it was applied. */
+export function formatBulkResult(
+  verb: string,
+  items: readonly BatchResultItemDto[],
+): string {
+  return [
+    ...items.map((item) => `${item.data.key}  ${verb}`),
+    `${items.length} task${items.length === 1 ? "" : "s"} ${verb}.`,
+  ].join("\n");
 }

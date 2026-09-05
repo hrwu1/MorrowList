@@ -676,3 +676,101 @@ describe("defer and deadline dates (GAP-16)", () => {
     expect(onTheDay.items.map((task) => task.id)).toEqual([card.id]);
   });
 });
+
+/**
+ * Bulk operations against real PostgreSQL (GAP-08, spec 10.4). What the in-memory double
+ * cannot show is whether 200 single-item commands in one transaction stay inside the
+ * mutation budget (spec 29.2), and whether a failing entry really rolls back every row
+ * the earlier entries wrote — the activity and outbox rows included.
+ */
+describe("bulk task operations", () => {
+  const BATCH_SIZE = 200;
+
+  async function seedTasks(count: number) {
+    const created = [];
+    for (let index = 0; index < count; index += 1) {
+      created.push(
+        await service.create(context, { workspaceId, title: `Bulk ${index}` }),
+      );
+    }
+    return created;
+  }
+
+  it("applies 200 operations in one transaction inside the mutation budget", async () => {
+    const tasks = await seedTasks(BATCH_SIZE);
+
+    const started = performance.now();
+    const result = await service.batch(context, workspaceId, {
+      operations: tasks.map((task) => ({
+        op: "setPriority" as const,
+        taskId: task.id,
+        expectedVersion: task.version,
+        priority: "high" as const,
+      })),
+    });
+    const elapsed = performance.now() - started;
+
+    expect(result.data).toHaveLength(BATCH_SIZE);
+    expect(result.data.every((item) => item.data.priority === "high")).toBe(true);
+    expect(elapsed).toBeLessThan(500);
+
+    // One per-task row plus the single administrative summary for the whole batch.
+    const activity = await handle.pool.query(
+      "select event_type, count(*)::int as count from activity_events where workspace_id = $1 and event_type like 'task.%' group by event_type",
+      [workspaceId],
+    );
+    const counts = Object.fromEntries(
+      activity.rows.map((row) => [row.event_type, row.count]),
+    );
+    expect(counts["task.updated"]).toBe(BATCH_SIZE);
+    expect(counts["task.batch_applied"]).toBe(1);
+  });
+
+  it("rolls every row of a failed batch back, activity and outbox included", async () => {
+    const tasks = await seedTasks(3);
+    const activityBefore = await handle.pool.query(
+      "select count(*)::int as count from activity_events where workspace_id = $1",
+      [workspaceId],
+    );
+    const outboxBefore = await handle.pool.query(
+      "select count(*)::int as count from outbox_events where workspace_id = $1",
+      [workspaceId],
+    );
+
+    await expect(
+      service.batch(context, workspaceId, {
+        operations: [
+          { op: "complete", taskId: tasks[0]!.id },
+          { op: "complete", taskId: tasks[1]!.id },
+          // A stale version on the last entry: the two completions above must not stick.
+          { op: "complete", taskId: tasks[2]!.id, expectedVersion: 99 },
+        ],
+      }),
+    ).rejects.toMatchObject({
+      code: "TASK_VERSION_CONFLICT",
+      details: { operationIndex: 2 },
+    });
+
+    const remaining = await handle.pool.query(
+      "select count(*)::int as count from tasks where workspace_id = $1 and completed_at is not null",
+      [workspaceId],
+    );
+    expect(remaining.rows[0].count).toBe(0);
+    await expect(
+      handle.pool
+        .query(
+          "select count(*)::int as count from activity_events where workspace_id = $1",
+          [workspaceId],
+        )
+        .then((r) => r.rows[0].count),
+    ).resolves.toBe(activityBefore.rows[0].count);
+    await expect(
+      handle.pool
+        .query(
+          "select count(*)::int as count from outbox_events where workspace_id = $1",
+          [workspaceId],
+        )
+        .then((r) => r.rows[0].count),
+    ).resolves.toBe(outboxBefore.rows[0].count);
+  });
+});

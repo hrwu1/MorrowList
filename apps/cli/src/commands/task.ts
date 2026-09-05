@@ -1,5 +1,11 @@
+import type { ApiClient } from "@morrowlist/api-client";
 import { ApiClientError } from "@morrowlist/api-client";
-import type { CreateTaskRequest, UpdateTaskRequest } from "@morrowlist/contracts";
+import type {
+  BatchOperation,
+  BatchTasksResult,
+  CreateTaskRequest,
+  UpdateTaskRequest,
+} from "@morrowlist/contracts";
 import { Command } from "commander";
 
 import {
@@ -11,15 +17,20 @@ import {
 } from "../formatters/output.js";
 
 import {
+  BULK_LIMIT,
+  assertBulkConfirmed,
   fail,
+  formatBulkPlan,
+  formatBulkResult,
   globalsOf,
   idempotency,
   recurrenceFromPhrase,
   usageFailure,
   withClient,
+  type BulkOptions,
 } from "./shared.js";
 import { findTag, resolveTags } from "./tag.js";
-import { WHERE_HELP, resolveWhere } from "./where.js";
+import { WHERE_HELP, bulkTargets, resolveWhere } from "./where.js";
 
 /**
  * `morrow task …` (CLI-002, CLI-003).
@@ -39,6 +50,59 @@ function reminderOption(
   if (remind === false) return { reminderOffsetMinutes: null };
   return { reminderOffsetMinutes: Number(remind) };
 }
+
+/**
+ * `--where` bulk plumbing (GAP-08). The selection is resolved, confirmed, and then sent
+ * as one batch: the server applies it in a single transaction, so a partial result is not
+ * a thing the CLI ever has to explain (spec 10.4).
+ */
+type BulkOutcome =
+  | { readonly kind: "plan"; readonly text: string }
+  | { readonly kind: "applied"; readonly result: BatchTasksResult };
+
+async function runBulk(
+  client: ApiClient,
+  options: BulkOptions,
+  json: boolean,
+  verb: string,
+  toOperation: (taskId: string, version: number) => BatchOperation,
+): Promise<BulkOutcome> {
+  const { tasks, error } = await bulkTargets(client, options.where ?? "", BULK_LIMIT);
+  if (error) usageFailure(error, json);
+  assertBulkConfirmed(tasks, options, json);
+  if (options.dryRun) return { kind: "plan", text: formatBulkPlan(verb, tasks) };
+
+  return {
+    kind: "applied",
+    result: await client.batchTasks(
+      { operations: tasks.map((task) => toOperation(task.id, task.version)) },
+      idempotency(),
+    ),
+  };
+}
+
+/** Print a bulk outcome, or fall through to the single-task path when there was none. */
+function reportBulk(outcome: BulkOutcome, verb: string, json: boolean): void {
+  if (outcome.kind === "plan") {
+    if (json) printJson({ ok: true, data: { dryRun: true, plan: outcome.text } });
+    else process.stdout.write(`${outcome.text}\n`);
+    return;
+  }
+  if (json) {
+    printJson({
+      ok: true,
+      data: outcome.result.data,
+      warnings: outcome.result.warnings,
+    });
+  } else {
+    process.stdout.write(`${formatBulkResult(verb, outcome.result.data)}\n`);
+    for (const warning of outcome.result.warnings) {
+      printError(`warning: ${warning.message}`);
+    }
+  }
+}
+
+const BULK_WHERE_HELP = `apply to every task matching this query instead of one task; ${WHERE_HELP}`;
 
 export function taskCommand(): Command {
   const task = new Command("task").description("Create and manage tasks");
@@ -354,17 +418,34 @@ export function taskCommand(): Command {
 
   task
     .command("complete")
-    .description("Complete a task")
-    .argument("<idOrKey>")
+    .description("Complete a task, or every task matching --where")
+    .argument("[idOrKey]")
     .option("--expected-version <n>", "fail unless the task is still at this version")
     .option(
       "--acknowledge-blocked",
       "complete even though the task is blocked (spec 8.4 warns, never forbids)",
     )
-    .action(async (idOrKey: string, options, command: Command) => {
+    .option("--where <query>", BULK_WHERE_HELP)
+    .option("--yes", "confirm a --where bulk change")
+    .option("--dry-run", "list what --where would change and stop")
+    .action(async (idOrKey: string | undefined, options, command: Command) => {
       const globals = globalsOf(command);
       const json = Boolean(globals.json);
       try {
+        if (options.where) {
+          const outcome = await withClient(globals, (client) =>
+            runBulk(client, options, json, "completed", (taskId, version) => ({
+              op: "complete",
+              taskId,
+              expectedVersion: version,
+              ...(options.acknowledgeBlocked ? { acknowledgeBlocked: true } : {}),
+            })),
+          );
+          reportBulk(outcome, "completed", json);
+          return;
+        }
+        if (!idOrKey) usageFailure("Name a task, or select some with --where.", json);
+
         const result = await withClient(globals, async (client) => {
           const current = await client.getTask(idOrKey);
           const expectedVersion = options.expectedVersion
@@ -503,12 +584,28 @@ export function taskCommand(): Command {
 
   task
     .command("delete")
-    .description("Move a task to Trash")
-    .argument("<idOrKey>")
-    .action(async (idOrKey: string, _options, command: Command) => {
+    .description("Move a task to Trash, or every task matching --where")
+    .argument("[idOrKey]")
+    .option("--where <query>", BULK_WHERE_HELP)
+    .option("--yes", "confirm a --where bulk change")
+    .option("--dry-run", "list what --where would change and stop")
+    .action(async (idOrKey: string | undefined, options, command: Command) => {
       const globals = globalsOf(command);
       const json = Boolean(globals.json);
       try {
+        if (options.where) {
+          const outcome = await withClient(globals, (client) =>
+            runBulk(client, options, json, "trashed", (taskId, version) => ({
+              op: "delete",
+              taskId,
+              expectedVersion: version,
+            })),
+          );
+          reportBulk(outcome, "trashed", json);
+          return;
+        }
+        if (!idOrKey) usageFailure("Name a task, or select some with --where.", json);
+
         const deleted = await withClient(globals, async (client) => {
           const current = await client.getTask(idOrKey);
           return client.deleteTask(current.id, idempotency());
@@ -516,6 +613,71 @@ export function taskCommand(): Command {
 
         if (json) printJson({ ok: true, data: deleted });
         else process.stdout.write(`${deleted.key}  moved to Trash\n`);
+      } catch (error) {
+        fail(error, json);
+      }
+    });
+
+  task
+    .command("move")
+    .description("Move a task, or every task matching --where, to a project status")
+    .argument("[idOrKey]")
+    .option("--project <id>", "destination project id")
+    .option("--status <id>", "destination workflow status id; requires --project")
+    .option("--inbox", "move back to the Inbox instead of a project")
+    .option("--expected-version <n>", "fail unless the task is still at this version")
+    .option("--where <query>", BULK_WHERE_HELP)
+    .option("--yes", "confirm a --where bulk change")
+    .option("--dry-run", "list what --where would change and stop")
+    .action(async (idOrKey: string | undefined, options, command: Command) => {
+      const globals = globalsOf(command);
+      const json = Boolean(globals.json);
+      // Null is the Inbox (spec 11.5), which is not the same as "no destination given".
+      if (!options.inbox && !options.project) {
+        usageFailure("Give a destination: --project <id>, or --inbox.", json);
+      }
+      if (options.inbox && (options.project || options.status)) {
+        usageFailure("--inbox takes no --project or --status.", json);
+      }
+      const destination = {
+        projectId: options.inbox ? null : (options.project as string),
+        ...(options.status ? { statusId: options.status as string } : {}),
+      };
+
+      try {
+        if (options.where) {
+          const outcome = await withClient(globals, (client) =>
+            runBulk(client, options, json, "moved", (taskId, version) => ({
+              op: "move",
+              taskId,
+              expectedVersion: version,
+              ...destination,
+            })),
+          );
+          reportBulk(outcome, "moved", json);
+          return;
+        }
+        if (!idOrKey) usageFailure("Name a task, or select some with --where.", json);
+
+        const { task: moved, warnings } = await withClient(globals, async (client) => {
+          const current = await client.getTask(idOrKey);
+          return client.moveTask(
+            current.id,
+            {
+              ...destination,
+              expectedVersion: options.expectedVersion
+                ? Number(options.expectedVersion)
+                : current.version,
+            },
+            idempotency(),
+          );
+        });
+
+        if (json) printJson({ ok: true, data: moved, warnings });
+        else {
+          process.stdout.write(`${moved.key}  moved\n`);
+          for (const warning of warnings) printError(`warning: ${warning.message}`);
+        }
       } catch (error) {
         fail(error, json);
       }

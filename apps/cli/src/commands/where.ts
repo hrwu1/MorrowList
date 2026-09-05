@@ -1,5 +1,5 @@
 import type { ApiClient } from "@morrowlist/api-client";
-import type { ListTasksQuery } from "@morrowlist/contracts";
+import type { ListTasksQuery, TaskDto } from "@morrowlist/contracts";
 import {
   SEARCH_OPERATORS,
   parseSearchQuery,
@@ -52,4 +52,25 @@ export async function resolveWhere(
     noSuchTag: Boolean(parsed.filters.tag) && !tag,
     error: null,
   };
+}
+
+/**
+ * The tasks a bulk command would touch. One page, capped by the caller: a bulk edit that
+ * silently paged through thousands of tasks would be the opposite of deliberate. An
+ * unresolvable `tag:` selects nothing rather than everything.
+ */
+export async function bulkTargets(
+  client: ApiClient,
+  where: string,
+  limit: number,
+): Promise<{ tasks: readonly TaskDto[]; error: string | null }> {
+  const resolved = await resolveWhere(client, where);
+  if (resolved.error) return { tasks: [], error: resolved.error };
+  if (resolved.noSuchTag) return { tasks: [], error: null };
+
+  const page = await client.listTasks({
+    ...resolved.query,
+    limit: limit + 1,
+  } as Partial<ListTasksQuery>);
+  return { tasks: page.data, error: null };
 }

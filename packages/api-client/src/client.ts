@@ -4,6 +4,9 @@ import type {
   AddTaskRelationRequest,
   AddTaskToDayRequest,
   ArchiveStatusRequest,
+  BatchTasksRequest,
+  BatchTasksResponse,
+  BatchTasksResult,
   CompleteTaskRequest,
   CreateProjectRequest,
   CreateSavedViewRequest,
@@ -403,6 +406,23 @@ export class ApiClient {
       options,
     );
     return { task: response.data, warnings: response.warnings ?? [] };
+  }
+
+  /**
+   * Bulk operations in one server transaction (spec 10.4). Results come back in request
+   * order; a failure anywhere rolls the whole batch back and the error names the entry.
+   */
+  async batchTasks(
+    body: BatchTasksRequest,
+    options: RequestOptions = {},
+  ): Promise<BatchTasksResult> {
+    const response = await this.send<BatchTasksResponse>(
+      "POST",
+      `/tasks/batch${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return { data: response.data, warnings: response.warnings ?? [] };
   }
 
   async reorderTask(

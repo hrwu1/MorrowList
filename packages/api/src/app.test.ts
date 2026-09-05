@@ -649,6 +649,76 @@ describe("task endpoints", () => {
   });
 });
 
+describe("bulk task endpoint (GAP-08)", () => {
+  async function create(title: string) {
+    return (await jsonRequest("/api/v1/tasks", "POST", { title })).json();
+  }
+
+  it("applies every operation and answers in request order", async () => {
+    const first = await create("First");
+    const second = await create("Second");
+
+    const response = await jsonRequest("/api/v1/tasks/batch", "POST", {
+      operations: [
+        { op: "complete", taskId: first.data.id },
+        { op: "setPriority", taskId: second.data.id, priority: "urgent" },
+      ],
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data).toHaveLength(2);
+    expect(body.data[0]).toMatchObject({ op: "complete", taskId: first.data.id });
+    expect(body.data[0].data.isCompleted).toBe(true);
+    expect(body.data[1].data.priority).toBe("urgent");
+    expect(body.warnings).toEqual([]);
+  });
+
+  it("rolls back and reports the failing entry with 409", async () => {
+    const first = await create("First");
+    const second = await create("Second");
+
+    const response = await jsonRequest("/api/v1/tasks/batch", "POST", {
+      operations: [
+        { op: "complete", taskId: first.data.id },
+        { op: "complete", taskId: second.data.id, expectedVersion: 99 },
+      ],
+    });
+
+    expect(response.status).toBe(409);
+    const body = await response.json();
+    expect(body.error.code).toBe("TASK_VERSION_CONFLICT");
+    expect(body.error.details).toMatchObject({
+      operationIndex: 1,
+      operation: "complete",
+    });
+
+    const untouched = await (await request(`/api/v1/tasks/${first.data.id}`)).json();
+    expect(untouched.data.isCompleted).toBe(false);
+  });
+
+  it("rejects an empty batch and one past the 200-operation limit", async () => {
+    const first = await create("First");
+    await expect(
+      (await jsonRequest("/api/v1/tasks/batch", "POST", { operations: [] })).status,
+    ).toBe(422);
+
+    const tooMany = Array.from({ length: 201 }, () => ({
+      op: "complete",
+      taskId: first.data.id,
+    }));
+    await expect(
+      (await jsonRequest("/api/v1/tasks/batch", "POST", { operations: tooMany }))
+        .status,
+    ).toBe(422);
+  });
+
+  it("does not read `batch` as a task key", async () => {
+    // The POST route is registered ahead of GET /tasks/{idOrKey}; the GET must still 404.
+    expect((await request("/api/v1/tasks/batch")).status).toBe(404);
+  });
+});
+
 describe("activity endpoints", () => {
   it("lists a task's history by key, newest first, with readable changes", async () => {
     const created = await (
