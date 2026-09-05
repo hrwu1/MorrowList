@@ -7,6 +7,8 @@ import type {
   BatchTasksRequest,
   BatchTasksResponse,
   BatchTasksResult,
+  BoardViewQuery,
+  BoardViewResponse,
   CompleteTaskRequest,
   CreateProjectRequest,
   CreateSavedViewRequest,
@@ -623,6 +625,18 @@ export class ApiClient {
       options,
     );
     return response.data;
+  }
+
+  async getBoardView(
+    query: Partial<BoardViewQuery> = {},
+    options: RequestOptions = {},
+  ): Promise<BoardViewResponse> {
+    return this.send<BoardViewResponse>(
+      "GET",
+      `/views/board${this.queryString(query, options)}`,
+      undefined,
+      options,
+    );
   }
 
   async getTodayView(

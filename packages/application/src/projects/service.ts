@@ -1,3 +1,4 @@
+import { PROJECT_EVENTS } from "@morrowlist/contracts";
 import type {
   CreateProjectRequest,
   ListProjectsQuery,
@@ -6,9 +7,8 @@ import type {
   ProjectDetailDto,
   ProjectDto,
   ProjectListResponse,
-  UpdateProjectRequest,
+  UpdateProjectRequest, BoardPlacementDto 
 } from "@morrowlist/contracts";
-import { PROJECT_EVENTS } from "@morrowlist/contracts";
 import {
   DEFAULT_WORKFLOW,
   ValidationError,
@@ -20,6 +20,7 @@ import {
   type WorkflowStatus,
 } from "@morrowlist/domain";
 
+import { buildLanes, statusColumnKey } from "../board/index.js";
 import { cardFlowFields } from "../flow/service.js";
 import {
   BOARD_TASK_LIMIT,
@@ -322,29 +323,64 @@ export class ProjectService {
       // blocked indicator (spec 29.3) and the flow fields (GAP-17); one query each
       // covers the whole board.
       const now = this.clock.now();
+      const today = toLocalDate(now, workspace.timezone);
       const [plans, progress, tags, edges, flow] = await Promise.all([
-        tx.dayPlans.listForTasks(boardTaskIds, toLocalDate(now, workspace.timezone)),
+        tx.dayPlans.listForTasks(boardTaskIds, today),
         tx.tasks.childSummary(workspaceId, boardTaskIds),
         tx.tasks.tagsFor(workspaceId, boardTaskIds),
         tx.tasks.relationsFor(workspaceId, boardTaskIds),
         cardFlowFields(tx, workspaceId, boardTaskIds, now),
       ]);
+      const cards = tasks.items.map((task) =>
+        toTaskDto(
+          task,
+          workspace.taskKeyPrefix,
+          plans.get(task.id) ?? [],
+          progress.get(task.id) ?? null,
+          tags.get(task.id) ?? [],
+          edges,
+          flow.get(task.id) ?? { inStatusSince: null, ageDays: null },
+        ),
+      );
+
+      // Swimlanes are the board's second axis (GAP-19); the columns stay this project's
+      // workflow statuses, so the same rendering serves a plain board and a pivoted one.
+      const swimlaneBy = query.swimlaneBy ?? "none";
+      const parentIds = [
+        ...new Set(
+          cards.flatMap((card) => (card.parentTaskId ? [card.parentTaskId] : [])),
+        ),
+      ];
+      const parents = await Promise.all(
+        parentIds.map((id) => tx.tasks.findById(workspaceId, id)),
+      );
+      const { lanes, laneKeys } = buildLanes(swimlaneBy, cards, {
+        projects: await tx.projects.listByWorkspace(workspaceId),
+        parentTitles: new Map(
+          parents.flatMap((parent) => (parent ? [[parent.id, parent.title]] : [])),
+        ),
+        today,
+      });
+      const placements: BoardPlacementDto[] = cards.flatMap((card) =>
+        card.statusId
+          ? [
+              {
+                taskId: card.id,
+                columnKey: statusColumnKey(card.statusId),
+                laneKey: laneKeys.get(card.id) as string,
+              },
+            ]
+          : [],
+      );
 
       return {
         data: {
           project: toProjectDto(project),
           statuses: statuses.map(toWorkflowStatusDto),
-          tasks: tasks.items.map((task) =>
-            toTaskDto(
-              task,
-              workspace.taskKeyPrefix,
-              plans.get(task.id) ?? [],
-              progress.get(task.id) ?? null,
-              tags.get(task.id) ?? [],
-              edges,
-              flow.get(task.id) ?? { inStatusSince: null, ageDays: null },
-            ),
-          ),
+          tasks: cards,
+          swimlaneBy,
+          lanes: [...lanes],
+          placements,
         },
         page: { hasMore: tasks.hasMore, truncated: tasks.truncated },
       };

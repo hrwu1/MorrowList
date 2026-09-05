@@ -97,6 +97,22 @@ function board(
       },
       statuses: [status()],
       tasks,
+      swimlaneBy: "none",
+      lanes: [
+        {
+          key: "all",
+          label: "All cards",
+          value: null,
+          writable: false,
+          colorToken: null,
+          count: tasks.length,
+        },
+      ],
+      placements: tasks.flatMap((task) =>
+        task.statusId
+          ? [{ taskId: task.id, columnKey: `status:${task.statusId}`, laneKey: "all" }]
+          : [],
+      ),
     },
     page: { hasMore: false, truncated: false, ...overrides },
   };

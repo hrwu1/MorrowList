@@ -1,11 +1,13 @@
 import { fixedClock } from "@morrowlist/domain";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { ProjectService } from "../projects/service.js";
 import { TaskService } from "../tasks/service.js";
 import {
   createInMemoryUnitOfWork,
   emptyData,
   seedWorkspace,
+  statusByCategory,
   type InMemoryUnitOfWork,
   type SeededWorkspace,
 } from "../testing/index.js";
@@ -282,5 +284,155 @@ describe("deferred tasks in the views (GAP-16)", () => {
     expect(later.data.groups.map((g) => g.tasks.map((t) => t.id))).toEqual([
       [deferredUpcoming.id],
     ]);
+  });
+});
+
+describe("ViewService.board", () => {
+  const boardQuery = {
+    source: "filters",
+    columnsBy: "category",
+    swimlaneBy: "none",
+    limit: 500,
+    includeSubtasks: false,
+  } as const;
+
+  async function secondProject(name: string) {
+    const projects = new ProjectService({ unitOfWork, clock: fixedClock(NOW) });
+    return projects.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      name,
+    });
+  }
+
+  it("lines projects up by status category, not by status name", async () => {
+    const other = await secondProject("Marketing");
+    const otherDoing = statusByCategory(other.statuses as never, "in_progress");
+    await unitOfWork.execute(async (tx) => {
+      await tx.statuses.update(
+        { ...(otherDoing as never), name: "Cooking" } as never,
+        otherDoing.version,
+      );
+    });
+    const here = await create("Ours", {
+      projectId: seeded.project.id,
+      statusId: statusByCategory(seeded.statuses, "in_progress").id,
+    });
+    const there = await create("Theirs", {
+      projectId: other.project.id,
+      statusId: otherDoing.id,
+    });
+
+    const { data, page } = await views.board(seeded.context, {
+      ...boardQuery,
+      workspaceId: seeded.workspace.id,
+    });
+
+    expect(data.columns.map((column) => column.category)).toEqual([
+      "backlog",
+      "ready",
+      "in_progress",
+      "blocked",
+      "review",
+      "done",
+    ]);
+    const inProgress = data.placements.filter(
+      (placement) => placement.columnKey === "category:in_progress",
+    );
+    expect(inProgress.map((placement) => placement.taskId).sort()).toEqual(
+      [here.id, there.id].sort(),
+    );
+    expect(page.truncated).toBe(false);
+  });
+
+  it("parks an Inbox card in Backlog and a finished one in Done", async () => {
+    const loose = await create("Loose");
+    const finished = await create("Finished");
+    await tasks.complete(seeded.context, seeded.workspace.id, finished.id);
+
+    const { data } = await views.board(seeded.context, {
+      ...boardQuery,
+      workspaceId: seeded.workspace.id,
+    });
+
+    const columnOf = (id: string) =>
+      data.placements.find((placement) => placement.taskId === id)?.columnKey;
+    expect(columnOf(loose.id)).toBe("category:backlog");
+    expect(columnOf(finished.id)).toBe("category:done");
+  });
+
+  it("returns lanes and a lane for every card when pivoted", async () => {
+    const urgent = await create("Urgent one", { priority: "urgent" });
+    const plain = await create("Plain one");
+
+    const { data } = await views.board(seeded.context, {
+      ...boardQuery,
+      swimlaneBy: "priority",
+      workspaceId: seeded.workspace.id,
+    });
+
+    expect(data.lanes.map((lane) => lane.key)).toEqual([
+      "priority:urgent",
+      "priority:high",
+      "priority:medium",
+      "priority:low",
+      "priority:none",
+    ]);
+    const laneOf = (id: string) =>
+      data.placements.find((placement) => placement.taskId === id)?.laneKey;
+    expect(laneOf(urgent.id)).toBe("priority:urgent");
+    expect(laneOf(plain.id)).toBe("priority:none");
+    expect(data.placements).toHaveLength(data.tasks.length);
+  });
+
+  it("draws Today as a board, My Day selections included", async () => {
+    const planned = await create("Chosen", { addToDay: "2026-09-03" });
+    await create("Someday");
+
+    const { data } = await views.board(seeded.context, {
+      ...boardQuery,
+      source: "today",
+      workspaceId: seeded.workspace.id,
+    });
+
+    expect(data.tasks.map((task) => task.id)).toEqual([planned.id]);
+    expect(data.source).toBe("today");
+  });
+
+  it("uses one project's own statuses when asked for status columns", async () => {
+    await create("Ours", {
+      projectId: seeded.project.id,
+      statusId: statusByCategory(seeded.statuses, "ready").id,
+    });
+
+    const { data } = await views.board(seeded.context, {
+      ...boardQuery,
+      columnsBy: "status",
+      projectId: seeded.project.id,
+      workspaceId: seeded.workspace.id,
+    });
+
+    expect(data.columns.map((column) => column.statusId)).toEqual(
+      seeded.statuses.map((status) => status.id),
+    );
+  });
+
+  it("refuses status columns without a project, because names differ per project", async () => {
+    await expect(
+      views.board(seeded.context, {
+        ...boardQuery,
+        columnsBy: "status",
+        workspaceId: seeded.workspace.id,
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  });
+
+  it("keeps another workspace's board out of reach", async () => {
+    const other = seedWorkspace(unitOfWork.data, {
+      workspace: { slug: "other", taskKeyPrefix: "OT" },
+    });
+
+    await expect(
+      views.board(seeded.context, { ...boardQuery, workspaceId: other.workspace.id }),
+    ).rejects.toMatchObject({ code: "WORKSPACE_NOT_FOUND" });
   });
 });

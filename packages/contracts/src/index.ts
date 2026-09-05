@@ -1,6 +1,7 @@
 export * from "./common.js";
 export * from "./tag.js";
 export * from "./task.js";
+export * from "./board.js";
 export * from "./project.js";
 export * from "./views.js";
 export * from "./search.js";

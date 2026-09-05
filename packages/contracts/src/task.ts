@@ -7,6 +7,7 @@ import {
   plainDateSchema,
   plainTimeSchema,
   prioritySchema,
+  statusCategorySchema,
   timezoneSchema,
   uuidSchema,
 } from "./common.js";
@@ -232,6 +233,13 @@ export const moveTaskRequestSchema = z
     /** Null moves the task back to the Inbox (spec 11.5). */
     projectId: uuidSchema.nullable(),
     statusId: uuidSchema.nullish(),
+    /**
+     * Name the destination by semantic category instead of by id, for a board whose
+     * columns span projects (GAP-19). The server resolves it inside the destination
+     * project: the lowest-ranked active status of that category, else the project's
+     * default (spec 11.5).
+     */
+    statusCategory: statusCategorySchema.optional(),
     /** Neighbours describe the intended position; the server computes the rank (spec 24.2). */
     beforeTaskId: uuidSchema.nullish(),
     afterTaskId: uuidSchema.nullish(),
@@ -243,6 +251,20 @@ export const moveTaskRequestSchema = z
         code: "custom",
         message: "statusId requires a project destination",
         path: ["statusId"],
+      });
+    }
+    if (body.projectId === null && body.statusCategory != null) {
+      context.addIssue({
+        code: "custom",
+        message: "statusCategory requires a project destination",
+        path: ["statusCategory"],
+      });
+    }
+    if (body.statusId != null && body.statusCategory != null) {
+      context.addIssue({
+        code: "custom",
+        message: "name the destination status by id or by category, not both",
+        path: ["statusCategory"],
       });
     }
     if (

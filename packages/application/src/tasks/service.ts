@@ -56,6 +56,7 @@ import {
   type DayPlanSource,
   type PlainDate,
   type PlainTime,
+  type StatusCategory,
   type Tag,
   type Task,
   type TaskRelation,
@@ -433,6 +434,7 @@ export class TaskService {
                 workspaceId,
                 request.projectId,
                 request.statusId ?? null,
+                request.statusCategory ?? null,
               );
         const scope: RankScope = {
           workspaceId,
@@ -1477,6 +1479,7 @@ export class TaskService {
     workspaceId: string,
     projectId: string,
     statusId: string | null,
+    statusCategory: StatusCategory | null = null,
   ): Promise<{ id: string; status: WorkflowStatus }> {
     const project = await tx.projects.findById(workspaceId, projectId);
     if (!project || project.archivedAt !== null) {
@@ -1487,9 +1490,17 @@ export class TaskService {
       throw new DomainError("PROJECT_NOT_FOUND", "Project not found.", { projectId });
     }
 
+    const defaultStatus = statuses.find((candidate) => candidate.isDefault);
     const status = statusId
       ? statuses.find((candidate) => candidate.id === statusId)
-      : statuses.find((candidate) => candidate.isDefault);
+      : statusCategory
+        ? // Spec 11.5: the same semantic category in the destination project, taking the
+          // first in workflow order when the project has several, else its default. This
+          // is how a column on a board spanning projects lands in each project's own
+          // workflow without asking the client to know any of them.
+          (statuses.find((candidate) => candidate.category === statusCategory) ??
+          defaultStatus)
+        : defaultStatus;
 
     if (!status) {
       throw new DomainError(
@@ -1497,7 +1508,7 @@ export class TaskService {
         statusId
           ? "The selected status does not belong to this project."
           : "The project has no default status.",
-        { projectId, statusId },
+        { projectId, statusId, statusCategory },
       );
     }
     return { id: projectId, status };

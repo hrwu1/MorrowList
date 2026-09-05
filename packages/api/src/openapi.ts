@@ -6,6 +6,8 @@ import {
   archiveStatusRequestSchema,
   batchTasksRequestSchema,
   batchTasksResponseSchema,
+  boardViewQuerySchema,
+  boardViewResponseSchema,
   completeTaskRequestSchema,
   createProjectRequestSchema,
   createTagRequestSchema,
@@ -114,6 +116,7 @@ const registry = {
   SetTaskBlockedRequest: setTaskBlockedRequestSchema,
   AddTaskToDayRequest: addTaskToDayRequestSchema,
   TodayView: todayViewResponseSchema,
+  BoardView: boardViewResponseSchema,
   UpcomingView: upcomingViewResponseSchema,
   SetTaskParentRequest: setTaskParentRequestSchema,
   SearchResponse: searchResponseSchema,
@@ -1218,6 +1221,21 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
             "200": {
               description: "A page of task hits plus project hits",
               ...jsonContent(ref("SearchResponse")),
+            },
+            ...commonErrors,
+          },
+        },
+      },
+      "/views/board": {
+        get: {
+          summary: "Board projection across projects",
+          description:
+            "Any saved view's filters, or Today, rendered as a board. Columns are the semantic status categories every project shares (`columnsBy=category`), or one project's own statuses when `projectId` is given and `columnsBy=status`. `swimlaneBy` pivots the board on a second axis; the response says which lane and column every card falls in, so the client groups nothing itself. Bounded like the project board, and explicit when truncated.",
+          parameters: [workspaceIdParam, ...queryParameters(boardViewQuerySchema)],
+          responses: {
+            "200": {
+              description: "The board projection",
+              ...jsonContent(ref("BoardView")),
             },
             ...commonErrors,
           },

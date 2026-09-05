@@ -451,6 +451,104 @@ describe("TaskService.update", () => {
   });
 });
 
+describe("TaskService.move by status category (GAP-19)", () => {
+  /** A second project whose workflow is named differently but categorised the same. */
+  function otherProject(rename: Record<string, string> = {}) {
+    const project = buildProject(seeded.workspace.id, {
+      name: "Marketing",
+      slug: "marketing",
+    });
+    const statuses = buildDefaultWorkflow(project.id).map((status) => ({
+      ...status,
+      name: rename[status.category] ?? status.name,
+    }));
+    unitOfWork.data.projects.set(project.id, project);
+    for (const status of statuses) unitOfWork.data.statuses.set(status.id, status);
+    return { project, statuses };
+  }
+
+  it("lands in the destination project's own status of that category", async () => {
+    const other = otherProject({ in_progress: "Cooking" });
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      projectId: seeded.project.id,
+      statusId: statusByCategory(seeded.statuses, "ready").id,
+      title: "Cross the board",
+    });
+
+    const { task: moved } = await service.move(
+      seeded.context,
+      seeded.workspace.id,
+      task.id,
+      {
+        projectId: other.project.id,
+        statusCategory: "in_progress",
+        expectedVersion: task.version,
+      },
+    );
+
+    expect(moved.projectId).toBe(other.project.id);
+    expect(moved.statusId).toBe(statusByCategory(other.statuses, "in_progress").id);
+  });
+
+  it("completes a card dropped in a Done column of another project", async () => {
+    const other = otherProject({ done: "Shipped" });
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      projectId: seeded.project.id,
+      statusId: statusByCategory(seeded.statuses, "ready").id,
+      title: "Finish elsewhere",
+    });
+
+    const { task: moved } = await service.move(
+      seeded.context,
+      seeded.workspace.id,
+      task.id,
+      {
+        projectId: other.project.id,
+        statusCategory: "done",
+        expectedVersion: task.version,
+      },
+    );
+
+    expect(moved.isCompleted).toBe(true);
+    expect(moved.statusId).toBe(statusByCategory(other.statuses, "done").id);
+  });
+
+  it("falls back to the project default when the category is missing there", async () => {
+    const project = buildProject(seeded.workspace.id, {
+      name: "Lean",
+      slug: "lean",
+    });
+    const [ready, done] = buildDefaultWorkflow(project.id).filter((status) =>
+      ["ready", "done"].includes(status.category),
+    );
+    unitOfWork.data.projects.set(project.id, project);
+    for (const status of [ready, done]) {
+      unitOfWork.data.statuses.set(status!.id, status!);
+    }
+    const task = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      projectId: seeded.project.id,
+      statusId: statusByCategory(seeded.statuses, "ready").id,
+      title: "No review here",
+    });
+
+    const { task: moved } = await service.move(
+      seeded.context,
+      seeded.workspace.id,
+      task.id,
+      {
+        projectId: project.id,
+        statusCategory: "review",
+        expectedVersion: task.version,
+      },
+    );
+
+    expect(moved.statusId).toBe(ready!.id);
+  });
+});
+
 describe("TaskService.move and reorder", () => {
   it("moves through Done and back using canonical completion semantics", async () => {
     const ready = statusByCategory(seeded.statuses, "ready");

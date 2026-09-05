@@ -154,12 +154,15 @@ export {
 } from "./task/capture.js";
 export {
   DAY_PLAN_SOURCES,
+  DUE_BUCKETS,
   TODAY_REASONS,
+  dueBucket,
   todayReasons,
   todaySections,
   upcomingGroups,
   type DayPlan,
   type DayPlanSource,
+  type DueBucket,
   type TodayEntry,
   type TodayReason,
   type TodaySection,

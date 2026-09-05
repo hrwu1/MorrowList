@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import {
+  boardLaneSchema,
+  boardPlacementSchema,
+  boardSwimlaneSchema,
+} from "./board.js";
 import { paginated, statusCategorySchema, uuidSchema } from "./common.js";
 import { taskSchema } from "./task.js";
 
@@ -139,6 +144,8 @@ export const projectBoardQuerySchema = z.object({
   includeSubtasks: z.stringbool().default(false),
   /** Deferred tasks stay off the board until their defer date unless asked for (GAP-16). */
   includeDeferred: z.stringbool().default(false),
+  /** The second axis the board is read along; columns stay statuses (GAP-19). */
+  swimlaneBy: boardSwimlaneSchema.default("none"),
 });
 
 export const projectDetailSchema = z.object({
@@ -148,6 +155,11 @@ export const projectDetailSchema = z.object({
 
 export const projectBoardSchema = projectDetailSchema.extend({
   tasks: z.array(taskSchema),
+  swimlaneBy: boardSwimlaneSchema,
+  /** Lane rows in display order; a single unnamed lane when `swimlaneBy` is `none`. */
+  lanes: z.array(boardLaneSchema),
+  /** The cell each task falls in: `status:<id>` column, lane key. */
+  placements: z.array(boardPlacementSchema),
 });
 
 export const projectResponseSchema = z.object({

@@ -192,6 +192,50 @@ describe("ProjectService reads", () => {
     expect(shown.data.tasks[1]?.subtaskProgress).toBeNull();
   });
 
+  it("keeps one flat card list and says which lane each card is in (GAP-19)", async () => {
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const urgent: Task = {
+      ...buildTask(seeded, ready.id, "Urgent", "a0"),
+      priority: "urgent",
+    };
+    const plain = buildTask(seeded, ready.id, "Plain", "a1");
+    for (const task of [urgent, plain]) unitOfWork.data.tasks.set(task.id, task);
+
+    const flat = await service.board(
+      seeded.context,
+      seeded.workspace.id,
+      seeded.project.id,
+    );
+    expect(flat.data.swimlaneBy).toBe("none");
+    expect(flat.data.lanes.map((lane) => lane.key)).toEqual(["all"]);
+
+    const pivoted = await service.board(
+      seeded.context,
+      seeded.workspace.id,
+      seeded.project.id,
+      { swimlaneBy: "priority" } as never,
+    );
+    // Switching the pivot cannot touch manual order: the same cards, same ranks.
+    expect(pivoted.data.tasks.map((task) => task.rank)).toEqual(
+      flat.data.tasks.map((task) => task.rank),
+    );
+    expect(pivoted.data.lanes.map((lane) => lane.key)).toEqual([
+      "priority:urgent",
+      "priority:high",
+      "priority:medium",
+      "priority:low",
+      "priority:none",
+    ]);
+    expect(pivoted.data.placements).toEqual([
+      {
+        taskId: urgent.id,
+        columnKey: `status:${ready.id}`,
+        laneKey: "priority:urgent",
+      },
+      { taskId: plain.id, columnKey: `status:${ready.id}`, laneKey: "priority:none" },
+    ]);
+  });
+
   it("never returns more than the 500-card hard cap", async () => {
     const ready = statusByCategory(seeded.statuses, "ready");
     let rank: string | null = null;

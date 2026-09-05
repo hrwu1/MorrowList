@@ -1,4 +1,5 @@
 import {
+  boardViewQuerySchema,
   createSavedViewRequestSchema,
   reorderSavedViewRequestSchema,
   todayViewQuerySchema,
@@ -31,6 +32,17 @@ export function viewRoutes(deps: ApiDependencies) {
       const query = parseQuery(c.req.query(), upcomingViewQuerySchema);
       return c.json(
         await deps.viewService.upcoming(actor, {
+          ...query,
+          workspaceId: requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
+        }),
+      );
+    })
+
+    .get("/views/board", async (c) => {
+      const actor = c.get("actor");
+      const query = parseQuery(c.req.query(), boardViewQuerySchema);
+      return c.json(
+        await deps.viewService.board(actor, {
           ...query,
           workspaceId: requireWorkspace(c.req.query("workspaceId"), actor.workspaceIds),
         }),

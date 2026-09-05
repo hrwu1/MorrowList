@@ -84,6 +84,21 @@ export function todaySections(
   }));
 }
 
+/**
+ * Due-date buckets a board can be pivoted by (GAP-19), soonest first. They are coarse on
+ * purpose: a swimlane is a glance at urgency, and Upcoming already groups by exact date.
+ */
+export const DUE_BUCKETS = ["overdue", "today", "soon", "later", "none"] as const;
+export type DueBucket = (typeof DUE_BUCKETS)[number];
+
+/** `soon` is the next seven days after today, matching the deadline filter's week. */
+export function dueBucket(dueDate: PlainDate | null, today: PlainDate): DueBucket {
+  if (dueDate === null) return "none";
+  if (dueDate < today) return "overdue";
+  if (dueDate === today) return "today";
+  return dueDate <= addDays(today, 7) ? "soon" : "later";
+}
+
 export interface UpcomingGroup {
   readonly date: PlainDate;
   readonly tasks: readonly Task[];

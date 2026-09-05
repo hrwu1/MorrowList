@@ -218,6 +218,20 @@ describe("board view", () => {
           status(DONE, { name: "Done", category: "done", isTerminal: true }),
         ],
         tasks: [source],
+        swimlaneBy: "none",
+        lanes: [
+          {
+            key: "all",
+            label: "All cards",
+            value: null,
+            writable: false,
+            colorToken: null,
+            count: 1,
+          },
+        ],
+        placements: [
+          { taskId: source.id, columnKey: `status:${READY}`, laneKey: "all" },
+        ],
       },
       page: { hasMore: false, truncated: false },
     };

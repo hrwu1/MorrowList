@@ -56,6 +56,18 @@ describe("projectBoardResponseSchema", () => {
           },
         ],
         tasks: [],
+        swimlaneBy: "none",
+        lanes: [
+          {
+            key: "all",
+            label: "All cards",
+            value: null,
+            writable: false,
+            colorToken: null,
+            count: 0,
+          },
+        ],
+        placements: [],
       },
     };
 
