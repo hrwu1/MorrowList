@@ -1585,6 +1585,50 @@
     opacity: 0.8;
   }
 
+  /* Settings › Data: the import dry-run preview (GAP-07) */
+  .import-preview {
+    padding: 1rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface-base);
+  }
+  .import-preview h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+  .import-preview__counts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    margin: 0.5rem 0;
+  }
+  .import-preview__counts div {
+    display: flex;
+    flex-direction: column;
+  }
+  .import-preview__counts dt {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
+  .import-preview__counts dd {
+    margin: 0;
+    font-size: 1.25rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .import-preview__columns,
+  .import-preview__sample {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .import-preview__sample {
+    max-height: 14rem;
+    overflow-y: auto;
+  }
+
   /* Project settings and the workflow editor */
   .settings-page {
     width: 100%;
@@ -3586,13 +3630,18 @@
   /* Saved views in the sidebar and on the filter panel. */
   .workspace-views {
     display: flex;
+    min-height: 0;
     flex-direction: column;
     margin-top: 0.8rem;
   }
+  /* Scrolls rather than spilling over the links below when the sidebar is short. */
   .workspace-views__list {
+    min-height: 0;
     margin: 0;
     padding: 0;
+    overflow-y: auto;
     list-style: none;
+    scrollbar-width: thin;
   }
   .workspace-view {
     display: grid;

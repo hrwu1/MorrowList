@@ -95,16 +95,18 @@ export function plannedTagNames(plan: ImportPlan): readonly string[] {
   return names;
 }
 
-/** How many tasks each planned column will hold, keyed by `externalId`. */
+/**
+ * How many cards each planned column will hold, keyed by `externalId`. Subtasks are not
+ * counted: a board hides them behind their parent by default (spec 8.3), so this is the
+ * number a person will actually see in the column, and the preview reports subtasks as a
+ * total of their own.
+ */
 export function taskCountByStatus(plan: ImportPlan): ReadonlyMap<string, number> {
   const counts = new Map<string, number>();
   for (const status of plan.statuses) counts.set(status.externalId, 0);
   for (const task of plan.tasks) {
     if (task.statusExternalId === null) continue;
-    counts.set(
-      task.statusExternalId,
-      (counts.get(task.statusExternalId) ?? 0) + 1 + task.subtasks.length,
-    );
+    counts.set(task.statusExternalId, (counts.get(task.statusExternalId) ?? 0) + 1);
   }
   return counts;
 }

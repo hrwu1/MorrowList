@@ -342,6 +342,14 @@ export function WorkspaceShell({
             </Link>
             <Link
               className="workspace-nav__link workspace-nav__link--quiet"
+              href="/settings/data"
+              aria-current={pathname === "/settings/data" ? "page" : undefined}
+            >
+              <Icon name="settings" />
+              <span>Export and import</span>
+            </Link>
+            <Link
+              className="workspace-nav__link workspace-nav__link--quiet"
               href="/settings/workspace"
               aria-current={pathname === "/settings/workspace" ? "page" : undefined}
             >
@@ -936,6 +944,15 @@ function MobileHeader({
             >
               <Icon name="tag" />
               Manage tags
+            </Link>
+            <Link
+              className="workspace-nav__link workspace-nav__link--quiet"
+              href="/settings/data"
+              aria-current={pathname === "/settings/data" ? "page" : undefined}
+              onClick={closeMenu}
+            >
+              <Icon name="settings" />
+              Export and import
             </Link>
           </nav>
           <button

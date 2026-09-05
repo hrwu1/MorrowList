@@ -149,6 +149,11 @@ describe("ImportService.apply", () => {
     // An archived card keeps its notes in the Trash rather than being dropped.
     expect(byTitle.has("Old vendor spike")).toBe(false);
 
+    // An open checklist item sits in its card's column rather than scattering across
+    // the workflow; a ticked one goes to Done, exactly as completing it by hand would.
+    expect(byTitle.get("Send the invitations")?.statusId).toBe(interview?.statusId);
+    expect(byTitle.get("Write the screener")?.statusId).not.toBe(interview?.statusId);
+
     const trashed = await tasks.list(seeded.context, {
       workspaceId: workspaceId(),
       deleted: true,

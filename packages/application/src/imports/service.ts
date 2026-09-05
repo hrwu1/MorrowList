@@ -201,11 +201,12 @@ export class ImportService {
           (planned.statusExternalId
             ? statusById.get(planned.statusExternalId)
             : undefined) ?? fallback;
+        // A task never starts in a Done column (spec 8.5); it is completed afterwards.
+        const landing = isTerminalCategory(status.category) ? fallback : status;
         const parent = await this.createOne(tx, context, workspace, {
           source,
           project,
-          // A task never starts in a Done column (spec 8.5); it is completed afterwards.
-          status: isTerminalCategory(status.category) ? fallback : status,
+          status: landing,
           planned,
           tags,
           parentTaskId: null,
@@ -214,10 +215,12 @@ export class ImportService {
         created += 1;
 
         for (const subtask of planned.subtasks) {
+          // A subtask sits in its parent's column, so showing subtasks on the board
+          // does not scatter a card's checklist across the workflow.
           await this.createOne(tx, context, workspace, {
             source,
             project,
-            status: fallback,
+            status: landing,
             planned: {
               ...emptyPlannedTask(subtask.title),
               isCompleted: subtask.isCompleted,
