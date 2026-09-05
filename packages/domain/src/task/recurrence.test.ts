@@ -454,8 +454,21 @@ describe("parseRecurrencePhrase", () => {
     "day until 2026-13-01",
     "day for x times",
     "every",
+    // Half-typed prefixes: quick add re-reads the line on every keystroke (GAP-15).
+    "2",
+    "every 2",
+    "3 ",
   ])("rejects %j", (phrase) => {
     expect(parseRecurrencePhrase(phrase, options)).toBeNull();
+  });
+
+  it("never throws, whatever it is handed", () => {
+    const phrase = "every 2 weeks on mon,thu until 2026-12-31";
+    for (let length = 0; length <= phrase.length; length += 1) {
+      expect(() =>
+        parseRecurrencePhrase(phrase.slice(0, length), options),
+      ).not.toThrow();
+    }
   });
 });
 

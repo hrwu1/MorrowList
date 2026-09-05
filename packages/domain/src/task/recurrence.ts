@@ -471,10 +471,11 @@ export interface RecurrencePhraseOptions {
 }
 
 /**
- * Parse the `every …` phrase the CLI takes and GAP-15's quick add will share, e.g.
- * `day`, `2 weeks on mon,thu`, `weekdays`, `month on 31`, `month on last fri`, `year`,
+ * Parse the `every …` phrase the CLI and quick add share, e.g. `day`,
+ * `2 weeks on mon,thu`, `weekdays`, `month on 31`, `month on last fri`, `year`,
  * `week until 2026-12-31`, `day for 10 times`. Returns null for anything it does not
- * understand rather than guessing.
+ * understand rather than guessing, and never throws: quick add re-reads the whole line on
+ * every keystroke (GAP-15), so it sees every half-typed prefix of a phrase.
  */
 export function parseRecurrencePhrase(
   phrase: string,
@@ -511,7 +512,9 @@ export function parseRecurrencePhrase(
   if (/^\d+$/.test(tokens[0] as string)) {
     interval = Number(tokens.shift());
   }
-  const unit = tokens.shift() as string;
+  // `every 2` on its own: an interval with nothing to count. Half a phrase is not a rule.
+  const unit = tokens.shift();
+  if (unit === undefined) return null;
   const mode = options.mode ?? "schedule";
 
   if (unit === "weekday" || unit === "weekdays") {

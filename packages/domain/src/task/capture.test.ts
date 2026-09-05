@@ -174,6 +174,18 @@ describe("parseCapture", () => {
   it("returns an empty title for blank input rather than throwing", () => {
     expect(parseCapture("   ", OPTIONS).title).toBe("");
   });
+
+  it("survives every half-typed prefix of every example", () => {
+    // Quick add re-reads the whole line on each keystroke, so the parser meets every
+    // prefix of a phrase. One that throws blanks the page, which is how a missing guard
+    // in `parseRecurrencePhrase` ("every 2" with nothing after it) was found.
+    for (const example of CAPTURE_EXAMPLES) {
+      for (let length = 0; length <= example.text.length; length += 1) {
+        const prefix = example.text.slice(0, length);
+        expect(() => parseCapture(prefix, OPTIONS), prefix).not.toThrow();
+      }
+    }
+  });
 });
 
 describe("removeSpan", () => {
