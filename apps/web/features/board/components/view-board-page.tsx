@@ -274,7 +274,8 @@ export function ViewBoardPage({
                 {columns.map((column) => (
                   <div
                     key={column.key}
-                    className="kanban-column kanban-column--label"
+                    className="kanban-column"
+                    data-header-only
                     data-category={column.category}
                     data-mobile-active={
                       column.key === activeColumn?.key || undefined

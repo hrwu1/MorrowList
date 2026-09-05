@@ -49,12 +49,12 @@ import {
   useArchiveStatus,
   useUpdateStatus,
 } from "@/features/projects/hooks/use-workflow";
+import { QuickAdd } from "@/features/tasks/components/quick-add";
 import {
   SelectionProvider,
   SelectionToolbar,
   useSelectionKeys,
 } from "@/features/tasks/components/selection-toolbar";
-import { QuickAdd } from "@/features/tasks/components/quick-add";
 import { TaskPanel } from "@/features/tasks/components/task-panel";
 import { WipWarning } from "@/features/workspace/components/wip-warning";
 
