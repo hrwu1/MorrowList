@@ -11,6 +11,8 @@ import type {
 import { Alert, Button, Select, TextArea, TextInput } from "@morrowlist/ui";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
+import { ALL_LANE_KEY, cellDroppableId, type BoardCell } from "../lib/board-view";
+
 import { KanbanCard } from "./kanban-card";
 
 import { STATUS_COLOR_TOKENS } from "@/features/projects/lib/workflow-view";
@@ -33,8 +35,19 @@ export interface ColumnEditing {
 
 export interface KanbanColumnProps {
   readonly status: WorkflowStatusDto;
+  /** The cards of this column in this lane, already grouped and ordered by the page. */
   readonly tasks: readonly TaskDto[];
   readonly statuses: readonly WorkflowStatusDto[];
+  /** The swimlane this column is drawn in; one board row per lane (GAP-19). */
+  readonly laneKey?: string;
+  /** Names the lane in the cards list's accessible name, so lanes stay tellable apart. */
+  readonly laneLabel?: string | null;
+  /**
+   * A swimlaned board draws the column headings once, above the lanes, and the cells
+   * below them: `headerHidden` is a lane's cell, `bodyHidden` is the heading strip.
+   */
+  readonly headerHidden?: boolean;
+  readonly bodyHidden?: boolean;
   readonly selectedTaskKey: string | null;
   readonly mobileActive: boolean;
   /** No card may start a drag (a move is in flight). */
@@ -56,6 +69,10 @@ export function KanbanColumn({
   status,
   tasks,
   statuses,
+  laneKey = ALL_LANE_KEY,
+  laneLabel = null,
+  headerHidden = false,
+  bodyHidden = false,
   selectedTaskKey,
   mobileActive,
   dragDisabled,
@@ -69,10 +86,16 @@ export function KanbanColumn({
   onToggleCollapse,
   editing,
 }: KanbanColumnProps) {
+  const columnKey = `status:${status.id}`;
   const { setNodeRef, isOver } = useDroppable({
-    id: `status:${status.id}`,
-    disabled: reorderDisabled,
-    data: { type: "status", statusId: status.id },
+    id: cellDroppableId(laneKey, columnKey),
+    disabled: reorderDisabled || bodyHidden,
+    data: {
+      type: "cell",
+      laneKey,
+      columnKey,
+      statusId: status.id,
+    } satisfies BoardCell,
   });
   const [renaming, setRenaming] = useState(false);
   const [policyOpen, setPolicyOpen] = useState(false);
@@ -95,9 +118,11 @@ export function KanbanColumn({
       data-wip-over={overLimit || undefined}
       data-mobile-active={mobileActive || undefined}
       data-collapsed={collapsed || undefined}
+      data-header-only={bodyHidden || undefined}
+      data-cell={headerHidden || undefined}
       aria-labelledby={`board-status-${status.id}`}
     >
-      {collapsed ? (
+      {headerHidden ? null : collapsed ? (
         <header className="kanban-column__header kanban-column__header--collapsed">
           <button
             type="button"
@@ -195,12 +220,17 @@ export function KanbanColumn({
         </header>
       )}
 
-      {collapsed ? null : (
+      {collapsed || bodyHidden ? null : (
         <SortableContext
           items={tasks.map((task) => task.id)}
           strategy={verticalListSortingStrategy}
         >
-          <ul className="kanban-column__tasks" aria-label={`${status.name} tasks`}>
+          <ul
+            className="kanban-column__tasks"
+            aria-label={
+              laneLabel ? `${laneLabel}, ${status.name} tasks` : `${status.name} tasks`
+            }
+          >
             {tasks.length === 0 ? (
               <li className="kanban-column__empty">Drop a task here</li>
             ) : (
@@ -208,7 +238,11 @@ export function KanbanColumn({
                 <KanbanCard
                   key={task.id}
                   task={task}
-                  statuses={statuses}
+                  moveOptions={statuses.map((candidate) => ({
+                    value: candidate.id,
+                    label: candidate.name,
+                  }))}
+                  currentMoveValue={task.statusId}
                   detailHref={hrefForTask(task.key)}
                   selected={task.key === selectedTaskKey}
                   dragDisabled={dragDisabled}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useSortable } from "@dnd-kit/sortable";
-import type { TaskDto, WorkflowStatusDto } from "@morrowlist/contracts";
+import type { TaskDto } from "@morrowlist/contracts";
 import Link from "next/link";
 import type { CSSProperties, KeyboardEventHandler } from "react";
 
@@ -21,9 +21,20 @@ import {
 import { useAddToDay, useRemoveFromDay } from "@/features/tasks/hooks/use-tasks";
 import type { TaskDragData } from "@/features/tasks/lib/task-dnd";
 
+/**
+ * The non-drag way to move a card (spec 9.5). A project board offers its statuses; a
+ * board spanning projects offers the shared categories, so the same card serves both.
+ */
+export interface BoardMoveOption {
+  readonly value: string;
+  readonly label: string;
+}
+
 export interface KanbanCardProps {
   readonly task: TaskDto;
-  readonly statuses: readonly WorkflowStatusDto[];
+  readonly moveOptions: readonly BoardMoveOption[];
+  /** The option the card already sits in, which the menu offers but disables. */
+  readonly currentMoveValue: string | null;
   readonly detailHref: string;
   readonly selected: boolean;
   readonly dragDisabled: boolean;
@@ -31,12 +42,13 @@ export interface KanbanCardProps {
   readonly moveDisabled: boolean;
   /** Show how long the card has sat in its column and fade the oldest (GAP-17). */
   readonly showAge: boolean;
-  readonly onMove: (task: TaskDto, statusId: string) => void;
+  readonly onMove: (task: TaskDto, value: string) => void;
 }
 
 export function KanbanCard({
   task,
-  statuses,
+  moveOptions,
+  currentMoveValue,
   detailHref,
   selected,
   dragDisabled,
@@ -102,13 +114,13 @@ export function KanbanCard({
             }}
           >
             <option value="">Move…</option>
-            {statuses.map((status) => (
+            {moveOptions.map((option) => (
               <option
-                key={status.id}
-                value={status.id}
-                disabled={status.id === task.statusId}
+                key={option.value}
+                value={option.value}
+                disabled={option.value === currentMoveValue}
               >
-                {status.name}
+                {option.label}
               </option>
             ))}
           </select>

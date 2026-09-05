@@ -10,6 +10,7 @@ import { TODAY_SECTION_LABELS, formatDateHeading } from "../lib/today-view";
 
 import { ReviewBanner } from "./review-banner";
 
+import { ViewBoardPage } from "@/features/board/components/view-board-page";
 import { TaskPanel } from "@/features/tasks/components/task-panel";
 import { TaskRow } from "@/features/tasks/components/task-row";
 
@@ -48,6 +49,16 @@ export function TodayPage() {
     return `${pathname}?${next.toString()}`;
   }
 
+  const layout = searchParams.get("layout") === "board" ? "board" : "list";
+
+  function changeLayout(next: "list" | "board") {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "list") params.delete("layout");
+    else params.set("layout", next);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
   const view = data?.data;
   const sections = view?.sections.filter((section) => section.tasks.length > 0) ?? [];
   const total = sections.reduce((sum, section) => sum + section.tasks.length, 0);
@@ -69,11 +80,39 @@ export function TodayPage() {
           </p>
         </header>
 
+        <fieldset className="saved-view-layout" aria-label="Today layout">
+          <legend className="ml-visually-hidden">Layout</legend>
+          <Button
+            variant={layout === "list" ? "primary" : "secondary"}
+            aria-pressed={layout === "list"}
+            onClick={() => changeLayout("list")}
+          >
+            List
+          </Button>
+          <Button
+            variant={layout === "board" ? "primary" : "secondary"}
+            aria-pressed={layout === "board"}
+            onClick={() => changeLayout("board")}
+          >
+            Board
+          </Button>
+        </fieldset>
+
         {view?.review ? (
           <ReviewBanner date={view.review.date} tasks={view.review.tasks} />
         ) : null}
 
-        {isPending ? (
+        {layout === "board" ? (
+          <ViewBoardPage
+            scope="today"
+            heading={isPastDay ? "Plan" : "Today"}
+            filters={{
+              source: "today",
+              ...(requestedDate ? { date: requestedDate } : {}),
+            }}
+            emptyMessage="Nothing is overdue or due, and nothing has been chosen for today yet."
+          />
+        ) : isPending ? (
           <div className="task-list__status">
             <Spinner label="Loading Today" />
           </div>

@@ -224,10 +224,14 @@ test("a filter set saves as a personal view that survives a reload and reorders"
   await expect(
     page.getByRole("list", { name: "Urgent inbox tasks" }).getByRole("listitem"),
   ).toHaveCount(1);
-  await expect(page.getByRole("button", { name: "Board" })).toHaveAttribute(
-    "aria-disabled",
-    "true",
-  );
+  // The same view reads as a board across projects, then back as a list (GAP-19).
+  await page.getByRole("button", { name: "Board" }).click();
+  await expect(page.getByRole("region", { name: "Board controls" })).toBeVisible();
+  await expect(page.getByLabel("Swimlanes")).toHaveValue("none");
+  await page.getByRole("button", { name: "List" }).click();
+  await expect(
+    page.getByRole("list", { name: "Urgent inbox tasks" }).getByRole("listitem"),
+  ).toHaveCount(1);
 
   await openFilters(page);
   await filters.getByLabel("Priority").selectOption("any");

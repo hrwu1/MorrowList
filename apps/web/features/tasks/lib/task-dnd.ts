@@ -46,11 +46,16 @@ export function readDestination(over: Over | null): DestinationDropData | null {
 }
 
 /**
- * A sidebar destination wins only while the pointer is actually inside it; otherwise the
- * board's nearest-corners rule applies, excluding the dragged card itself so drops into an
- * empty column do not resolve back onto the card following the pointer. Keyboard drags
- * have no pointer, and their collision rect already sits on the chosen target, so nearest
- * corners over every target is right for them.
+ * A sidebar destination wins only while the pointer is actually inside it. Otherwise the
+ * board target under the pointer wins, and only when the pointer is over no target at all
+ * does the nearest-corners rule apply. That order matters once a board has swimlanes
+ * (GAP-19): the same column exists in every lane, one directly above the other, and
+ * nearest corners alone will happily resolve a drop into the lane the pointer left.
+ *
+ * The dragged card itself is always excluded, so a drop into an empty cell cannot resolve
+ * back onto the card following the pointer. Keyboard drags have no pointer, and their
+ * collision rect already sits on the chosen target, so nearest corners over every target
+ * is right for them.
  */
 export const taskDropCollision: CollisionDetection = (args) => {
   const isDestination = (container: { data: { current?: unknown } }) =>
@@ -70,8 +75,9 @@ export const taskDropCollision: CollisionDetection = (args) => {
   });
   if (destinations.length > 0) return destinations;
 
-  return closestCorners({
-    ...args,
-    droppableContainers: candidates.filter((container) => !isDestination(container)),
-  });
+  const board = candidates.filter((container) => !isDestination(container));
+  const under = pointerWithin({ ...args, droppableContainers: board });
+  if (under.length > 0) return under;
+
+  return closestCorners({ ...args, droppableContainers: board });
 };

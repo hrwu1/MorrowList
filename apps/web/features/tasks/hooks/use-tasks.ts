@@ -20,6 +20,7 @@ import {
 } from "@tanstack/react-query";
 
 import { activityKeys } from "../../activity/hooks/use-activity";
+import { boardViewKeys } from "../../board/lib/board-keys";
 import { flowKeys } from "../../flow/hooks/use-flow";
 import { projectKeys, type BoardViewOptions } from "../../projects/hooks/use-projects";
 import { localToday, patchTaskInToday } from "../../today/lib/today-view";
@@ -224,6 +225,7 @@ function invalidateLists(queryClient: QueryClient): void {
 export function invalidateTaskProjections(queryClient: QueryClient): void {
   invalidateLists(queryClient);
   void queryClient.invalidateQueries({ queryKey: projectKeys.boards() });
+  void queryClient.invalidateQueries({ queryKey: boardViewKeys.all });
   // Every mutation records history, so any open activity list is now behind.
   void queryClient.invalidateQueries({ queryKey: activityKeys.all });
   void queryClient.invalidateQueries({ queryKey: flowKeys.all });
@@ -238,6 +240,7 @@ async function cancelTaskProjections(queryClient: QueryClient): Promise<void> {
   await Promise.all([
     queryClient.cancelQueries({ queryKey: taskKeys.all }),
     queryClient.cancelQueries({ queryKey: projectKeys.boards() }),
+    queryClient.cancelQueries({ queryKey: boardViewKeys.all }),
     queryClient.cancelQueries({ queryKey: todayKeys.all }),
     queryClient.cancelQueries({ queryKey: upcomingKeys.all }),
   ]);

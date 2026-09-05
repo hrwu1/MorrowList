@@ -52,6 +52,7 @@ export function projectRoutes(deps: ApiDependencies) {
             limit: query.limit,
             includeSubtasks: query.includeSubtasks,
             includeDeferred: query.includeDeferred,
+            swimlaneBy: query.swimlaneBy,
           },
         ),
       );

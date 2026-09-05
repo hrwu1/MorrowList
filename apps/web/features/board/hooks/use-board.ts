@@ -22,7 +22,11 @@ import { apiClient } from "@/lib/api-client";
 
 export function useProjectBoard(
   projectId: string,
-  view: BoardViewOptions = { includeSubtasks: false, includeDeferred: false },
+  view: BoardViewOptions = {
+    includeSubtasks: false,
+    includeDeferred: false,
+    swimlaneBy: "none",
+  },
 ) {
   return useQuery({
     queryKey: projectKeys.board(projectId, view),

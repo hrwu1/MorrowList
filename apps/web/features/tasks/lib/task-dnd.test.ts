@@ -96,3 +96,47 @@ describe("taskDropCollision", () => {
     expect(collide(null)[0]).toBe(destinationDroppableId("p1"));
   });
 });
+
+describe("taskDropCollision across swimlanes (GAP-19)", () => {
+  // The same column in two lanes, stacked: the pointer decides, not the nearest corner.
+  const topCell = container(
+    "cell:priority:urgent::status:ready",
+    { type: "cell", laneKey: "priority:urgent", columnKey: "status:ready" },
+    rect(300, 0, 200, 300),
+  );
+  const bottomCell = container(
+    "cell:priority:low::status:ready",
+    { type: "cell", laneKey: "priority:low", columnKey: "status:ready" },
+    rect(300, 320, 200, 300),
+  );
+
+  function collideCells(pointer: { x: number; y: number } | null) {
+    return taskDropCollision({
+      active,
+      collisionRect: pointer
+        ? { ...rect(pointer.x - 10, pointer.y - 250, 180, 60) }
+        : { ...rect(300, 0, 200, 300) },
+      droppableRects: new Map(
+        [topCell, bottomCell, self].map((item) => [item.id, item.rect.current!]),
+      ),
+      droppableContainers: [topCell, bottomCell, self],
+      pointerCoordinates: pointer,
+    }).map((collision) => collision.id);
+  }
+
+  it("drops into the lane the pointer is in, even when the card overhangs another", () => {
+    // The dragged card's rect still overlaps the upper lane; the pointer does not.
+    expect(collideCells({ x: 400, y: 400 })[0]).toBe(
+      "cell:priority:low::status:ready",
+    );
+    expect(collideCells({ x: 400, y: 150 })[0]).toBe(
+      "cell:priority:urgent::status:ready",
+    );
+  });
+
+  it("still resolves a drop in the gap between lanes to the nearest cell", () => {
+    expect(collideCells({ x: 400, y: 310 })).toContain(
+      "cell:priority:urgent::status:ready",
+    );
+  });
+});

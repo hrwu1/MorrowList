@@ -1,7 +1,13 @@
-import type {
-  ProjectBoardResponse,
-  TaskDto,
-  WorkflowStatusDto,
+import {
+  BOARD_SWIMLANES,
+  type BoardColumnDto,
+  type BoardLaneDto,
+  type BoardPlacementDto,
+  type BoardSwimlane,
+  type ProjectBoardResponse,
+  type StatusCategory,
+  type TaskDto,
+  type WorkflowStatusDto,
 } from "@morrowlist/contracts";
 
 export const BOARD_SORTS = ["manual", "due", "priority"] as const;
@@ -196,5 +202,199 @@ export function moveTaskInBoard(
 
   const tasks = [...without];
   tasks.splice(insertionIndex, 0, nextTask);
-  return { ...response, data: { ...response.data, tasks } };
+  // The lane is unchanged by a status move, but the cell is: keep the placement in step
+  // so the optimistic board draws the card under its new column straight away.
+  const placements = response.data.placements.map((placement) =>
+    placement.taskId === move.taskId
+      ? { ...placement, columnKey: `status:${move.destination.id}` }
+      : placement,
+  );
+  return { ...response, data: { ...response.data, tasks, placements } };
+}
+
+/* ── Swimlanes (GAP-19) ─────────────────────────────────────────────────────────── */
+
+/** The single lane a board without swimlanes still reports, mirroring the server. */
+export const ALL_LANE_KEY = "all";
+
+export const SWIMLANE_LABELS: Record<BoardSwimlane, string> = {
+  none: "No swimlanes",
+  priority: "Priority",
+  project: "Project",
+  tag: "Tag",
+  due: "Due date",
+  parent: "Parent task",
+};
+
+/** The pivot is a URL choice like every other view option, so a board is shareable. */
+export function readBoardSwimlane(params: URLSearchParams): BoardSwimlane {
+  const requested = params.get("swimlane");
+  return BOARD_SWIMLANES.find((lane) => lane === requested) ?? "none";
+}
+
+/** A board is a grid: one drop target per lane and column, addressed by both keys. */
+export function cellDroppableId(laneKey: string, columnKey: string): string {
+  return `cell:${laneKey}::${columnKey}`;
+}
+
+export interface BoardCell {
+  readonly type: "cell";
+  readonly laneKey: string;
+  readonly columnKey: string;
+  /** Present when the column is one project's own workflow status. */
+  readonly statusId: string | null;
+}
+
+export function readBoardCell(data: unknown): BoardCell | null {
+  const cell = data as Partial<BoardCell> | undefined;
+  return cell?.type === "cell" && cell.laneKey && cell.columnKey
+    ? {
+        type: "cell",
+        laneKey: cell.laneKey,
+        columnKey: cell.columnKey,
+        statusId: cell.statusId ?? null,
+      }
+    : null;
+}
+
+/** The cards of one cell, in the board's current order. */
+export function tasksInCell(
+  tasks: readonly TaskDto[],
+  placements: readonly BoardPlacementDto[],
+  laneKey: string,
+  columnKey: string,
+  sort: BoardSort,
+): TaskDto[] {
+  const inCell = new Set(
+    placements
+      .filter(
+        (placement) =>
+          placement.laneKey === laneKey && placement.columnKey === columnKey,
+      )
+      .map((placement) => placement.taskId),
+  );
+  return sortBoardTasks(
+    tasks.filter((task) => inCell.has(task.id)),
+    sort,
+  );
+}
+
+/** Every card of one column, across lanes: the order a placement is computed against. */
+export function tasksInColumn(
+  tasks: readonly TaskDto[],
+  placements: readonly BoardPlacementDto[],
+  columnKey: string,
+): TaskDto[] {
+  const inColumn = new Set(
+    placements
+      .filter((placement) => placement.columnKey === columnKey)
+      .map((placement) => placement.taskId),
+  );
+  return tasks.filter((task) => inColumn.has(task.id));
+}
+
+/**
+ * What a drop means. Kept here rather than in the component so the rule is tested:
+ * a card can cross a column, a lane, or both at once, and each is an ordinary command
+ * on the canonical task — never a board-only side effect.
+ */
+export type BoardDropStep =
+  | { readonly kind: "reorder"; readonly placement: BoardPlacement }
+  | {
+      readonly kind: "move";
+      readonly projectId: string | null;
+      readonly statusId: string | null;
+      readonly statusCategory: StatusCategory | null;
+      readonly placement: BoardPlacement;
+    }
+  | { readonly kind: "priority"; readonly priority: TaskDto["priority"] }
+  | {
+      readonly kind: "tag";
+      readonly addTagId: string | null;
+      readonly removeTagId: string | null;
+    }
+  | { readonly kind: "complete" }
+  | { readonly kind: "reopen" };
+
+export interface BoardDrop {
+  readonly steps: readonly BoardDropStep[];
+  /** Why nothing happens, for the live region; null when the drop is accepted. */
+  readonly refusal: string | null;
+}
+
+export interface BoardDropInput {
+  readonly task: TaskDto;
+  readonly swimlaneBy: BoardSwimlane;
+  readonly from: { readonly laneKey: string; readonly columnKey: string };
+  readonly to: BoardCell;
+  readonly lanes: readonly BoardLaneDto[];
+  readonly columns: readonly BoardColumnDto[];
+  readonly placement: BoardPlacement;
+  /** Manual order is the only order a drop may rewrite (ADR-009). */
+  readonly reorderDisabled: boolean;
+}
+
+const NOT_WRITABLE: Record<BoardSwimlane, string> = {
+  none: "",
+  priority: "",
+  project: "",
+  tag: "Cards cannot be dragged into the untagged lane; remove the tag on the card.",
+  due: "Due-date lanes are read-only. Change the due date on the card instead.",
+  parent: "Parent lanes are read-only. Change the parent on the card instead.",
+};
+
+export function boardDropIntent(input: BoardDropInput): BoardDrop {
+  const { task, from, to } = input;
+  const laneChanged = from.laneKey !== to.laneKey;
+  const columnChanged = from.columnKey !== to.columnKey;
+  const lane = input.lanes.find((candidate) => candidate.key === to.laneKey);
+  const column = input.columns.find((candidate) => candidate.key === to.columnKey);
+  if (!column) return { steps: [], refusal: null };
+
+  if (laneChanged && !lane?.writable) {
+    return { steps: [], refusal: NOT_WRITABLE[input.swimlaneBy] || null };
+  }
+
+  const steps: BoardDropStep[] = [];
+  const movingProject =
+    laneChanged && input.swimlaneBy === "project" ? (lane?.value ?? null) : undefined;
+  const projectId = movingProject === undefined ? task.projectId : movingProject;
+
+  if (columnChanged || movingProject !== undefined) {
+    if (projectId === null) {
+      // An Inbox card has no workflow status at all (spec 9.1); the only board move it
+      // can make is the one that does not need one.
+      if (column.isTerminal && !task.isCompleted) steps.push({ kind: "complete" });
+      else if (!column.isTerminal && task.isCompleted) steps.push({ kind: "reopen" });
+      else if (columnChanged) {
+        return {
+          steps: [],
+          refusal: `${task.key} is in the Inbox. Give it a project to move it between columns.`,
+        };
+      }
+    } else {
+      steps.push({
+        kind: "move",
+        projectId,
+        statusId: column.statusId,
+        statusCategory: column.statusId === null ? column.category : null,
+        placement: input.placement,
+      });
+    }
+  } else if (!input.reorderDisabled && !laneChanged) {
+    steps.push({ kind: "reorder", placement: input.placement });
+  }
+
+  if (laneChanged) {
+    if (input.swimlaneBy === "priority" && lane?.value) {
+      steps.push({ kind: "priority", priority: lane.value as TaskDto["priority"] });
+    }
+    if (input.swimlaneBy === "tag") {
+      const removeTagId =
+        input.lanes.find((candidate) => candidate.key === from.laneKey)?.value ?? null;
+      steps.push({ kind: "tag", addTagId: lane?.value ?? null, removeTagId });
+    }
+  }
+
+  return { steps, refusal: null };
 }

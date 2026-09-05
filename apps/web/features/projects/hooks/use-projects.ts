@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  BoardSwimlane,
   CreateProjectRequest,
   ListProjectsQuery,
   ProjectBoardResponse,
@@ -17,10 +18,15 @@ import {
 
 import { apiClient } from "@/lib/api-client";
 
-/** The board variants a project can be cached as: subtasks and deferred tasks shown or hidden. */
+/**
+ * The board variants a project can be cached as: subtasks and deferred tasks shown or
+ * hidden, and the swimlane it is pivoted by (GAP-19), because the lanes come back with
+ * the projection rather than being derived in the browser.
+ */
 export interface BoardViewOptions {
   readonly includeSubtasks: boolean;
   readonly includeDeferred: boolean;
+  readonly swimlaneBy?: BoardSwimlane;
 }
 
 export const projectKeys = {

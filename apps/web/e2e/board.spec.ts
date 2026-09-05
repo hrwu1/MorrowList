@@ -182,7 +182,7 @@ test("automatic sort disables drag but keeps the Move menu", async ({ page }) =>
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("region", { name: "Ready" })).toBeVisible();
   await expect(page.getByRole("region", { name: "In Review" })).toBeHidden();
-  await page.getByLabel("Lane").selectOption({ label: "In Review · 1" });
+  await page.getByLabel("Board stage").selectOption({ label: "In Review · 1" });
   await expect(page.getByRole("region", { name: "Ready" })).toBeHidden();
   await expect(page.getByRole("region", { name: "In Review" })).toBeVisible();
 });

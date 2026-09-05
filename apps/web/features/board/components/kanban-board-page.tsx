@@ -1,23 +1,39 @@
 "use client";
 
 import { useDndMonitor, type DragEndEvent } from "@dnd-kit/core";
-import type { TaskDto, WipWarningDto, WorkflowStatusDto } from "@morrowlist/contracts";
+import {
+  BOARD_SWIMLANES,
+  type BoardColumnDto,
+  type BoardSwimlane,
+  type TaskDto,
+  type WipWarningDto,
+  type WorkflowStatusDto,
+} from "@morrowlist/contracts";
 import { Alert, Button, Select, Spinner } from "@morrowlist/ui";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { isMoveConflict, useMoveBoardTask, useProjectBoard } from "../hooks/use-board";
+import { useBoardDrop } from "../hooks/use-board-view";
 import { useCollapsedColumns } from "../hooks/use-collapsed-columns";
 import {
+  ALL_LANE_KEY,
+  SWIMLANE_LABELS,
+  boardDropIntent,
   placementChangesTask,
   placementForDrop,
+  readBoardCell,
   readBoardDeferred,
   readBoardStageView,
   readBoardSort,
   readBoardSubtasks,
+  readBoardSwimlane,
+  tasksInCell,
+  tasksInColumn,
   tasksInStatus,
   visibleBoardStatuses,
+  type BoardCell,
   type BoardPlacement,
   type BoardSort,
   type BoardStageView,
@@ -33,12 +49,12 @@ import {
   useArchiveStatus,
   useUpdateStatus,
 } from "@/features/projects/hooks/use-workflow";
-import { QuickAdd } from "@/features/tasks/components/quick-add";
 import {
   SelectionProvider,
   SelectionToolbar,
   useSelectionKeys,
 } from "@/features/tasks/components/selection-toolbar";
+import { QuickAdd } from "@/features/tasks/components/quick-add";
 import { TaskPanel } from "@/features/tasks/components/task-panel";
 import { WipWarning } from "@/features/workspace/components/wip-warning";
 
@@ -55,19 +71,23 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   const updateStatus = useUpdateStatus(projectId);
   const archiveStatus = useArchiveStatus(projectId);
   const collapsedColumns = useCollapsedColumns(projectId);
+  const collapsedLanes = useCollapsedColumns(projectId, "lanes");
   const [editError, setEditError] = useState<ColumnEditing["error"]>(null);
   const sort = readBoardSort(new URLSearchParams(searchParams.toString()));
   const stageView = readBoardStageView(new URLSearchParams(searchParams.toString()));
   const showSubtasks = readBoardSubtasks(new URLSearchParams(searchParams.toString()));
   const showAge = readBoardAge(new URLSearchParams(searchParams.toString()));
   const showDeferred = readBoardDeferred(new URLSearchParams(searchParams.toString()));
+  const swimlaneBy = readBoardSwimlane(new URLSearchParams(searchParams.toString()));
   const board = useProjectBoard(projectId, {
     includeSubtasks: showSubtasks,
     includeDeferred: showDeferred,
+    swimlaneBy,
   });
   const flow = useProjectFlow(projectId);
   const doneHint = usuallyDoneLabel(flow.data?.cycleTimeDays.p85 ?? null);
   const moveTask = useMoveBoardTask(projectId);
+  const boardDrop = useBoardDrop();
   const selectedTaskKey = searchParams.get("task");
   const [mobileStatusId, setMobileStatusId] = useState<string | null>(null);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -117,6 +137,25 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
     [manuallyOrderedTasks],
   );
   const [boardRoot, setBoardRoot] = useState<HTMLDivElement | null>(null);
+  const lanes = response?.data.lanes ?? [];
+  const placements = response?.data.placements ?? [];
+  const swimlaned = swimlaneBy !== "none";
+  const moveDisabled = moveTask.isPending || boardDrop.isPending;
+  // The columns of this board expressed the way the drop rule reads them: a project
+  // board's columns are its own statuses, so each one names a status id.
+  const columns: BoardColumnDto[] = useMemo(
+    () =>
+      statuses.map((status) => ({
+        key: `status:${status.id}`,
+        label: status.name,
+        category: status.category,
+        statusId: status.id,
+        isTerminal: status.isTerminal,
+        wipLimit: status.wipLimit,
+        colorToken: status.colorToken,
+      })),
+    [statuses],
+  );
 
   // The drag session belongs to the workspace shell (cards can also be dropped on a
   // sidebar project); the board only interprets drops on its own columns and cards.
@@ -142,6 +181,14 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
     const params = new URLSearchParams(searchParams.toString());
     if (show) params.delete("age");
     else params.set("age", "off");
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
+  function changeSwimlane(next: BoardSwimlane) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "none") params.delete("swimlane");
+    else params.set("swimlane", next);
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
@@ -246,19 +293,40 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
     void commitMove(task, destination, placement);
   }
 
-  function onDragEnd(event: DragEndEvent) {
-    if (sort !== "manual" || !event.over) return;
-
-    const task = tasks.find((candidate) => candidate.id === String(event.active.id));
-    if (!task) return;
+  /** Which cell the pointer ended on: a cell itself, or the cell a card sits in. */
+  function dropTarget(event: DragEndEvent): {
+    cell: BoardCell;
+    overTaskId: string | null;
+  } | null {
+    if (!event.over) return null;
     const overData = event.over.data.current as
-      | { type?: string; statusId?: string }
+      | { type?: string; statusId?: string | null }
       | undefined;
-    const statusId = overData?.statusId;
-    const destination = statuses.find((status) => status.id === statusId);
+    const cell = readBoardCell(overData);
+    if (cell) return { cell, overTaskId: null };
+    if (overData?.type !== "task") return null;
+
+    const overTaskId = String(event.over.id);
+    const placement = placements.find((entry) => entry.taskId === overTaskId);
+    if (!placement) return null;
+    return {
+      cell: {
+        type: "cell",
+        laneKey: placement.laneKey,
+        columnKey: placement.columnKey,
+        statusId: overData.statusId ?? null,
+      },
+      overTaskId,
+    };
+  }
+
+  function onDragEnd(event: DragEndEvent) {
+    const task = tasks.find((candidate) => candidate.id === String(event.active.id));
+    const target = dropTarget(event);
+    if (!task || !target || !event.over) return;
+    const destination = statuses.find((status) => status.id === target.cell.statusId);
     if (!destination) return;
 
-    const overTaskId = overData?.type === "task" ? String(event.over.id) : null;
     const activeTop = event.active.rect.current.translated?.top;
     const insertAfter =
       activeTop !== undefined &&
@@ -267,11 +335,56 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
       manuallyOrderedTasks,
       task.id,
       destination.id,
-      overTaskId,
+      target.overTaskId,
       insertAfter,
     );
-    if (!placementChangesTask(manuallyOrderedTasks, task, placement)) return;
-    void commitMove(task, destination, placement);
+    const current = placements.find((entry) => entry.taskId === task.id);
+    const from = {
+      laneKey: current?.laneKey ?? ALL_LANE_KEY,
+      columnKey: current?.columnKey ?? `status:${task.statusId ?? ""}`,
+    };
+
+    // The same-cell drop is the everyday one and keeps its optimistic path; anything
+    // that crosses a lane is a real change to the card and goes through the commands
+    // that own it (GAP-19).
+    if (from.laneKey === target.cell.laneKey) {
+      if (sort !== "manual") return;
+      if (!placementChangesTask(manuallyOrderedTasks, task, placement)) return;
+      void commitMove(task, destination, placement);
+      return;
+    }
+
+    const intent = boardDropIntent({
+      task,
+      swimlaneBy,
+      from,
+      to: target.cell,
+      lanes,
+      columns,
+      placement,
+      reorderDisabled: sort !== "manual",
+    });
+    if (intent.refusal) {
+      setAnnouncement(intent.refusal);
+      return;
+    }
+    if (intent.steps.length === 0) return;
+
+    const laneLabel =
+      lanes.find((lane) => lane.key === target.cell.laneKey)?.label ?? "another lane";
+    boardDrop.mutate(
+      { task, steps: intent.steps },
+      {
+        onSuccess: (result) => {
+          setWipWarning(result.warnings[0] ?? null);
+          setAnnouncement(`Moved ${task.key} to ${destination.name}, ${laneLabel}.`);
+        },
+        onError: () =>
+          setAnnouncement(
+            `Could not move ${task.key}. Its previous position was restored.`,
+          ),
+      },
+    );
   }
 
   if (board.isPending) {
@@ -365,6 +478,12 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
                 </span>
                 <span
                   className="view-disclosure__chip"
+                  data-active={swimlaned || undefined}
+                >
+                  {swimlaned ? `Lanes: ${SWIMLANE_LABELS[swimlaneBy]}` : "No swimlanes"}
+                </span>
+                <span
+                  className="view-disclosure__chip"
                   data-active={showSubtasks || undefined}
                 >
                   {showSubtasks ? "Subtasks shown" : "Subtasks hidden"}
@@ -409,6 +528,22 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
                 >
                   <option value="focus">Focused stages</option>
                   <option value="all">All stages</option>
+                </Select>
+              </label>
+              <label className="filters__control">
+                <span className="ml-field__label">Swimlanes</span>
+                <Select
+                  value={swimlaneBy}
+                  aria-label="Swimlanes"
+                  onChange={(event) =>
+                    changeSwimlane(event.target.value as BoardSwimlane)
+                  }
+                >
+                  {BOARD_SWIMLANES.map((value) => (
+                    <option key={value} value={value}>
+                      {SWIMLANE_LABELS[value]}
+                    </option>
+                  ))}
                 </Select>
               </label>
               <label className="filters__control">
@@ -515,9 +650,11 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
           >
             <div className="board-page__canvas">
               <label className="board-mobile-status">
-                <span>Lane</span>
+                {/* A column, not a swimlane: on a phone the board shows one stage at a time. */}
+                <span>Stage</span>
                 <Select
                   value={selectedMobileStatus?.id ?? ""}
+                  aria-label="Board stage"
                   onChange={(event) => setMobileStatusId(event.target.value)}
                 >
                   {visibleStatuses.map((status) => (
@@ -528,28 +665,128 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
                 </Select>
               </label>
 
-              <div className="kanban-board" aria-label={`${project.name} board`}>
-                {visibleStatuses.map((status) => (
-                  <KanbanColumn
-                    key={status.id}
-                    status={status}
-                    tasks={tasksInStatus(tasks, status.id, sort)}
-                    statuses={statuses}
-                    selectedTaskKey={selectedTaskKey}
-                    mobileActive={status.id === selectedMobileStatus?.id}
-                    dragDisabled={moveTask.isPending}
-                    reorderDisabled={sort !== "manual"}
-                    moveDisabled={moveTask.isPending}
-                    collapsed={collapsedColumns.collapsed.includes(status.id)}
-                    showAge={showAge}
-                    hint={status.category === "in_progress" ? doneHint : null}
-                    hrefForTask={hrefForTask}
-                    onMove={moveFromMenu}
-                    onToggleCollapse={collapsedColumns.toggle}
-                    editing={editing}
-                  />
-                ))}
-              </div>
+              {swimlaned ? (
+                <div className="board-swimlanes" aria-label={`${project.name} board`}>
+                  {/* The columns are named once, above the lanes, so a card's column and
+                    its lane each have exactly one heading. */}
+                  <div className="kanban-board kanban-board--headings">
+                    {visibleStatuses.map((status) => (
+                      <KanbanColumn
+                        key={status.id}
+                        status={status}
+                        tasks={tasksInColumn(tasks, placements, `status:${status.id}`)}
+                        statuses={statuses}
+                        bodyHidden
+                        selectedTaskKey={selectedTaskKey}
+                        mobileActive={status.id === selectedMobileStatus?.id}
+                        dragDisabled
+                        reorderDisabled
+                        moveDisabled={moveDisabled}
+                        collapsed={collapsedColumns.collapsed.includes(status.id)}
+                        showAge={showAge}
+                        hint={status.category === "in_progress" ? doneHint : null}
+                        hrefForTask={hrefForTask}
+                        onMove={moveFromMenu}
+                        onToggleCollapse={collapsedColumns.toggle}
+                        editing={editing}
+                      />
+                    ))}
+                  </div>
+
+                  {lanes.map((lane) => {
+                    const laneCollapsed = collapsedLanes.collapsed.includes(lane.key);
+                    return (
+                      <section
+                        key={lane.key}
+                        className="board-lane"
+                        data-collapsed={laneCollapsed || undefined}
+                        data-writable={lane.writable || undefined}
+                        aria-labelledby={`board-lane-${lane.key}`}
+                      >
+                        <header className="board-lane__header">
+                          <button
+                            type="button"
+                            className="board-lane__toggle"
+                            aria-expanded={!laneCollapsed}
+                            aria-label={`${laneCollapsed ? "Expand" : "Collapse"} ${lane.label}`}
+                            onClick={() => collapsedLanes.toggle(lane.key)}
+                          >
+                            <span aria-hidden="true">{laneCollapsed ? "›" : "⌄"}</span>
+                          </button>
+                          <h2 id={`board-lane-${lane.key}`}>{lane.label}</h2>
+                          <span
+                            className="board-lane__count"
+                            aria-label={`${lane.count} cards`}
+                          >
+                            {lane.count}
+                          </span>
+                          {lane.writable ? null : (
+                            <span className="board-lane__hint">Read-only lane</span>
+                          )}
+                        </header>
+                        {laneCollapsed ? null : (
+                          <div className="kanban-board">
+                            {visibleStatuses.map((status) => (
+                              <KanbanColumn
+                                key={status.id}
+                                status={status}
+                                tasks={tasksInCell(
+                                  tasks,
+                                  placements,
+                                  lane.key,
+                                  `status:${status.id}`,
+                                  sort,
+                                )}
+                                statuses={statuses}
+                                laneKey={lane.key}
+                                laneLabel={lane.label}
+                                headerHidden
+                                selectedTaskKey={selectedTaskKey}
+                                mobileActive={status.id === selectedMobileStatus?.id}
+                                dragDisabled={moveDisabled}
+                                reorderDisabled={false}
+                                moveDisabled={moveDisabled}
+                                collapsed={collapsedColumns.collapsed.includes(
+                                  status.id,
+                                )}
+                                showAge={showAge}
+                                hint={null}
+                                hrefForTask={hrefForTask}
+                                onMove={moveFromMenu}
+                                onToggleCollapse={collapsedColumns.toggle}
+                                editing={editing}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </section>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="kanban-board" aria-label={`${project.name} board`}>
+                  {visibleStatuses.map((status) => (
+                    <KanbanColumn
+                      key={status.id}
+                      status={status}
+                      tasks={tasksInStatus(tasks, status.id, sort)}
+                      statuses={statuses}
+                      selectedTaskKey={selectedTaskKey}
+                      mobileActive={status.id === selectedMobileStatus?.id}
+                      dragDisabled={moveTask.isPending}
+                      reorderDisabled={sort !== "manual"}
+                      moveDisabled={moveTask.isPending}
+                      collapsed={collapsedColumns.collapsed.includes(status.id)}
+                      showAge={showAge}
+                      hint={status.category === "in_progress" ? doneHint : null}
+                      hrefForTask={hrefForTask}
+                      onMove={moveFromMenu}
+                      onToggleCollapse={collapsedColumns.toggle}
+                      editing={editing}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
 
             {selectedTaskKey ? (

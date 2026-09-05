@@ -2378,6 +2378,83 @@
     overscroll-behavior-x: contain;
     scrollbar-width: thin;
   }
+  /* Swimlanes (GAP-19): one board row per lane, under a single row of column headings.
+     The lane heading sticks to the left so a wide board keeps saying which lane is which. */
+  .board-swimlanes {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.35rem;
+    /* One scroll container for every lane, so the lanes and the heading row stay
+       aligned when the board is wider than the screen. */
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+  .board-swimlanes .kanban-board {
+    width: max-content;
+    min-width: 100%;
+    overflow-x: visible;
+  }
+  .board-lane {
+    min-width: 0;
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 0.35rem;
+  }
+  .board-lane__header {
+    position: sticky;
+    left: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.15rem 0 0.3rem;
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+  .board-lane__header h2 {
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+  .board-lane__toggle {
+    display: inline-flex;
+    width: 1.25rem;
+    height: 1.25rem;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  .board-lane__toggle:hover {
+    background: var(--surface-sunken);
+  }
+  .board-lane__count {
+    border-radius: 999px;
+    background: var(--surface-sunken);
+    padding: 0 0.4rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .board-lane__hint {
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+  .kanban-board--headings {
+    padding-bottom: 0;
+  }
+  .kanban-column[data-header-only] {
+    min-height: auto;
+  }
+  .kanban-column[data-cell] {
+    min-height: 7rem;
+  }
+  .kanban-column[data-cell] .kanban-column__tasks {
+    min-height: 4.5rem;
+  }
   .kanban-column {
     --board-status: var(--text-muted);
     flex: 1 1 14rem;

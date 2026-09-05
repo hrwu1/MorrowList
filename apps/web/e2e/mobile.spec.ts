@@ -146,7 +146,7 @@ test("the board runs one lane at a time and the task detail opens as a sheet", a
     page.getByRole("heading", { level: 1, name: "Phone board" }),
   ).toBeVisible();
 
-  const lane = page.getByLabel("Lane");
+  const lane = page.getByLabel("Board stage");
   await expect(lane).toBeVisible();
   const visibleColumns = page.locator(".kanban-column:visible");
   await expect(visibleColumns).toHaveCount(1);

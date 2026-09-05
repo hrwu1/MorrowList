@@ -6,8 +6,8 @@ import { useCallback, useEffect, useState } from "react";
  * Per-user collapsed columns, kept in `localStorage` (GAP-05): a personal view
  * preference, not project state, so it never touches the API or other members.
  */
-export function useCollapsedColumns(projectId: string) {
-  const storageKey = `morrowlist.board.${projectId}.collapsed`;
+export function useCollapsedColumns(projectId: string, scope = "collapsed") {
+  const storageKey = `morrowlist.board.${projectId}.${scope}`;
   const [collapsed, setCollapsed] = useState<readonly string[]>([]);
 
   // Read after mount so the server-rendered board and the first client render agree.
@@ -24,11 +24,11 @@ export function useCollapsedColumns(projectId: string) {
   }, [storageKey]);
 
   const toggle = useCallback(
-    (statusId: string) => {
+    (key: string) => {
       setCollapsed((current) => {
-        const next = current.includes(statusId)
-          ? current.filter((id) => id !== statusId)
-          : [...current, statusId];
+        const next = current.includes(key)
+          ? current.filter((id) => id !== key)
+          : [...current, key];
         try {
           window.localStorage.setItem(storageKey, JSON.stringify(next));
         } catch {
