@@ -67,7 +67,14 @@ export default tseslint.config(
   {
     files: ["scripts/**/*.mjs", "**/*.config.{js,mjs,ts}"],
     languageOptions: {
-      globals: { process: "readonly", console: "readonly", URL: "readonly" },
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        URL: "readonly",
+        // Node's fetch is a global with no importable form, unlike timers and
+        // performance, which scripts import from `node:` explicitly.
+        fetch: "readonly",
+      },
     },
   },
   {

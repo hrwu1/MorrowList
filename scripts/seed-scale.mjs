@@ -491,6 +491,11 @@ try {
   // --- tags on tasks --------------------------------------------------------
   // Spec 29.1 asks for a task carrying twenty tags; the long tail carries one or two,
   // which is what makes the tag filter's selectivity realistic.
+  //
+  // The twenty-tag tasks are the board project's cards, which is deliberate: it puts the
+  // reference scale's two heaviest requirements — 500 cards in one board query and 20
+  // tags per task — on the same response, so the board benchmark measures the worst page
+  // the spec asks the product to serve rather than a comfortable one.
   await unitOfWork.execute(async (tx) => {
     for (let i = 0; i < scale.heavilyTaggedTasks; i += 1) {
       const taskId = liveProjectTasks[i];
@@ -591,6 +596,8 @@ try {
     email,
     boardProjectId: boardProject.id,
     tagId: tags[0]?.id ?? null,
+    /** The task carrying 1,000 activity events, for the paginated-activity read. */
+    activityTaskId: heavilyEdited[0] ?? null,
     searchTerm: RARE_TERM,
     projects: projects.length,
     tags: tags.length,

@@ -1,0 +1,102 @@
+name: Benchmark
+
+# The spec 29.2 budgets at the spec 29.1 reference scale (GAP-23).
+#
+# Nightly rather than per pull request: a run seeds 100,000 tasks and drives fourteen
+# scenarios, which takes minutes, and latency numbers are only comparable between runs on
+# the same hardware. So the job compares against its own previous result, restored from
+# the actions cache, and never against the table in docs/performance.md — that table was
+# measured on a developer machine and would fail every runner.
+#
+# The absolute budget check needs no baseline: bench.mjs exits non-zero on its own when a
+# p95 exceeds what spec 29.2 allows.
+
+on:
+  schedule:
+    # 03:20 UTC, off the hour so it does not queue behind everyone else's nightly.
+    - cron: "20 3 * * *"
+  workflow_dispatch:
+    inputs:
+      scale:
+        description: "Seed scale"
+        type: choice
+        options: [reference, small]
+        default: reference
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "24"
+
+jobs:
+  benchmark:
+    name: Reference-scale benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: morrowlist
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # The benchmark never touches this one; it is here so the typed environment parses.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/morrowlist
+      BENCH_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/morrowlist_bench
+      AUTH_SECRET: ci-only-secret-value-not-used-in-production
+      BENCH_PORT: "3400"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      - name: Create the throwaway benchmark database
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE morrowlist_bench'
+
+      # The previous nightly's result, so a regression is measured runner against runner.
+      # A miss is fine: the first run has nothing to compare against and only the absolute
+      # budgets are enforced.
+      - id: baseline
+        uses: actions/cache/restore@v4
+        with:
+          path: previous.json
+          key: benchmark-baseline-${{ github.run_id }}
+          restore-keys: benchmark-baseline-
+
+      - name: Run the benchmark
+        run: |
+          node scripts/bench.mjs \
+            --scale "${{ inputs.scale || 'reference' }}" \
+            --out benchmark.json \
+            ${{ steps.baseline.outputs.cache-matched-key && '--check previous.json --regression 20' || '' }}
+
+      - name: Keep this run as the next run's baseline
+        if: success()
+        run: cp benchmark.json previous.json
+
+      - uses: actions/cache/save@v4
+        if: success()
+        with:
+          path: previous.json
+          key: benchmark-baseline-${{ github.run_id }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: benchmark.json
+          retention-days: 90

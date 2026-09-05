@@ -84,6 +84,16 @@ jobs:
       - name: Apply migrations from an empty database
         run: pnpm db:migrate
       - run: pnpm test:integration
+      # The reference-scale seed writes through the repositories and the domain policies,
+      # so a schema or policy change can break it. Proving it still runs costs seconds at
+      # the reduced scale; the nightly benchmark runs it at the full 100,000 rows.
+      - name: Seed a throwaway database at reduced scale
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE morrowlist_seed'
+          DATABASE_URL=postgresql://postgres:postgres@localhost:5432/morrowlist_seed pnpm db:migrate
+          node scripts/seed-scale.mjs \
+            --database-url postgresql://postgres:postgres@localhost:5432/morrowlist_seed \
+            --scale small
 
   e2e:
     name: Browser end-to-end
