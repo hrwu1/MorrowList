@@ -846,6 +846,86 @@
     min-width: 10rem;
   }
 
+  /* What capture read out of the line (GAP-15). Every chip carries its own words, so
+     the parse is never something the user has to infer from a changed field. */
+  .quick-add__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .quick-add__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.1rem 0.3rem 0.1rem 0.6rem;
+    border-radius: 99px;
+    background: var(--tag-blue-bg);
+    color: var(--tag-blue-text);
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+  .quick-add__chip[data-kind="priority"] {
+    background: var(--tag-amber-bg);
+    color: var(--tag-amber-text);
+  }
+  .quick-add__chip[data-kind="project"] {
+    background: var(--tag-violet-bg);
+    color: var(--tag-violet-text);
+  }
+  .quick-add__chip[data-kind="tag"] {
+    background: var(--tag-teal-bg);
+    color: var(--tag-teal-text);
+  }
+  .quick-add__chip[data-kind="recurrence"] {
+    background: var(--tag-green-bg);
+    color: var(--tag-green-text);
+  }
+  .quick-add__chip[data-unknown="true"] {
+    background: var(--surface-sunken);
+    color: var(--text-secondary);
+    border: 1px dashed var(--border-strong);
+  }
+  .quick-add__chip-remove {
+    display: grid;
+    width: 1.15rem;
+    height: 1.15rem;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .quick-add__chip-remove:hover {
+    background: color-mix(in oklch, currentColor 18%, transparent);
+  }
+  .quick-add__chip-create {
+    padding: 0 0.4rem;
+    border: 0;
+    border-radius: 99px;
+    background: color-mix(in oklch, currentColor 12%, transparent);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .quick-add__chip-create:disabled {
+    cursor: progress;
+    opacity: 0.6;
+  }
+  .quick-add__preview {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+  }
+
   .button-row {
     display: flex;
     flex-wrap: wrap;

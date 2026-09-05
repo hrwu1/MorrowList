@@ -1,5 +1,3 @@
-import { randomFillSync } from "node:crypto";
-
 /**
  * UUIDv7 generation (spec 8.1, 18.2): time-ordered identifiers so primary keys cluster by
  * creation time, which keeps activity and outbox inserts append-friendly.
@@ -7,6 +5,11 @@ import { randomFillSync } from "node:crypto";
  * Layout per RFC 9562: 48-bit big-endian Unix millisecond timestamp, 4-bit version, 12
  * bits of monotonic sequence, 2-bit variant, 62 bits of randomness. The sequence keeps
  * identifiers minted inside the same millisecond strictly increasing.
+ *
+ * Randomness comes from the Web Crypto global rather than `node:crypto`, because the
+ * domain is imported by the browser bundle as well as the server (GAP-15 gave quick add
+ * a domain parser) and a `node:` specifier fails to build there. The global is standard
+ * in Node 19+ and in every browser, so this is the same CSPRNG either way.
  */
 
 const bytes = new Uint8Array(16);
@@ -25,7 +28,7 @@ let explicitEmitted = -1;
 let explicitSequence = 0;
 
 function mint(timestamp: number, sequence: number): string {
-  randomFillSync(bytes, 8);
+  crypto.getRandomValues(bytes.subarray(8));
 
   const ms = BigInt(timestamp);
   bytes[0] = Number((ms >> 40n) & 0xffn);

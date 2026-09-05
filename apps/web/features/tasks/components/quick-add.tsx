@@ -1,10 +1,21 @@
 "use client";
 
-import type { CreateTaskRequest, Priority } from "@morrowlist/contracts";
+import type { CreateTaskRequest, Priority, TaskDto } from "@morrowlist/contracts";
+import { removeSpan, type CaptureSpan } from "@morrowlist/domain";
 import { Alert, Button, TextInput } from "@morrowlist/ui";
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 
+import { useCaptureNames, useParsingEnabled } from "../hooks/use-capture";
 import { useCreateTask } from "../hooks/use-tasks";
+import { capturePlan, capturePreview, parseQuickAdd } from "../lib/capture";
 
 import { DueDateInput, PrioritySelect } from "./task-fields";
 
@@ -16,6 +27,8 @@ import {
   readDraft,
   writeDraft,
 } from "@/features/offline/lib/drafts";
+import { useCreateProject } from "@/features/projects/hooks/use-projects";
+import { useAddTaskTag, useCreateTag, useTags } from "@/features/tags/hooks/use-tags";
 
 /**
  * Global quick add (TASK-010, spec 10.1).
@@ -25,6 +38,13 @@ import {
  * already made, but they stay collapsed so the common case is still one field and one
  * keystroke. The field keeps focus after submitting so several thoughts can be captured
  * in a row.
+ *
+ * What is typed is also read for dates, priority, a project, tags and a repeat (GAP-15,
+ * ADR pending-natural-language-capture). The spec deferred that because unexpected
+ * parsing slows capture down, so nothing here is silent: every match becomes a chip
+ * saying what it resolved to, each chip removes its own text, a backslash escapes a
+ * token, and the whole thing can be switched off in settings. The request is built from
+ * that one parse; the server is sent ordinary fields and never parses anything.
  *
  * A capture that cannot be sent — offline, or a failed request — is kept on this device
  * under the workspace and destination it was meant for (spec 25.1), restored into the
@@ -69,6 +89,22 @@ export function QuickAdd({
     ? draftKey(scope.workspaceId, statusId ?? projectId ?? "inbox")
     : null;
 
+  const parsingEnabled = useParsingEnabled();
+  const names = useCaptureNames();
+  const tagList = useTags();
+  const addTaskTag = useAddTaskTag();
+  const createProject = useCreateProject();
+  const createTag = useCreateTag();
+
+  const parsed = useMemo(
+    () =>
+      parsingEnabled && title.trim().length > 0
+        ? parseQuickAdd(title, names.today, names.projects, names.tags)
+        : null,
+    [parsingEnabled, title, names],
+  );
+  const spans = parsed?.spans ?? [];
+
   // Restore an unsent capture once the workspace is known, without overwriting typing.
   useEffect(() => {
     if (!storageKey) return;
@@ -86,20 +122,54 @@ export function QuickAdd({
     setUnsent(true);
   }
 
+  /** Put a rewritten line back in the field, keeping focus where the typing was. */
+  function retype(next: string) {
+    setTitle(next);
+    if (unsent) keepDraft({ title: next, priority, dueDate });
+    inputRef.current?.focus();
+  }
+
+  /** Make the project or tag the text named; the next parse then resolves it. */
+  async function create(span: CaptureSpan) {
+    try {
+      if (span.kind === "project")
+        await createProject.mutateAsync({ name: span.value });
+      else await createTag.mutateAsync({ name: span.value });
+      inputRef.current?.focus();
+    } catch {
+      // The name may already exist under another casing, or the request failed. The text
+      // is still in the field either way, so there is nothing to recover.
+    }
+  }
+
   async function submit() {
     const trimmed = title.trim();
     if (trimmed.length === 0 || createTask.isPending) return;
 
+    const plan = parsed
+      ? capturePlan(parsed, names.projects, names.tags, { projectId, statusId })
+      : {
+          request: {
+            title: trimmed,
+            ...(projectId ? { projectId } : {}),
+            ...(statusId ? { statusId } : {}),
+          } satisfies CreateTaskRequest,
+          tagIds: [] as readonly string[],
+        };
+
     const request: CreateTaskRequest = {
-      title: trimmed,
-      ...(projectId ? { projectId } : {}),
-      ...(statusId ? { statusId } : {}),
+      ...plan.request,
+      // The collapsed controls are a deliberate choice, so they beat the text.
       ...(priority === "none" ? {} : { priority }),
       ...(dueDate === null ? {} : { dueDate }),
     };
 
     try {
-      const task = await createTask.mutateAsync(request);
+      let task: TaskDto = await createTask.mutateAsync(request);
+      for (const tagId of plan.tagIds) {
+        const tag = tagList.data?.data.find((candidate) => candidate.id === tagId);
+        if (tag) task = await addTaskTag.mutateAsync({ task, tag });
+      }
       if (storageKey) clearDraft(storageKey);
       setUnsent(false);
       setTitle("");
@@ -159,6 +229,50 @@ export function QuickAdd({
           Add
         </Button>
       </div>
+
+      {parsed && spans.length > 0 ? (
+        <>
+          <ul className="quick-add__chips" aria-label="Read from what you typed">
+            {spans.map((span) => (
+              <li key={`${span.kind}-${span.start}`}>
+                {span.known ? (
+                  <span className="quick-add__chip" data-kind={span.kind}>
+                    {span.label}
+                    <button
+                      type="button"
+                      className="quick-add__chip-remove"
+                      aria-label={`Remove ${span.label}`}
+                      onKeyDown={(event: KeyboardEvent) => {
+                        if (event.key !== "Backspace" && event.key !== "Delete") return;
+                        event.preventDefault();
+                        retype(removeSpan(title, span));
+                      }}
+                      onClick={() => retype(removeSpan(title, span))}
+                    >
+                      <span aria-hidden="true">×</span>
+                    </button>
+                  </span>
+                ) : (
+                  <span className="quick-add__chip" data-unknown="true">
+                    {span.label}
+                    <button
+                      type="button"
+                      className="quick-add__chip-create"
+                      disabled={createProject.isPending || createTag.isPending}
+                      onClick={() => void create(span)}
+                    >
+                      Create
+                    </button>
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="quick-add__preview" role="status">
+            {capturePreview(parsed)}
+          </p>
+        </>
+      ) : null}
 
       {showDetails ? (
         <div className="quick-add__details" id={detailsId}>

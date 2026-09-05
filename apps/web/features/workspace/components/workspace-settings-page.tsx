@@ -7,14 +7,23 @@ import { useDefaultWorkspace, useMe, useUpdateWorkspace } from "../hooks/use-wor
 import { describeInProgress } from "../lib/wip";
 
 import { describeWorkflowError } from "@/features/projects/hooks/use-workflow";
+import {
+  useParsingEnabled,
+  useSetParsingEnabled,
+} from "@/features/tasks/hooks/use-capture";
 
-/** Workspace settings (GAP-20): the one in-progress limit that spans every project. */
+/**
+ * Workspace settings: the one in-progress limit that spans every project (GAP-20), and
+ * this device's capture preference (GAP-15).
+ */
 export function WorkspaceSettingsPage() {
   const me = useMe();
   const workspace = useDefaultWorkspace();
   const update = useUpdateWorkspace();
   const id = useId();
   const [limit, setLimit] = useState("");
+  const parsingEnabled = useParsingEnabled();
+  const setParsingEnabled = useSetParsingEnabled();
 
   useEffect(() => {
     setLimit(workspace?.inProgressLimit?.toString() ?? "");
@@ -102,6 +111,26 @@ export function WorkspaceSettingsPage() {
           </span>
         </div>
       </form>
+
+      {/* Reading what you type is a browser preference, not workspace data (GAP-15): it
+          changes how this device captures, so it saves here and nowhere else. */}
+      <section className="settings-form" aria-label="Quick add">
+        <h2 className="section-heading">Quick add</h2>
+        <label className="notification-settings__check">
+          <input
+            type="checkbox"
+            checked={parsingEnabled}
+            onChange={(event) => setParsingEnabled(event.target.checked)}
+          />
+          Read dates, priority, projects and tags out of what I type
+        </label>
+        <p className="page-header__subtitle">
+          With this on, &ldquo;Call Sam tomorrow 5pm p1 #launch @phone&rdquo; fills
+          those fields in, and a chip under the field says what it read before you press
+          Enter. A backslash keeps one word literal, as in &ldquo;\#12&rdquo;. This
+          setting is kept on this device.
+        </p>
+      </section>
     </div>
   );
 }

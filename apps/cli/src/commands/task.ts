@@ -17,6 +17,13 @@ import {
 } from "../formatters/output.js";
 
 import {
+  capture,
+  captureContext,
+  captureFields,
+  captureReport,
+  projectIdFor,
+} from "./capture.js";
+import {
   BULK_LIMIT,
   assertBulkConfirmed,
   fail,
@@ -147,9 +154,14 @@ export function taskCommand(): Command {
       "--after-completion",
       "count the next occurrence from the completion date rather than the due date",
     )
+    .option(
+      "--literal",
+      'take the text exactly as typed, reading no "tomorrow 5pm p1 #project @tag" out of it',
+    )
     .action(async (titleParts: string[], options, command) => {
       const globals = globalsOf(command);
       const json = Boolean(globals.json);
+      const text = titleParts.join(" ");
       try {
         const recurrence = options.every
           ? recurrenceFromPhrase(
@@ -159,16 +171,28 @@ export function taskCommand(): Command {
               json,
             )
           : null;
-        const created = await withClient(globals, async (client) => {
+        const { created, parsed } = await withClient(globals, async (client) => {
+          const createTags = Boolean(options.createTags);
+          // Quick add's grammar, read here too so a phrase means one thing (GAP-15).
+          const context = await captureContext(
+            client,
+            options.literal ? "" : text,
+            createTags,
+          );
+          const parse = options.literal ? null : capture(text, context);
+          const projectId = projectIdFor(context, parse?.projectName ?? null);
           // Tags are resolved before the task exists so an unknown name fails cleanly.
           const tags = await resolveTags(
             client,
-            options.tag as string[],
-            Boolean(options.createTags),
+            [...(options.tag as string[]), ...(parse?.tagNames ?? [])],
+            createTags,
             json,
           );
           const body: CreateTaskRequest = {
-            title: titleParts.join(" "),
+            title: parse ? parse.title : text,
+            ...(parse ? captureFields(parse) : {}),
+            ...(projectId ? { projectId } : {}),
+            // An explicit flag is exact, so it wins over anything read from the text.
             ...(options.description ? { descriptionMd: options.description } : {}),
             ...(options.priority ? { priority: options.priority } : {}),
             ...(options.due ? { dueDate: options.due } : {}),
@@ -188,11 +212,16 @@ export function taskCommand(): Command {
           for (const tag of tags) {
             task = await client.addTaskTag(task.id, tag.id, idempotency());
           }
-          return task;
+          return { created: task, parsed: parse };
         });
 
-        if (json) printJson({ ok: true, data: created });
-        else process.stdout.write(`${created.key}  ${created.title}\n`);
+        if (json) {
+          printJson({
+            ok: true,
+            data: created,
+            ...(parsed ? { parsed: captureReport(parsed) } : {}),
+          });
+        } else process.stdout.write(`${created.key}  ${created.title}\n`);
       } catch (error) {
         fail(error, json);
       }

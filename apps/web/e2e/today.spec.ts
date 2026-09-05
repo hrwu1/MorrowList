@@ -59,15 +59,15 @@ test("adds a task to My Day, sees it in Today, and completes it inline", async (
   page,
 }) => {
   await signUp(page);
-  await capture(page, "Chosen for today");
+  await capture(page, "Chosen for the day");
 
-  await page.getByRole("button", { name: "Edit Chosen for today" }).click();
-  await page.getByRole("button", { name: "Add Chosen for today to My Day" }).click();
+  await page.getByRole("button", { name: "Edit Chosen for the day" }).click();
+  await page.getByRole("button", { name: "Add Chosen for the day to My Day" }).click();
   await expect(
-    row(page, "Chosen for today").getByText("My Day", { exact: true }),
+    row(page, "Chosen for the day").getByText("My Day", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Remove Chosen for today from My Day" }),
+    page.getByRole("button", { name: "Remove Chosen for the day from My Day" }),
   ).toBeVisible();
 
   const todayLink = page.getByRole("link", { name: "Today", exact: true });
@@ -75,10 +75,10 @@ test("adds a task to My Day, sees it in Today, and completes it inline", async (
   await todayLink.click();
   await expect(page.getByRole("heading", { level: 1, name: "Today" })).toBeVisible();
   const myDay = page.getByRole("list", { name: "My Day tasks" });
-  await expect(myDay.getByRole("link", { name: "Chosen for today" })).toBeVisible();
+  await expect(myDay.getByRole("link", { name: "Chosen for the day" })).toBeVisible();
   await page.screenshot({ path: "test-results/today-my-day.png", fullPage: true });
 
-  await page.getByRole("button", { name: "Complete Chosen for today" }).click();
+  await page.getByRole("button", { name: "Complete Chosen for the day" }).click();
   await expect(
     page.getByRole("heading", { name: "Nothing needs you today" }),
   ).toBeVisible();
@@ -243,15 +243,15 @@ test("My Day can be toggled from a board card and the task detail", async ({
   ).toBeVisible();
   await page.getByRole("button", { name: "+ Add to Ready" }).click();
   const field = page.getByPlaceholder("Add to Ready and press Enter");
-  await field.fill("Card for today");
+  await field.fill("Card for the day");
   await field.press("Enter");
   const ready = page.getByRole("region", { name: "Ready" });
-  await expect(ready.getByRole("link", { name: "Card for today" })).toBeVisible();
+  await expect(ready.getByRole("link", { name: "Card for the day" })).toBeVisible();
 
-  await ready.getByRole("button", { name: "Add Card for today to My Day" }).click();
+  await ready.getByRole("button", { name: "Add Card for the day to My Day" }).click();
   await expect(ready.getByText("My Day", { exact: true })).toBeVisible();
 
-  await ready.getByRole("link", { name: "Card for today" }).click();
+  await ready.getByRole("link", { name: "Card for the day" }).click();
   const panel = page.getByRole("complementary", { name: /Task details for/ });
   await expect(panel.getByRole("button", { name: "Remove from My Day" })).toBeVisible();
   await panel.getByRole("button", { name: "Remove from My Day" }).click();
