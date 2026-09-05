@@ -8,7 +8,9 @@
  * hand-written SQL, so the shape stays correct as the schema evolves: a task is built by
  * `createTask` and completed by `completeTask`, a project comes from `ProjectService`.
  * The one exception is looking up an existing account by email, which lives in the auth
- * package's own table and has no repository.
+ * package's own table and has no repository. Two maintenance statements are also issued
+ * directly and write no data: `truncate` (via the test harness, behind `--reset`) and
+ * `analyze`, so the planner has current statistics before anything is measured.
  *
  * Deliberately not seeded, because the benchmark does not read them and they would
  * multiply the row count by ten: an activity and outbox row per task. Activity is seeded
