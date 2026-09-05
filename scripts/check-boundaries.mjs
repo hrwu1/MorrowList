@@ -35,6 +35,11 @@ const CASES = [
     expect: "never import Drizzle",
   },
   {
+    fixture: "mcp/application-import.ts.fixture",
+    target: "apps/mcp/src/__boundary_fixture__.ts",
+    expect: "api-client only",
+  },
+  {
     fixture: "web/deep-import.ts.fixture",
     target: "apps/web/__boundary_fixture__.ts",
     expect: "public entry point",

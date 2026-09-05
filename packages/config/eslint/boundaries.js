@@ -132,6 +132,30 @@ export const boundaries = [
     ],
   },
   {
+    // apps/mcp is a transport adapter like the CLI (ADR-005, docs/adr/pending-mcp-server.md):
+    // it speaks the public REST API and nothing else, so an agent is subject to the same
+    // rules as a person.
+    area: "mcp",
+    files: ["apps/mcp/src/**/*.ts"],
+    forbid: [
+      {
+        group: [
+          "@morrowlist/database",
+          "@morrowlist/database/*",
+          "@morrowlist/application",
+          "@morrowlist/application/*",
+          "@morrowlist/api",
+          "@morrowlist/api/*",
+          "drizzle-orm",
+          "drizzle-orm/*",
+          "pg",
+        ],
+        message:
+          "apps/mcp communicates through @morrowlist/api-client only; it must not reach PostgreSQL, the application layer, or the API package directly (spec 16.2).",
+      },
+    ],
+  },
+  {
     area: "ui",
     files: ["packages/ui/src/**/*.ts", "packages/ui/src/**/*.tsx"],
     forbid: [

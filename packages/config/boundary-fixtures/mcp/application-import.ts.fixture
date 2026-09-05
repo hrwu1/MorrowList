@@ -1,0 +1,6 @@
+// INVALID ON PURPOSE. See ../README.md.
+// The MCP server is a transport adapter: it reaches MorrowList through the public REST
+// API, never through the application layer (spec 16.2, docs/adr/pending-mcp-server.md).
+import { TaskService } from "@morrowlist/application";
+
+export const service = TaskService;

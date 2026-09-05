@@ -56,5 +56,17 @@ dependency explicitly and the coordinator pre-approved it.
 
 ## Measured budget
 
-`apps/mcp/src/tools.test.ts` counts the advertised surface on every run. The number as
-landed is recorded there and in the plan file.
+`apps/mcp/src/tools.test.ts` connects a real MCP client over an in-memory transport,
+serialises the actual `tools/list` payload, and measures it. As landed:
+
+    MCP tool surface: 6,150 characters, ~1,758 tokens (budget 2,000)
+
+The estimate charges 3.5 characters per token — the usual four-per-token rule of thumb,
+tightened because JSON schema text is punctuation-heavy. No tokenizer is vendored: that
+would be a second dependency for a number the budget only needs to within a few per cent,
+and erring high is the safe direction.
+
+The largest single saving was not prose. `z.uuid()` emits a 170-character regex into the
+advertised schema, and repeating it once per id field cost about a quarter of the budget
+to tell a model what a uuid looks like. Ids are described instead; the server still
+validates them properly.

@@ -1,0 +1,28 @@
+{
+  "name": "@morrowlist/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "morrow-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "lint": "echo \"linted from repository root\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "@morrowlist/api-client": "workspace:*",
+    "@morrowlist/contracts": "workspace:*",
+    "zod": "4.1.5"
+  },
+  "devDependencies": {
+    "@morrowlist/config": "workspace:*",
+    "tsup": "8.5.0",
+    "typescript": "5.9.2",
+    "vitest": "3.2.4"
+  }
+}
