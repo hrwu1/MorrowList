@@ -11,6 +11,10 @@ import type { ProjectRepository, WorkflowStatusRepository } from "./projects.js"
 import type { SavedViewRepository } from "./saved-views.js";
 import type { TagRepository } from "./tags.js";
 import type { TaskCounterRepository, TaskRepository } from "./tasks.js";
+import type {
+  WebhookDeliveryRepository,
+  WebhookSubscriptionRepository,
+} from "./webhooks.js";
 import type { WorkspaceRepository } from "./workspace.js";
 
 /**
@@ -27,6 +31,8 @@ export interface TransactionContext {
   readonly tags: TagRepository;
   readonly statusIntervals: StatusIntervalRepository;
   readonly savedViews: SavedViewRepository;
+  readonly webhookSubscriptions: WebhookSubscriptionRepository;
+  readonly webhookDeliveries: WebhookDeliveryRepository;
   readonly workspaces: WorkspaceRepository;
   readonly reminders: ReminderRepository;
   readonly notifications: NotificationRepository;

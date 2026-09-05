@@ -83,9 +83,18 @@ export interface OutboxEventInput {
 
 export interface OutboxRepository {
   enqueue(event: OutboxEventInput): Promise<void>;
-  /** Inspection support for the MVP; external delivery is deferred (spec 18.2). */
+  /** Inspection support: one workspace's undelivered events (spec 18.2). */
   listUnpublished(
     workspaceId: string,
     limit?: number,
   ): Promise<readonly OutboxEventInput[]>;
+  /**
+   * The webhook dispatcher's fan-out queue (GAP-18): unpublished events across every
+   * workspace whose `availableAt` has passed, oldest first. Reading rather than claiming
+   * is deliberate — the fan-out itself is idempotent, so two dispatchers reading the same
+   * row is harmless, and a row stays visible until its deliveries are all terminal.
+   */
+  listPending(now: Date, limit: number): Promise<readonly OutboxEventInput[]>;
+  /** Mark events delivered (or not deliverable) so the dispatcher stops looking at them. */
+  markPublished(ids: readonly string[], publishedAt: Date): Promise<void>;
 }

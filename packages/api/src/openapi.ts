@@ -58,12 +58,21 @@ import {
   todayViewQuerySchema,
   todayViewResponseSchema,
   upcomingViewQuerySchema,
+  createWebhookRequestSchema,
+  createdWebhookSubscriptionResponseSchema,
+  listWebhookDeliveriesQuerySchema,
+  paginationQuerySchema,
+  webhookDeliveryListResponseSchema,
+  webhookDeliveryResponseSchema,
+  webhookSubscriptionListResponseSchema,
+  webhookSubscriptionResponseSchema,
   upcomingViewResponseSchema,
   updateSavedViewRequestSchema,
   updateTagRequestSchema,
   updateProjectRequestSchema,
   updateStatusRequestSchema,
   updateTaskRequestSchema,
+  updateWebhookRequestSchema,
   updateWorkspaceRequestSchema,
   workflowStatusListResponseSchema,
   workflowStatusResponseSchema,
@@ -134,6 +143,13 @@ const registry = {
   UpdateNotificationPreferencesRequest: updateNotificationPreferencesRequestSchema,
   PushSubscriptionRequest: pushSubscriptionRequestSchema,
   PushSubscription: pushSubscriptionResponseSchema,
+  Webhook: webhookSubscriptionResponseSchema,
+  CreatedWebhook: createdWebhookSubscriptionResponseSchema,
+  WebhookList: webhookSubscriptionListResponseSchema,
+  CreateWebhookRequest: createWebhookRequestSchema,
+  UpdateWebhookRequest: updateWebhookRequestSchema,
+  WebhookDelivery: webhookDeliveryResponseSchema,
+  WebhookDeliveryList: webhookDeliveryListResponseSchema,
   ErrorResponse: errorResponseSchema,
   WorkspaceExport: workspaceExportSchema,
   ImportRequest: importRequestSchema,
@@ -471,6 +487,115 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
               ...jsonContent(ref("Notification")),
             },
             "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/webhooks": {
+        get: {
+          summary: "List the workspace's webhook endpoints",
+          description:
+            "Secrets are never returned here; only the prefix of each, so two endpoints can be told apart.",
+          parameters: [workspaceIdParam, ...queryParameters(paginationQuerySchema)],
+          responses: {
+            "200": {
+              description: "A page of endpoints",
+              ...jsonContent(ref("WebhookList")),
+            },
+            ...commonErrors,
+          },
+        },
+        post: {
+          summary: "Subscribe an endpoint to workspace events",
+          description:
+            "Returns the signing secret exactly once. The server stores only its SHA-256 digest and signs deliveries with that digest, so the secret cannot be recovered later. eventTypes accepts exact types, prefixes such as task.*, or * for everything.",
+          parameters: [workspaceIdParam],
+          requestBody: { required: true, ...jsonContent(ref("CreateWebhookRequest")) },
+          responses: {
+            "201": {
+              description: "The endpoint, with its secret",
+              ...jsonContent(ref("CreatedWebhook")),
+            },
+            ...commonErrors,
+          },
+        },
+      },
+      "/webhooks/{id}": {
+        patch: {
+          summary: "Change an endpoint's URL, event types, description, or active flag",
+          parameters: [taskIdParam, workspaceIdParam],
+          requestBody: { required: true, ...jsonContent(ref("UpdateWebhookRequest")) },
+          responses: {
+            "200": { description: "The endpoint", ...jsonContent(ref("Webhook")) },
+            ...notFound,
+            ...commonErrors,
+          },
+        },
+        delete: {
+          summary: "Remove an endpoint and its delivery log",
+          parameters: [taskIdParam, workspaceIdParam],
+          responses: {
+            "204": { description: "Removed" },
+            ...notFound,
+            ...commonErrors,
+          },
+        },
+      },
+      "/webhooks/{id}/test": {
+        post: {
+          summary: "Send one test delivery now",
+          description:
+            "Sent synchronously and never retried. A refused delivery is reported as a recorded failure with the endpoint's status code, not as a request error.",
+          parameters: [taskIdParam, workspaceIdParam],
+          responses: {
+            "200": {
+              description: "What happened",
+              ...jsonContent(ref("WebhookDelivery")),
+            },
+            ...notFound,
+            ...commonErrors,
+          },
+        },
+      },
+      "/webhooks/{id}/deliveries": {
+        get: {
+          summary: "The endpoint's delivery log, newest first",
+          parameters: [
+            taskIdParam,
+            workspaceIdParam,
+            ...queryParameters(listWebhookDeliveriesQuerySchema),
+          ],
+          responses: {
+            "200": {
+              description: "A page of deliveries",
+              ...jsonContent(ref("WebhookDeliveryList")),
+            },
+            ...notFound,
+            ...commonErrors,
+          },
+        },
+      },
+      "/webhooks/{id}/deliveries/{deliveryId}/retry": {
+        post: {
+          summary: "Re-arm a dead-lettered delivery",
+          description:
+            "Queues the delivery again with a fresh budget of four attempts. A test delivery cannot be retried; send a new test instead.",
+          parameters: [
+            taskIdParam,
+            {
+              name: "deliveryId",
+              in: "path",
+              required: true,
+              schema: { type: "string", format: "uuid" },
+            },
+            workspaceIdParam,
+          ],
+          responses: {
+            "200": {
+              description: "The re-armed delivery",
+              ...jsonContent(ref("WebhookDelivery")),
+            },
+            ...notFound,
             ...commonErrors,
           },
         },

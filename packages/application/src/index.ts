@@ -21,4 +21,5 @@ export * from "./search/index.js";
 export * from "./tags/index.js";
 export * from "./tasks/index.js";
 export * from "./views/index.js";
+export * from "./webhooks/index.js";
 export * from "./workspace/index.js";

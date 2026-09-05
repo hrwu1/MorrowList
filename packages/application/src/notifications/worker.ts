@@ -1,12 +1,18 @@
 import type { Logger } from "@morrowlist/observability";
 
+import type { WebhookDispatcher } from "../webhooks/dispatcher.js";
+
 import type { NotificationService } from "./service.js";
 
 /**
- * The reminder worker (GAP-13): a polling loop, not a queue. Every tick delivers the
- * reminders that have come due and any digests whose time has passed. It is a plain
+ * The background worker (GAP-13, extended by GAP-18): a polling loop, not a queue. Every
+ * tick delivers the reminders that have come due, any digests whose time has passed, and
+ * — when a dispatcher is supplied — the webhook deliveries that are due. It is a plain
  * function so the web process can embed it and `scripts/worker.mjs` can run it alone;
  * several instances may run at once because every claim is transactional.
+ *
+ * There is deliberately one loop rather than one per job: the work is all short, database
+ * claims already prevent overlap, and a second timer would double the idle polling cost.
  */
 
 export interface NotificationWorkerOptions {
@@ -14,11 +20,20 @@ export interface NotificationWorkerOptions {
   readonly logger: Logger;
   readonly pollIntervalMs: number;
   readonly now?: () => Date;
+  /** Webhook delivery (GAP-18). Omitted, the tick does reminders and digests only. */
+  readonly webhookDispatcher?: WebhookDispatcher | undefined;
+}
+
+export interface WorkerTickResult {
+  readonly reminders: number;
+  readonly digests: number;
+  /** Delivery attempts that succeeded on this tick. */
+  readonly webhooks: number;
 }
 
 export interface NotificationWorker {
   /** Run one tick now, independently of the timer. Concurrent ticks are serialised. */
-  tick(): Promise<{ reminders: number; digests: number }>;
+  tick(): Promise<WorkerTickResult>;
   /** Stop the timer and wait for an in-flight tick to finish. */
   stop(): Promise<void>;
 }
@@ -30,16 +45,24 @@ export function startNotificationWorker(
   const now = options.now ?? (() => new Date());
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let inFlight: Promise<{ reminders: number; digests: number }> | null = null;
+  let inFlight: Promise<WorkerTickResult> | null = null;
 
-  async function runTick() {
+  async function runTick(): Promise<WorkerTickResult> {
     const at = now();
-    const result = { reminders: 0, digests: 0 };
+    const result = { reminders: 0, digests: 0, webhooks: 0 };
     try {
       result.reminders = await service.deliverDue(at);
       result.digests = await service.digest(at);
       if (result.reminders > 0 || result.digests > 0) {
-        logger.info("notifications delivered", result);
+        logger.info("notifications delivered", {
+          reminders: result.reminders,
+          digests: result.digests,
+        });
+      }
+      // Webhook delivery is separate work on the same tick: a failing endpoint must not
+      // hold up a reminder, and a failing reminder must not stop a delivery.
+      if (options.webhookDispatcher) {
+        result.webhooks = (await options.webhookDispatcher.tick(at)).delivered;
       }
     } catch (error) {
       // One bad tick must not stop the loop; the next tick claims what is still pending.

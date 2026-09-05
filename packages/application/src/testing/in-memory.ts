@@ -49,6 +49,10 @@ import type {
   WorkflowStatusRepository,
   Workspace,
   WorkspaceMembership,
+  WebhookDelivery,
+  WebhookDeliveryRepository,
+  WebhookSubscription,
+  WebhookSubscriptionRepository,
   WorkspaceRepository,
   WorkspaceRole,
 } from "../ports/index.js";
@@ -85,6 +89,10 @@ export interface InMemoryData {
   pushSubscriptions: Map<string, PushSubscription>;
   activity: ActivityEvent[];
   outbox: OutboxEventInput[];
+  /** Outbox ids the dispatcher has finished with. */
+  published: Map<string, Date>;
+  webhookSubscriptions: Map<string, WebhookSubscription>;
+  webhookDeliveries: Map<string, WebhookDelivery>;
 }
 
 /** A stored interval: the input plus the moment it was left. */
@@ -110,6 +118,9 @@ export function emptyData(): InMemoryData {
     pushSubscriptions: new Map(),
     activity: [],
     outbox: [],
+    published: new Map(),
+    webhookSubscriptions: new Map(),
+    webhookDeliveries: new Map(),
   };
 }
 
@@ -1077,8 +1088,195 @@ function outboxRepository(data: InMemoryData): OutboxRepository {
     },
     async listUnpublished(workspaceId, limit = 100) {
       return data.outbox
-        .filter((event) => event.workspaceId === workspaceId)
+        .filter(
+          (event) =>
+            event.workspaceId === workspaceId && !data.published.has(event.id),
+        )
         .slice(0, limit);
+    },
+    async listPending(now, limit) {
+      return data.outbox
+        .filter(
+          (event) =>
+            !data.published.has(event.id) && event.availableAt.getTime() <= now.getTime(),
+        )
+        .sort((left, right) => {
+          const byTime = left.availableAt.getTime() - right.availableAt.getTime();
+          return byTime !== 0 ? byTime : left.id < right.id ? -1 : 1;
+        })
+        .slice(0, limit);
+    },
+    async markPublished(ids, publishedAt) {
+      for (const id of ids) data.published.set(id, publishedAt);
+    },
+  };
+}
+
+function webhookSubscriptionRepository(
+  data: InMemoryData,
+): WebhookSubscriptionRepository {
+  const inWorkspace = (workspaceId: string) =>
+    [...data.webhookSubscriptions.values()]
+      .filter((subscription) => subscription.workspaceId === workspaceId)
+      .sort((left, right) => (left.id < right.id ? -1 : 1));
+
+  return {
+    async insert(subscription) {
+      data.webhookSubscriptions.set(subscription.id, subscription);
+    },
+    async update(subscription) {
+      data.webhookSubscriptions.set(subscription.id, subscription);
+    },
+    async findById(workspaceId, id) {
+      const found = data.webhookSubscriptions.get(id);
+      return found && found.workspaceId === workspaceId ? found : null;
+    },
+    async list(workspaceId, cursor) {
+      let items = inWorkspace(workspaceId);
+      if (cursor.after) {
+        const index = items.findIndex((item) => item.id === cursor.after);
+        if (index >= 0) items = items.slice(index + 1);
+      }
+      return {
+        items: items.slice(0, cursor.limit),
+        hasMore: items.length > cursor.limit,
+        nextCursor: null,
+      };
+    },
+    async delete(workspaceId, id) {
+      const found = data.webhookSubscriptions.get(id);
+      if (!found || found.workspaceId !== workspaceId) return false;
+      data.webhookSubscriptions.delete(id);
+      for (const [key, delivery] of data.webhookDeliveries) {
+        if (delivery.subscriptionId === id) data.webhookDeliveries.delete(key);
+      }
+      return true;
+    },
+    async listActive(workspaceId) {
+      return inWorkspace(workspaceId).filter((subscription) => subscription.active);
+    },
+  };
+}
+
+function webhookDeliveryRepository(data: InMemoryData): WebhookDeliveryRepository {
+  return {
+    async insert(delivery) {
+      data.webhookDeliveries.set(delivery.id, delivery);
+    },
+    async enqueueIfAbsent(delivery) {
+      const exists = [...data.webhookDeliveries.values()].some(
+        (candidate) =>
+          candidate.subscriptionId === delivery.subscriptionId &&
+          candidate.outboxEventId !== null &&
+          candidate.outboxEventId === delivery.outboxEventId,
+      );
+      if (exists) return false;
+      data.webhookDeliveries.set(delivery.id, delivery);
+      return true;
+    },
+    async claimDue(now, limit) {
+      const due = [...data.webhookDeliveries.values()]
+        .filter(
+          (delivery) =>
+            delivery.status === "pending" &&
+            delivery.nextAttemptAt !== null &&
+            delivery.nextAttemptAt.getTime() <= now.getTime(),
+        )
+        .sort((left, right) => {
+          const byTime =
+            (left.nextAttemptAt?.getTime() ?? 0) - (right.nextAttemptAt?.getTime() ?? 0);
+          return byTime !== 0 ? byTime : left.id < right.id ? -1 : 1;
+        })
+        .slice(0, limit);
+
+      return due.map((delivery) => {
+        // Claiming takes the attempt and clears the schedule, exactly as the SQL does.
+        const claimed: WebhookDelivery = {
+          ...delivery,
+          attempt: delivery.attempt + 1,
+          nextAttemptAt: null,
+          updatedAt: now,
+        };
+        data.webhookDeliveries.set(claimed.id, claimed);
+        const subscription = data.webhookSubscriptions.get(claimed.subscriptionId);
+        const event = data.outbox.find(
+          (candidate) => candidate.id === claimed.outboxEventId,
+        );
+        return {
+          delivery: claimed,
+          url: subscription?.url ?? "",
+          secretHash: subscription?.secretHash ?? "",
+          event: event
+            ? {
+                id: event.id,
+                schemaVersion: event.schemaVersion,
+                eventType: event.eventType,
+                aggregateType: event.aggregateType,
+                aggregateId: event.aggregateId,
+                workspaceId: event.workspaceId,
+                actor: event.actor,
+                payload: event.payload,
+                correlationId: event.correlationId,
+                occurredAt: event.occurredAt,
+              }
+            : null,
+        };
+      });
+    },
+    async recordOutcome(outcome) {
+      const current = data.webhookDeliveries.get(outcome.id);
+      if (!current) return;
+      data.webhookDeliveries.set(outcome.id, {
+        ...current,
+        status: outcome.status,
+        responseCode: outcome.responseCode,
+        error: outcome.error,
+        nextAttemptAt: outcome.nextAttemptAt,
+        deliveredAt: outcome.deliveredAt,
+        // Only a manual retry restarts the budget, matching the SQL repository.
+        attempt: outcome.resetAttempts ? 0 : current.attempt,
+        updatedAt: outcome.updatedAt,
+      });
+    },
+    async findById(workspaceId, id) {
+      const found = data.webhookDeliveries.get(id);
+      return found && found.workspaceId === workspaceId ? found : null;
+    },
+    async listForSubscription(workspaceId, subscriptionId, cursor) {
+      let items = [...data.webhookDeliveries.values()]
+        .filter(
+          (delivery) =>
+            delivery.workspaceId === workspaceId &&
+            delivery.subscriptionId === subscriptionId,
+        )
+        .sort((left, right) => {
+          const byTime = right.createdAt.getTime() - left.createdAt.getTime();
+          return byTime !== 0 ? byTime : left.id < right.id ? 1 : -1;
+        });
+      if (cursor.after) {
+        const index = items.findIndex((item) => item.id === cursor.after);
+        if (index >= 0) items = items.slice(index + 1);
+      }
+      return {
+        items: items.slice(0, cursor.limit),
+        hasMore: items.length > cursor.limit,
+        nextCursor: null,
+      };
+    },
+    async outstandingEventIds(eventIds) {
+      const wanted = new Set(eventIds);
+      return [
+        ...new Set(
+          [...data.webhookDeliveries.values()]
+            .filter(
+              (delivery) =>
+                delivery.status === "pending" &&
+                delivery.outboxEventId !== null &&
+                wanted.has(delivery.outboxEventId),
+            )
+            .map((delivery) => delivery.outboxEventId as string),
+        ),
+      ];
     },
   };
 }
@@ -1119,6 +1317,9 @@ export function createInMemoryUnitOfWork(
     pushSubscriptions: new Map(source.pushSubscriptions),
     activity: [...source.activity],
     outbox: [...source.outbox],
+    published: new Map(source.published),
+    webhookSubscriptions: new Map(source.webhookSubscriptions),
+    webhookDeliveries: new Map(source.webhookDeliveries),
   });
 
   const restore = (target: InMemoryData, source: InMemoryData): void => {
@@ -1140,6 +1341,9 @@ export function createInMemoryUnitOfWork(
     target.pushSubscriptions = source.pushSubscriptions;
     target.activity = source.activity;
     target.outbox = source.outbox;
+    target.published = source.published;
+    target.webhookSubscriptions = source.webhookSubscriptions;
+    target.webhookDeliveries = source.webhookDeliveries;
   };
 
   return {
@@ -1166,6 +1370,8 @@ export function createInMemoryUnitOfWork(
         notifications: notificationRepository(working),
         notificationPreferences: notificationPreferenceRepository(working),
         pushSubscriptions: pushSubscriptionRepository(working),
+        webhookSubscriptions: webhookSubscriptionRepository(working),
+        webhookDeliveries: webhookDeliveryRepository(working),
         activity: activityRepository(working),
         outbox: outboxRepository(working),
       };

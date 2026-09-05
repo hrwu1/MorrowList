@@ -13,10 +13,13 @@ import {
   TagService,
   TaskService,
   ViewService,
+  WebhookDispatcher,
+  WebhookService,
   WorkflowService,
   WorkspaceService,
   bootstrapUser,
   createConsoleEmailSender,
+  createFetchWebhookSender,
   startNotificationWorker,
   type NotificationWorker,
 } from "@morrowlist/application";
@@ -110,6 +113,19 @@ export function getContainer(): Container {
     appUrl: env.APP_URL,
     logger,
   });
+  // One sender for the synchronous test delivery and the dispatcher alike (GAP-18).
+  const webhookSender = createFetchWebhookSender();
+  const webhookService = new WebhookService({
+    unitOfWork,
+    sender: webhookSender,
+    cursorSecret,
+  });
+  const webhookDispatcher = new WebhookDispatcher({
+    unitOfWork,
+    sender: webhookSender,
+    logger: logger.child({ component: "webhook-dispatcher" }),
+  });
+
   const dependencies: ApiDependencies = {
     auth,
     unitOfWork,
@@ -126,18 +142,20 @@ export function getContainer(): Container {
     searchService: new SearchService({ unitOfWork, cursorSecret }),
     savedViewService: new SavedViewService({ unitOfWork }),
     notificationService,
+    webhookService,
     logger,
     checkHealth: () => checkDatabaseHealth(database),
   };
 
-  // One-container deploys run the reminder worker inside the web process; `external`
-  // leaves it to `pnpm worker` (scripts/worker.mjs).
+  // One-container deploys run the background worker — reminders, digests, and webhook
+  // delivery — inside the web process; `external` leaves it to `pnpm worker`.
   const worker =
     env.WORKER_MODE === "embedded"
       ? startNotificationWorker({
           service: notificationService,
           logger: logger.child({ component: "notification-worker" }),
           pollIntervalMs: env.WORKER_POLL_SECONDS * 1000,
+          webhookDispatcher,
         })
       : null;
 

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
- * The reminder worker as its own process (GAP-13): `pnpm worker`, for deployments that
- * set `WORKER_MODE=external` on the web app. Same loop as the embedded one; several
- * copies may run because every claim is transactional. Requires `pnpm build` first.
+ * The background worker as its own process (GAP-13, GAP-18): `pnpm worker`, for
+ * deployments that set `WORKER_MODE=external` on the web app. Same loop as the embedded
+ * one — reminders, digests, and webhook delivery on every tick — and several copies may
+ * run because every claim is transactional. Requires `pnpm build` first.
  */
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
@@ -38,18 +39,26 @@ const handle = database.createDatabase({
   max: 2,
   applicationName: "morrowlist-worker",
 });
+const unitOfWork = database.createUnitOfWork(handle);
 const service = new application.NotificationService({
-  unitOfWork: database.createUnitOfWork(handle),
+  unitOfWork,
   cursorSecret: env.AUTH_SECRET ?? "development-only-cursor-secret",
   emailSender: application.createConsoleEmailSender(logger),
   userDirectory: auth.createUserDirectory(handle.db),
   appUrl: env.APP_URL,
   logger,
 });
+// Webhook delivery rides the same tick rather than opening a second loop (GAP-18).
+const webhookDispatcher = new application.WebhookDispatcher({
+  unitOfWork,
+  sender: application.createFetchWebhookSender(),
+  logger,
+});
 const worker = application.startNotificationWorker({
   service,
   logger,
   pollIntervalMs: env.WORKER_POLL_SECONDS * 1000,
+  webhookDispatcher,
 });
 
 // Keep the process alive between ticks; the worker's own timer is unref'd on purpose.

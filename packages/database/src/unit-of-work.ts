@@ -23,6 +23,10 @@ import {
   createTaskCounterRepository,
   createTaskRepository,
 } from "./repositories/tasks.js";
+import {
+  createWebhookDeliveryRepository,
+  createWebhookSubscriptionRepository,
+} from "./repositories/webhooks.js";
 import { createWorkspaceRepository } from "./repositories/workspaces.js";
 
 /**
@@ -42,6 +46,8 @@ export function buildTransactionContext(db: Database): TransactionContext {
     tags: createTagRepository(db),
     statusIntervals: createStatusIntervalRepository(db),
     savedViews: createSavedViewRepository(db),
+    webhookSubscriptions: createWebhookSubscriptionRepository(db),
+    webhookDeliveries: createWebhookDeliveryRepository(db),
     workspaces: createWorkspaceRepository(db),
     reminders: createReminderRepository(db),
     notifications: createNotificationRepository(db),

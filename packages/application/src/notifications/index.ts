@@ -20,4 +20,5 @@ export {
   startNotificationWorker,
   type NotificationWorker,
   type NotificationWorkerOptions,
+  type WorkerTickResult,
 } from "./worker.js";

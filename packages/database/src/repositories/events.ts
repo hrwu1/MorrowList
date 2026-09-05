@@ -5,7 +5,7 @@ import type {
   OutboxRepository,
   Page,
 } from "@morrowlist/application";
-import { and, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 
 import type { Database } from "../client.js";
 import { activityEvents, outboxEvents, tasks } from "../schema/index.js";
@@ -153,20 +153,48 @@ export function createOutboxRepository(db: Database): OutboxRepository {
         .orderBy(outboxEvents.availableAt, outboxEvents.id)
         .limit(limit);
 
-      return rows.map((row) => ({
-        id: row.id,
-        workspaceId: row.workspaceId,
-        schemaVersion: row.schemaVersion,
-        eventType: row.eventType,
-        aggregateType: row.aggregateType,
-        aggregateId: row.aggregateId,
-        actor: row.actor as { kind: never; id: string },
-        payload: row.payload as Record<string, unknown>,
-        correlationId: row.correlationId,
-        causationId: row.causationId ?? undefined,
-        occurredAt: row.occurredAt,
-        availableAt: row.availableAt,
-      }));
+      return rows.map(toOutboxEvent);
     },
+
+    async listPending(now, limit) {
+      // Ordered by the partial index on unpublished rows, so the scan stays proportional
+      // to the backlog rather than to the history.
+      const rows = await db
+        .select()
+        .from(outboxEvents)
+        .where(
+          and(isNull(outboxEvents.publishedAt), lte(outboxEvents.availableAt, now)),
+        )
+        .orderBy(outboxEvents.availableAt, outboxEvents.id)
+        .limit(limit);
+      return rows.map(toOutboxEvent);
+    },
+
+    async markPublished(ids, publishedAt) {
+      if (ids.length === 0) return;
+      await db
+        .update(outboxEvents)
+        .set({ publishedAt })
+        .where(inArray(outboxEvents.id, [...ids]));
+    },
+  };
+}
+
+type OutboxRow = typeof outboxEvents.$inferSelect;
+
+function toOutboxEvent(row: OutboxRow) {
+  return {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    schemaVersion: row.schemaVersion,
+    eventType: row.eventType,
+    aggregateType: row.aggregateType,
+    aggregateId: row.aggregateId,
+    actor: row.actor as { kind: never; id: string },
+    payload: row.payload as Record<string, unknown>,
+    correlationId: row.correlationId,
+    causationId: row.causationId ?? undefined,
+    occurredAt: row.occurredAt,
+    availableAt: row.availableAt,
   };
 }

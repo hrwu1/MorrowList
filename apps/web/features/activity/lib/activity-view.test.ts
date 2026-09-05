@@ -101,6 +101,18 @@ const CATALOGUE: Record<string, Partial<ActivityEntryDto>> = {
     aggregateType: "workspace",
     summary: "Imported 24 tasks from Trello into Website Relaunch",
   },
+  [WORKSPACE_EVENTS.webhookCreated]: {
+    aggregateType: "workspace",
+    summary: "Added webhook endpoint https://hooks.example/morrow",
+  },
+  [WORKSPACE_EVENTS.webhookUpdated]: {
+    aggregateType: "workspace",
+    summary: "Updated webhook endpoint https://hooks.example/morrow",
+  },
+  [WORKSPACE_EVENTS.webhookDeleted]: {
+    aggregateType: "workspace",
+    summary: "Removed webhook endpoint https://hooks.example/morrow",
+  },
 };
 
 describe("describeEntry", () => {

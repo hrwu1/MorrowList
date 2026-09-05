@@ -67,7 +67,15 @@ import type {
   UpdateProjectRequest,
   UpdateStatusRequest,
   UpdateTaskRequest,
+  UpdateWebhookRequest,
   UpdateWorkspaceRequest,
+  CreateWebhookRequest,
+  CreatedWebhookSubscriptionDto,
+  ListWebhookDeliveriesQuery,
+  WebhookDeliveryDto,
+  WebhookDeliveryListResponse,
+  WebhookSubscriptionDto,
+  WebhookSubscriptionListResponse,
   WorkflowStatusDto,
   WorkflowStatusListResponse,
   WorkflowStatusResponse,
@@ -896,6 +904,96 @@ export class ApiClient {
       undefined,
       options,
     );
+  }
+
+  /** Webhook endpoints (GAP-18). The secret comes back from `createWebhook` only. */
+  async listWebhooks(
+    query: { limit?: number; cursor?: string } = {},
+    options: RequestOptions = {},
+  ): Promise<WebhookSubscriptionListResponse> {
+    return this.send<WebhookSubscriptionListResponse>(
+      "GET",
+      `/webhooks${this.queryString(query, options)}`,
+      undefined,
+      options,
+    );
+  }
+
+  async createWebhook(
+    body: CreateWebhookRequest,
+    options: RequestOptions = {},
+  ): Promise<CreatedWebhookSubscriptionDto> {
+    const response = await this.send<{ data: CreatedWebhookSubscriptionDto }>(
+      "POST",
+      `/webhooks${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async updateWebhook(
+    id: string,
+    body: UpdateWebhookRequest,
+    options: RequestOptions = {},
+  ): Promise<WebhookSubscriptionDto> {
+    const response = await this.send<{ data: WebhookSubscriptionDto }>(
+      "PATCH",
+      `/webhooks/${encodeURIComponent(id)}${this.queryString({}, options)}`,
+      body,
+      options,
+    );
+    return response.data;
+  }
+
+  async deleteWebhook(id: string, options: RequestOptions = {}): Promise<void> {
+    await this.send<void>(
+      "DELETE",
+      `/webhooks/${encodeURIComponent(id)}${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+  }
+
+  /** Sends one delivery now. A refused delivery is a recorded failure, not an error. */
+  async testWebhook(
+    id: string,
+    options: RequestOptions = {},
+  ): Promise<WebhookDeliveryDto> {
+    const response = await this.send<{ data: WebhookDeliveryDto }>(
+      "POST",
+      `/webhooks/${encodeURIComponent(id)}/test${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+    return response.data;
+  }
+
+  async listWebhookDeliveries(
+    id: string,
+    query: Partial<ListWebhookDeliveriesQuery> = {},
+    options: RequestOptions = {},
+  ): Promise<WebhookDeliveryListResponse> {
+    return this.send<WebhookDeliveryListResponse>(
+      "GET",
+      `/webhooks/${encodeURIComponent(id)}/deliveries${this.queryString(query, options)}`,
+      undefined,
+      options,
+    );
+  }
+
+  async retryWebhookDelivery(
+    id: string,
+    deliveryId: string,
+    options: RequestOptions = {},
+  ): Promise<WebhookDeliveryDto> {
+    const response = await this.send<{ data: WebhookDeliveryDto }>(
+      "POST",
+      `/webhooks/${encodeURIComponent(id)}/deliveries/${encodeURIComponent(deliveryId)}/retry${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+    return response.data;
   }
 
   /**

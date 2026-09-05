@@ -10,9 +10,12 @@ import {
   TagService,
   TaskService,
   ViewService,
+  WebhookService,
   WorkflowService,
   WorkspaceService,
   bootstrapUser,
+  type WebhookRequest,
+  type WebhookSender,
 } from "@morrowlist/application";
 import type { AuthPort, AuthenticatedUser } from "@morrowlist/auth";
 import { fixedClock, uuidv7 } from "@morrowlist/domain";
@@ -40,6 +43,8 @@ let app: ReturnType<typeof createApiApp>;
 let deps: ApiDependencies;
 let currentUser: AuthenticatedUser | null;
 let healthy: boolean;
+/** A receiver that always accepts, so webhook routes can be exercised without a server. */
+let webhookSender: WebhookSender & { sent: WebhookRequest[] };
 
 function request(path: string, init?: RequestInit) {
   return app.request(`http://localhost${path}`, init);
@@ -70,6 +75,13 @@ beforeEach(async () => {
   );
   currentUser = { id: userId, email: "alex@example.com", name: "Alex" };
 
+  webhookSender = {
+    sent: [],
+    async send(request) {
+      webhookSender.sent.push(request);
+      return { status: 200, error: null };
+    },
+  };
   const auth: AuthPort = {
     resolveUser: async () => currentUser,
     handleRequest: async () => new Response("not used", { status: 404 }),
@@ -105,6 +117,12 @@ beforeEach(async () => {
       emailSender: createRecordingEmailSender(),
       userDirectory: { findById: async () => currentUser },
       appUrl: "http://localhost:3200",
+    }),
+    webhookService: new WebhookService({
+      unitOfWork,
+      clock: fixedClock(NOW),
+      cursorSecret: "test-secret",
+      sender: webhookSender,
     }),
     logger: silentLogger,
     checkHealth: async () =>
@@ -1646,6 +1664,96 @@ describe("notifications", () => {
     expect(
       (await request("/api/v1/me/push-subscriptions", { method: "DELETE" })).status,
     ).toBe(422);
+  });
+});
+
+describe("webhook routes", () => {
+  async function createEndpoint(url = "https://receiver.example/hook") {
+    const response = await jsonRequest("/api/v1/webhooks", "POST", {
+      url,
+      eventTypes: ["task.*"],
+    });
+    expect(response.status).toBe(201);
+    return (await response.json()).data;
+  }
+
+  it("returns the secret on create and never again", async () => {
+    const created = await createEndpoint();
+    expect(created.secret.startsWith("whsec_")).toBe(true);
+
+    const listed = await request("/api/v1/webhooks");
+    expect(listed.status).toBe(200);
+    const body = await listed.text();
+    expect(body).toContain(created.secretPrefix);
+    expect(body).not.toContain(created.secret.slice(14));
+  });
+
+  it("validates the URL and the event types", async () => {
+    const badUrl = await jsonRequest("/api/v1/webhooks", "POST", {
+      url: "not a url",
+    });
+    expect(badUrl.status).toBe(422);
+
+    const badType = await jsonRequest("/api/v1/webhooks", "POST", {
+      url: "https://receiver.example/hook",
+      eventTypes: ["Task Created"],
+    });
+    expect(badType.status).toBe(422);
+  });
+
+  it("updates, tests, logs and deletes an endpoint", async () => {
+    const created = await createEndpoint();
+
+    const patched = await jsonRequest(`/api/v1/webhooks/${created.id}`, "PATCH", {
+      active: false,
+      description: "Staging receiver",
+    });
+    expect(patched.status).toBe(200);
+    expect((await patched.json()).data).toMatchObject({
+      active: false,
+      description: "Staging receiver",
+    });
+
+    const tested = await jsonRequest(`/api/v1/webhooks/${created.id}/test`, "POST");
+    expect(tested.status).toBe(200);
+    expect((await tested.json()).data).toMatchObject({
+      eventType: "webhook.test",
+      status: "delivered",
+      responseCode: 200,
+    });
+    expect(webhookSender.sent).toHaveLength(1);
+
+    const log = await request(`/api/v1/webhooks/${created.id}/deliveries`);
+    expect(log.status).toBe(200);
+    expect((await log.json()).data).toHaveLength(1);
+
+    const removed = await request(`/api/v1/webhooks/${created.id}`, {
+      method: "DELETE",
+    });
+    expect(removed.status).toBe(204);
+    expect(
+      (await request(`/api/v1/webhooks/${created.id}/deliveries`)).status,
+    ).toBe(404);
+  });
+
+  it("reports an unknown endpoint and an unknown delivery as 404", async () => {
+    const missing = uuidv7();
+    expect((await jsonRequest(`/api/v1/webhooks/${missing}/test`, "POST")).status).toBe(
+      404,
+    );
+
+    const created = await createEndpoint();
+    const retry = await jsonRequest(
+      `/api/v1/webhooks/${created.id}/deliveries/${missing}/retry`,
+      "POST",
+    );
+    expect(retry.status).toBe(404);
+    expect((await retry.json()).error.code).toBe("WEBHOOK_DELIVERY_NOT_FOUND");
+  });
+
+  it("requires authentication like every other resource route", async () => {
+    currentUser = null;
+    expect((await request("/api/v1/webhooks")).status).toBe(401);
   });
 });
 

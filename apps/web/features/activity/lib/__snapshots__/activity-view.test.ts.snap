@@ -32,5 +32,8 @@ exports[`describeEntry > renders a readable line for every event type in the cat
   "workspace.imported": "Imported 24 tasks from Trello into Website Relaunch",
   "workspace.notification_preferences_updated": "Updated notification preferences",
   "workspace.updated": "Updated workspace Alex's Workspace",
+  "workspace.webhook_created": "Added webhook endpoint https://hooks.example/morrow",
+  "workspace.webhook_deleted": "Removed webhook endpoint https://hooks.example/morrow",
+  "workspace.webhook_updated": "Updated webhook endpoint https://hooks.example/morrow",
 }
 `;

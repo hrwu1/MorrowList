@@ -12,6 +12,7 @@ import type {
   TaskService,
   UnitOfWork,
   ViewService,
+  WebhookService,
   WorkflowService,
   WorkspaceService,
 } from "@morrowlist/application";
@@ -38,6 +39,7 @@ export interface ApiDependencies {
   readonly searchService: SearchService;
   readonly savedViewService: SavedViewService;
   readonly notificationService: NotificationService;
+  readonly webhookService: WebhookService;
   readonly logger: Logger;
   readonly metrics?: Metrics;
   /** Readiness probe backing `GET /ready` (spec FND-006). */

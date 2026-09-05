@@ -113,6 +113,15 @@ export const WORKSPACE_EVENTS = {
    * `{ workspaceId, source, projectId, projectName, counts }`.
    */
   imported: "workspace.imported",
+  /**
+   * Webhook subscriptions (GAP-18). Recorded on the workspace because a subscription is
+   * workspace configuration, not an aggregate of its own. Payload:
+   * `{ subscriptionId, url, eventTypes }`; updated adds `changes`. The secret never
+   * appears in a payload, an activity summary, or a log line.
+   */
+  webhookCreated: "workspace.webhook_created",
+  webhookUpdated: "workspace.webhook_updated",
+  webhookDeleted: "workspace.webhook_deleted",
 } as const;
 
 export const PROJECT_EVENTS = {
