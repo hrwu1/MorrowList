@@ -1,4 +1,4 @@
-# ADR-0XX — Ten typed custom fields, and no more
+# ADR-019: Ten typed custom fields, and no more
 
 **Status:** Proposed
 

@@ -24,6 +24,7 @@ it costs, so a future change is a deliberate reversal rather than an accident.
 | [ADR-016](016-natural-language-capture.md)           | Natural-language capture           | Accepted |
 | [ADR-017](017-swimlanes-and-cross-project-boards.md) | Swimlanes and cross-project boards | Accepted |
 | [ADR-018](018-mcp-server.md)                         | MCP server over the REST API       | Accepted |
+| [ADR-019](019-typed-fields.md)                       | Ten typed custom fields, no more   | Accepted |
 
 ## Adding a record
 
