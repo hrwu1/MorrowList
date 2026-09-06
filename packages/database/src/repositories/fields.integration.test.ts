@@ -165,11 +165,15 @@ describe("field definitions in PostgreSQL", () => {
     }>(
       "select event_type, payload from activity_events where aggregate_type = 'field'",
     );
-    expect(events.at(-1)).toMatchObject({
-      event_type: "field.deleted",
-      // Both the live and the trashed task lost the key: a restore must not bring it back.
-      payload: { taskCount: 2 },
-    });
+    // Picked by type rather than by row order: the select is unordered, and the fixed
+    // clock gives every event in this test the same `created_at` to sort on.
+    expect(events.filter((event) => event.event_type === "field.deleted")).toMatchObject([
+      {
+        event_type: "field.deleted",
+        // Both the live and the trashed task lost the key: a restore must not bring it back.
+        payload: { taskCount: 2 },
+      },
+    ]);
   });
 
   it("rolls the definition, the cleared values and both event rows back together", async () => {
