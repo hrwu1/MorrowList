@@ -18,7 +18,6 @@ import {
   blockedWarning,
   openSubtasksWarning,
 } from "@/features/tasks/components/task-row";
-import { useUndo } from "@/features/tasks/hooks/use-undo";
 import {
   taskKeys,
   useAddToDay,
@@ -29,6 +28,7 @@ import {
   useTaskAction,
   useUpdateTask,
 } from "@/features/tasks/hooks/use-tasks";
+import { useUndo } from "@/features/tasks/hooks/use-undo";
 import { hasOpenSubtasks } from "@/features/tasks/lib/task-projections";
 import { todayKeys } from "@/features/today/hooks/use-today";
 import { localToday } from "@/features/today/lib/today-view";
