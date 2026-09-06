@@ -2828,6 +2828,22 @@
                         }
                       ]
                     },
+                    "fields": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      }
+                    },
                     "parentTaskId": {
                       "anyOf": [
                         {
@@ -3365,6 +3381,7 @@
                     "deadlineTime",
                     "dateWarnings",
                     "reminderOffsetMinutes",
+                    "fields",
                     "parentTaskId",
                     "recurrence",
                     "seriesId",
@@ -9144,6 +9161,22 @@
                         }
                       ]
                     },
+                    "fields": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      }
+                    },
                     "parentTaskId": {
                       "anyOf": [
                         {
@@ -9681,6 +9714,7 @@
                     "deadlineTime",
                     "dateWarnings",
                     "reminderOffsetMinutes",
+                    "fields",
                     "parentTaskId",
                     "recurrence",
                     "seriesId",
@@ -14602,6 +14636,70 @@
                         "none"
                       ]
                     },
+                    "fields": {
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "op": {
+                            "type": "string",
+                            "enum": [
+                              "eq",
+                              "ne",
+                              "lt",
+                              "gt",
+                              "between",
+                              "empty"
+                            ]
+                          },
+                          "value": {
+                            "anyOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "upper": {
+                            "anyOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "op",
+                          "value",
+                          "upper"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
                     "inbox": {
                       "type": "boolean"
                     },
@@ -14682,7 +14780,8 @@
                     "status",
                     "tag",
                     "workspace",
-                    "saved_view"
+                    "saved_view",
+                    "field"
                   ]
                 },
                 "aggregateId": {
@@ -15298,6 +15397,74 @@
                 "week",
                 "none"
               ]
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "maxItems": 4,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "op": {
+                    "type": "string",
+                    "enum": [
+                      "eq",
+                      "ne",
+                      "lt",
+                      "gt",
+                      "between",
+                      "empty"
+                    ]
+                  },
+                  "value": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "upper": {
+                    "anyOf": [
+                      {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "key",
+                  "op",
+                  "value",
+                  "upper"
+                ]
+              }
             }
           },
           {
