@@ -1,4 +1,4 @@
-# ADR-0XX: Import is in scope, and the archive is the format it is judged against
+# ADR-015: Import is in scope, and the archive is the format it is judged against
 
 - Status: accepted
 - Date: 2026-09-05
