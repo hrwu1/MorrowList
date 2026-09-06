@@ -1,4 +1,4 @@
-# ADR-pending — Natural-language capture is in scope, parsed on the client
+# ADR-016: Natural-language capture is in scope, parsed on the client
 
 **Status:** Accepted
 

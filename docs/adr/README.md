@@ -21,6 +21,7 @@ it costs, so a future change is a deliberate reversal rather than an accident.
 | [ADR-013](013-start-defer-dates.md)                  | Start/defer dates and deadlines    | Accepted |
 | [ADR-014](014-reminders.md)                          | Reminders and notifications        | Accepted |
 | [ADR-015](015-import-in-mvp-scope.md)                | Import is in scope for the MVP     | Accepted |
+| [ADR-016](016-natural-language-capture.md)           | Natural-language capture           | Accepted |
 
 ## Adding a record
 
