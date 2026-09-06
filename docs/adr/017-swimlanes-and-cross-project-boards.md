@@ -1,4 +1,4 @@
-# ADR-0XX — Swimlanes pivot a board; across projects its columns are categories
+# ADR-017: Swimlanes pivot a board; across projects its columns are categories
 
 **Status:** Proposed
 
