@@ -42,32 +42,6 @@ export function UndoToast() {
     return () => window.clearTimeout(timer);
   }, [status, dismiss]);
 
-  /*
-   * Cmd/Ctrl+Z, only while the toast is open. GAP-10 owns the shortcut registry under
-   * `features/shortcuts`; until that lands this stays local, which also keeps the binding
-   * scoped to exactly the moment it means something.
-   */
-  useEffect(() => {
-    if (!entry) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key.toLowerCase() !== "z" || event.shiftKey) return;
-      if (!event.metaKey && !event.ctrlKey) return;
-      const target = event.target as HTMLElement | null;
-      // Never steal the browser's own undo out of a field the user is typing in.
-      if (
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.isContentEditable
-      ) {
-        return;
-      }
-      event.preventDefault();
-      undo();
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [entry, undo]);
-
   const visible = entry !== null || status === "failed";
 
   return (

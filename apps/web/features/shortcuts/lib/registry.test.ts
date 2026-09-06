@@ -33,6 +33,8 @@ function deps(overrides: Partial<ShortcutDeps> = {}): ShortcutDeps {
     openCapture: vi.fn(),
     openPalette: vi.fn(),
     openCheatSheet: vi.fn(),
+    canUndo: () => true,
+    undo: vi.fn(),
     currentTask: async () => null,
     today: () => "2026-09-05",
     actions: {

@@ -10,8 +10,10 @@ import type { Command } from "./registry";
  * availability — can be unit-tested with stubs, and so the cheat sheet and the palette
  * read the same list the key handler does and cannot drift from it.
  *
- * `Cmd/Ctrl+Z` is missing on purpose: GAP-08 owns the undo stack and it is not in this
- * tree yet. The plan file carries the merge-time TODO to register it here.
+ * `Cmd/Ctrl+Z` is the one command whose `when` matters for correctness rather than for
+ * tidiness: with nothing on the undo stack it must not match, so the keystroke falls
+ * through to the browser's own undo instead of being swallowed. The cheat sheet lists it
+ * regardless, because it groups by `group` and never consults `when`.
  */
 
 export interface TaskShortcutActions {
@@ -38,6 +40,9 @@ export interface ShortcutDeps {
   readonly openCapture: () => void;
   readonly openPalette: () => void;
   readonly openCheatSheet: () => void;
+  /** The undo stack (GAP-08): whether an offer is live, and how to take it. */
+  readonly canUndo: () => boolean;
+  readonly undo: () => void;
   /** The focused or open task, resolved when the key is pressed rather than on render. */
   readonly currentTask: () => Promise<TaskDto | null>;
   readonly today: () => string;
@@ -121,6 +126,17 @@ export function buildCommands(deps: ShortcutDeps): readonly Command[] {
       group: "Global",
       alwaysEnabled: true,
       run: () => deps.openCheatSheet(),
+    },
+    {
+      id: "app.undo",
+      title: "Undo the last change",
+      keywords: "revert back restore",
+      keys: ["mod+z"],
+      scope: "global",
+      group: "Global",
+      alwaysEnabled: true,
+      when: () => deps.canUndo(),
+      run: () => deps.undo(),
     },
 
     {

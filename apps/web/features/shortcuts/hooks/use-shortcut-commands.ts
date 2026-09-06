@@ -18,6 +18,7 @@ import {
   blockedWarning,
   openSubtasksWarning,
 } from "@/features/tasks/components/task-row";
+import { useUndo } from "@/features/tasks/hooks/use-undo";
 import {
   taskKeys,
   useAddToDay,
@@ -69,6 +70,7 @@ export function useShortcutCommands(input: CommandsInput): readonly Command[] {
   const addToDay = useAddToDay();
   const removeFromDay = useRemoveFromDay();
   const remove = useDeleteTask();
+  const undo = useUndo();
   // A status move is the move endpoint plus the shared optimistic machinery every other
   // task action already uses; the server still ranks the card and enforces the workflow.
   const moveToStatus = useTaskAction<{
@@ -168,6 +170,8 @@ export function useShortcutCommands(input: CommandsInput): readonly Command[] {
     openCapture: () => input.surface?.openCapture(),
     openPalette: input.openPalette,
     openCheatSheet: input.openCheatSheet,
+    canUndo: () => undo.entry !== null,
+    undo: () => undo.undo(),
     currentTask,
     today: () => workspaceToday(queryClient),
     actions,
