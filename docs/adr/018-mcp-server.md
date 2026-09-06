@@ -1,4 +1,4 @@
-# ADR (pending) — An MCP server is a thin adapter over the REST API
+# ADR-018: An MCP server is a thin adapter over the REST API
 
 **Status:** Proposed (GAP-18). Number it when the plan lands.
 
