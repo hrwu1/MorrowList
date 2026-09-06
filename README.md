@@ -16,7 +16,7 @@ same versioned REST API, so anything you can do by clicking you can do from a sc
 ```bash
 corepack enable pnpm
 pnpm setup:dev                # one-time setup; PostgreSQL must be running
-pnpm dev                      # http://localhost:3000
+pnpm dev                      # http://localhost:3200
 ```
 
 Requires Node.js 24 and PostgreSQL 18. `docker compose -f infra/compose/docker-compose.yml up -d`

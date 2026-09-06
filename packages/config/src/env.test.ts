@@ -11,10 +11,10 @@ describe("parseServerEnv", () => {
     const env = parseServerEnv(base as NodeJS.ProcessEnv);
 
     expect(env.NODE_ENV).toBe("development");
-    expect(env.PORT).toBe(3000);
+    expect(env.PORT).toBe(3200);
     expect(env.LOG_LEVEL).toBe("info");
     expect(env.TRASH_RETENTION_DAYS).toBe(30);
-    expect(env.AUTH_TRUSTED_ORIGINS).toEqual(["http://localhost:3000"]);
+    expect(env.AUTH_TRUSTED_ORIGINS).toEqual(["http://localhost:3200"]);
   });
 
   it("rejects a non-postgres database URL", () => {
@@ -48,11 +48,11 @@ describe("parseServerEnv", () => {
   it("parses a comma separated trusted origin list", () => {
     const env = parseServerEnv({
       ...base,
-      AUTH_TRUSTED_ORIGINS: "http://localhost:3000, https://app.example.com",
+      AUTH_TRUSTED_ORIGINS: "http://localhost:3200, https://app.example.com",
     } as NodeJS.ProcessEnv);
 
     expect(env.AUTH_TRUSTED_ORIGINS).toEqual([
-      "http://localhost:3000",
+      "http://localhost:3200",
       "https://app.example.com",
     ]);
   });

@@ -104,7 +104,7 @@ beforeEach(async () => {
       cursorSecret: "test-secret",
       emailSender: createRecordingEmailSender(),
       userDirectory: { findById: async () => currentUser },
-      appUrl: "http://localhost:3000",
+      appUrl: "http://localhost:3200",
     }),
     logger: silentLogger,
     checkHealth: async () =>

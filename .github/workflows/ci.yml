@@ -107,7 +107,7 @@ jobs:
       # truncates it in Playwright's global setup.
       E2E_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/morrowlist_e2e
       AUTH_SECRET: ci-only-secret-value-not-used-in-production
-      APP_URL: http://127.0.0.1:3210
+      APP_URL: http://127.0.0.1:3250
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

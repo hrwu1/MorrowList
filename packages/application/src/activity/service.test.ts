@@ -51,7 +51,7 @@ beforeEach(() => {
     cursorSecret: CURSOR_SECRET,
     emailSender: createRecordingEmailSender(),
     userDirectory: { findById: async () => null },
-    appUrl: "http://localhost:3000",
+    appUrl: "http://localhost:3200",
   });
 });
 

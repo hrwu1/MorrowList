@@ -19,7 +19,7 @@ process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS = "1";
  * every test signs up, so sharing would silently fill day-to-day data with junk.
  */
 const production = Boolean(process.env.CI);
-const PORT = Number(process.env.E2E_PORT ?? 3210);
+const PORT = Number(process.env.E2E_PORT ?? 3250);
 const baseURL = `http://127.0.0.1:${PORT}`;
 const databaseUrl = e2eDatabaseUrl();
 

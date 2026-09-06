@@ -24,7 +24,7 @@ export interface ConfigFile {
   readonly profiles: Record<string, Profile>;
 }
 
-export const DEFAULT_BASE_URL = "http://localhost:3000/api/v1";
+export const DEFAULT_BASE_URL = "http://localhost:3200/api/v1";
 
 export function configPath(): string {
   const override = process.env.MORROW_CONFIG;

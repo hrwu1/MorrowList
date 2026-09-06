@@ -24,8 +24,8 @@ const optionalString = z
 export const serverEnvSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-    APP_URL: z.url().default("http://localhost:3000"),
-    PORT: z.coerce.number().int().positive().max(65535).default(3000),
+    APP_URL: z.url().default("http://localhost:3200"),
+    PORT: z.coerce.number().int().positive().max(65535).default(3200),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
 
     DATABASE_URL: postgresUrl,
@@ -37,7 +37,7 @@ export const serverEnvSchema = z
     AUTH_SECRET: optionalString,
     AUTH_TRUSTED_ORIGINS: z
       .string()
-      .default("http://localhost:3000")
+      .default("http://localhost:3200")
       .transform((value) =>
         value
           .split(",")

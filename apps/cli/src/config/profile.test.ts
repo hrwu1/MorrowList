@@ -37,11 +37,11 @@ describe("resolveProfile", () => {
 
   it("lets the environment override the file", () => {
     const resolved = resolveProfile(config, {}, {
-      MORROW_BASE_URL: "http://localhost:3000/api/v1",
+      MORROW_BASE_URL: "http://localhost:3200/api/v1",
       MORROW_API_KEY: "from-env",
     } as NodeJS.ProcessEnv);
 
-    expect(resolved.baseUrl).toBe("http://localhost:3000/api/v1");
+    expect(resolved.baseUrl).toBe("http://localhost:3200/api/v1");
     expect(resolved.apiKey).toBe("from-env");
   });
 

@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node scripts/build-sw.mjs && next dev --port ${PORT:-3000}",
+    "dev": "node scripts/build-sw.mjs && next dev --port ${PORT:-3200}",
     "build": "node scripts/build-sw.mjs && next build",
     "build:sw": "node scripts/build-sw.mjs",
-    "start": "next start --port ${PORT:-3000}",
+    "start": "next start --port ${PORT:-3200}",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p sw/tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
     "lint": "echo \"linted from repository root\"",

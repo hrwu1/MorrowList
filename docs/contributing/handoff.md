@@ -38,7 +38,7 @@ API keys.
 - Databases: `morrowlist` (dev), `morrowlist_test` (integration harness),
   `morrowlist_e2e` (Playwright). Each suite refuses to run unless its own URL is set and
   differs from `DATABASE_URL`.
-- Dev server: `pnpm --filter @morrowlist/web dev` → http://localhost:3000
+- Dev server: `pnpm --filter @morrowlist/web dev` → http://localhost:3200
 - Test account: `robin@example.com` / `correct-horse-battery-staple`
 
 ## Gotchas that will cost you an hour each

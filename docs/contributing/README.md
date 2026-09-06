@@ -6,7 +6,7 @@ Prerequisites: Node.js 24, pnpm (via `corepack enable pnpm`), and PostgreSQL 18.
 
 ```bash
 pnpm setup:dev                # one-time setup; safe to rerun
-pnpm dev                      # http://localhost:3000
+pnpm dev                      # http://localhost:3200
 ```
 
 `pnpm setup:dev` installs workspace dependencies, creates `.env` from `.env.example`
