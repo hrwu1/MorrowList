@@ -1,4 +1,4 @@
-# ADR-NNN — No SQLite mode; PostgreSQL stays the only database
+# ADR-020: No SQLite mode; PostgreSQL stays the only database
 
 **Status:** Proposed
 
