@@ -238,7 +238,7 @@ export function WorkspaceShell({
             onClick={openSearch}
           >
             <Icon name="search" />
-            <span>Search</span>
+            <span>Find anything</span>
             <kbd aria-hidden="true">/</kbd>
           </button>
 
@@ -249,11 +249,29 @@ export function WorkspaceShell({
             onClick={openInbox}
           >
             <Icon name="plus" />
-            <span>New task</span>
+            <span>Capture a thought</span>
             <kbd aria-hidden="true">N</kbd>
           </button>
 
           <nav className="workspace-nav" aria-label="Primary">
+            <span className="workspace-nav__label studio-nav-label">Your space</span>
+            {planningLinks.map((link) => (
+              <Link
+                key={link.href}
+                className="workspace-nav__link"
+                href={link.href}
+                aria-current={pathname === link.href ? "page" : undefined}
+              >
+                <Icon name={link.icon} />
+                <span>{link.label}</span>
+                {link.count ? (
+                  <span className="workspace-nav__count" aria-hidden="true">
+                    {link.count}
+                  </span>
+                ) : null}
+              </Link>
+            ))}
+
             <div className="workspace-inbox-link">
               <DropDestination destination={{ projectId: null, name: "Inbox" }}>
                 {(drop) => (
@@ -286,23 +304,6 @@ export function WorkspaceShell({
                 <Icon name="arrow-up-right" />
               </Link>
             </div>
-
-            {planningLinks.map((link) => (
-              <Link
-                key={link.href}
-                className="workspace-nav__link"
-                href={link.href}
-                aria-current={pathname === link.href ? "page" : undefined}
-              >
-                <Icon name={link.icon} />
-                <span>{link.label}</span>
-                {link.count ? (
-                  <span className="workspace-nav__count" aria-hidden="true">
-                    {link.count}
-                  </span>
-                ) : null}
-              </Link>
-            ))}
 
             <div className="workspace-nav__section">
               <ProjectSection
@@ -416,6 +417,10 @@ export function WorkspaceShell({
         />
 
         <main id="main" className="app-shell__main">
+          <div className="studio-workspace-meta">
+            <span>Personal workspace</span>
+            <span>A little progress, every day.</span>
+          </div>
           {children}
         </main>
 
@@ -458,8 +463,15 @@ function Brand() {
   return (
     <Link className="workspace-brand" href="/today" aria-label="MorrowList home">
       <span className="workspace-brand__mark" aria-hidden="true">
-        <span />
-        <span />
+        <svg viewBox="0 0 32 32" fill="none">
+          <path
+            d="M16 25V15M16 19C7 19 5 13 7 7c7 0 10 5 9 12ZM16 16c0-7 4-11 10-11 2 7-1 13-10 14"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </span>
       <span>MorrowList</span>
     </Link>

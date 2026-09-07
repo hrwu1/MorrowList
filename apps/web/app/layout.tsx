@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Providers } from "@/components/providers";
 
 import "./globals.css";
+import "./studio.css";
 
 /** Application shell (FND-007). */
 
@@ -24,8 +25,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fdfcfb" },
-    { media: "(prefers-color-scheme: dark)", color: "#1c1b1a" },
+    { media: "(prefers-color-scheme: light)", color: "#f8f7f2" },
+    { media: "(prefers-color-scheme: dark)", color: "#19221e" },
   ],
 };
 
