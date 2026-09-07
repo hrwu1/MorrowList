@@ -27,6 +27,24 @@ export default async function Page({
     );
   }
   const user = await getContainer().auth.resolveUser(new Headers(await headers()));
-  if (!user) redirect(`/sign-in?returnTo=${encodeURIComponent(capturePath(shared))}`);
+  if (!user) {
+    let returnTo: string;
+    try {
+      returnTo = capturePath(shared);
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
+      return (
+        <main id="main" className="settings-page capture-page stack">
+          <h1>Share needs a shorter selection</h1>
+          <p>{error.message}</p>
+          <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+            {[shared.title, shared.text, shared.url].filter(Boolean).join("\n\n")}
+          </p>
+          <a href="/capture">Open Quick capture</a>
+        </main>
+      );
+    }
+    redirect(`/sign-in?returnTo=${encodeURIComponent(returnTo)}`);
+  }
   return <CapturePage shared={shared} />;
 }

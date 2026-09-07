@@ -88,12 +88,19 @@ export function emailDescription(email: InboundEmail): string | null {
   }
   // No active HTML is carried into Markdown, even in the plain-text alternative.
   const text = lines.join("\n").trim().replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return (
-    [
-      text,
-      email.attachmentCount ? `[${email.attachmentCount} attachment(s) omitted.]` : "",
-    ]
-      .filter(Boolean)
-      .join("\n\n") || null
-  );
+  const attachmentNote = email.attachmentCount
+    ? `[${email.attachmentCount} attachment(s) omitted.]`
+    : "";
+  const description = [text, attachmentNote].filter(Boolean).join("\n\n");
+  // Align with the task API and editor. Count the sanitized result: escaping HTML can
+  // expand a small input, and the notices themselves must fit inside the same limit.
+  const maxLength = 50_000;
+  if (description.length <= maxLength) return description || null;
+  const suffix = ["[Email body truncated to fit the task description.]", attachmentNote]
+    .filter(Boolean)
+    .join("\n\n");
+  const prefix = text
+    .slice(0, maxLength - suffix.length - 2)
+    .replace(/[\uD800-\uDBFF]$/, "");
+  return `${prefix}\n\n${suffix}`;
 }

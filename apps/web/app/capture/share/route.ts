@@ -2,6 +2,8 @@ import { ApiClient } from "@morrowlist/api-client";
 
 import {
   capturePath,
+  CAPTURE_REDIRECT_TOO_LONG,
+  type SharedCapture,
   readSharedCapture,
   sharedTaskRequest,
 } from "@/features/capture/lib/share";
@@ -41,11 +43,11 @@ export async function POST(request: Request) {
   }
   const container = getContainer();
   const origin = new URL(container.env.APP_URL).origin;
-  const preview = new URL(capturePath(shared), origin);
+  const preview = () => previewResponse(shared, origin);
   const user = await container.auth.resolveUser(request.headers);
   const source = request.headers.get("origin");
   // A cross-site HTML form may preview, but cannot silently create a task.
-  if (!user || (source && source !== origin)) return Response.redirect(preview, 303);
+  if (!user || (source && source !== origin)) return preview();
   const client = new ApiClient({
     baseUrl: `${origin}/api/v1`,
     fetch: async (input, init) => {
@@ -60,6 +62,28 @@ export async function POST(request: Request) {
     return Response.redirect(new URL(`/tasks/${task.key}`, origin), 303);
   } catch {
     // Failed captures stay reviewable and retryable; never discard the shared text.
-    return Response.redirect(preview, 303);
+    return preview();
+  }
+}
+
+function previewResponse(shared: SharedCapture, origin: string): Response {
+  try {
+    return Response.redirect(new URL(capturePath(shared), origin), 303);
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    // Keep the original content copyable without putting an oversized draft in a URL.
+    return new Response(
+      [
+        CAPTURE_REDIRECT_TOO_LONG,
+        ...[shared.title, shared.text, shared.url].filter(Boolean),
+      ].join("\n\n"),
+      {
+        status: 413,
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "private, no-store",
+        },
+      },
+    );
   }
 }

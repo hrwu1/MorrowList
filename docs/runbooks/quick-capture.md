@@ -29,6 +29,9 @@ The app itself never changes global keyboard settings.
 Install the PWA from a compatible browser. The manifest registers a POST share target at
 `/capture/share` with title, text and URL. Signed-in native shares create a task and open
 it. Signed-out shares preserve the fields through sign-in and open a capture preview.
+If the fully encoded sign-in URL would exceed 6,000 characters, the response keeps the
+original fields visible for copying and asks for a shorter selection. Long signed-in
+native shares can still create tasks directly.
 Cross-site website forms also require preview submission. If the operating system does
 not offer the PWA in its share sheet, use the capture URL or bookmarklet.
 
@@ -73,7 +76,9 @@ checked for every delivery. Address rotation and delivery serialize; receipts de
 retries by recipient, provider and message id, transactionally with task/activity/outbox.
 Retries must retain the same provider and stable message id. Do not change adapter mode
 for the same already-delivered mail. The body cap is 1 MB; text is 200,000 characters and
-HTML 500,000. Attachments are ignored and noted; HTML becomes plain Markdown text, common
+HTML 500,000. The final sanitized description is capped at 50,000 characters, including
+a truncation notice when needed and any attachment note, so captured tasks remain editable.
+Attachments are ignored and noted; HTML becomes plain Markdown text, common
 quoted reply lines are removed, and subject parsing resolves dates in workspace time.
 
 Provider shape adapters are `postmark`, `mailgun` (JSON or form fields), `ses`, and `imap`.

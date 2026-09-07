@@ -6,6 +6,8 @@ import {
   readSharedCapture,
   sharedTaskRequest,
   captureBookmarklet,
+  CAPTURE_REDIRECT_TOO_LONG,
+  MAX_CAPTURE_LOGIN_PATH_LENGTH,
 } from "./share";
 describe("share transport", () => {
   it("preserves title, selected text and URL through login encoding", () => {
@@ -37,6 +39,18 @@ describe("share transport", () => {
       "/capture?x=\n",
     ])
       expect(captureReturnTo(path)).toBe("/inbox");
+  });
+  it("bounds the fully encoded login path while preserving long native POST fields", () => {
+    const shared = readSharedCapture(new URLSearchParams({ text: "漢".repeat(3000) }));
+    expect(sharedTaskRequest(shared).descriptionMd).toBe(shared.text);
+    expect(() => capturePath(shared)).toThrow(CAPTURE_REDIRECT_TOO_LONG);
+    const short = capturePath({ ...shared, text: "漢".repeat(300) });
+    expect(`/sign-in?returnTo=${encodeURIComponent(short)}`.length).toBeLessThanOrEqual(
+      MAX_CAPTURE_LOGIN_PATH_LENGTH,
+    );
+    expect(readSharedCapture(new URLSearchParams(short.split("?")[1])).text).toBe(
+      "漢".repeat(300),
+    );
   });
   it("builds an origin-bound bookmarklet without credentials", () => {
     expect(captureBookmarklet("https://morrow.example")).toContain(
