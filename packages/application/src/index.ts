@@ -27,3 +27,9 @@ export * from "./tasks/index.js";
 export * from "./views/index.js";
 export * from "./webhooks/index.js";
 export * from "./workspace/index.js";
+
+export {
+  CalendarFeedService,
+  type CalendarFeedServiceOptions,
+} from "./calendar/service.js";
+export { renderCalendar } from "./calendar/ics.js";

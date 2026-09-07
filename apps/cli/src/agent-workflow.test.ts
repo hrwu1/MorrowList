@@ -90,6 +90,16 @@ function stubApi(): Server {
         send({ data: [task], page: { hasMore: false, nextCursor: null } });
       } else if (request.method === "POST" && path === "/api/v1/tasks") {
         send({ data: { ...task, title: (body as { title: string }).title } });
+      } else if (request.method === "POST" && path === "/api/v1/me/calendar-feed") {
+        send({
+          data: {
+            url: "https://tasks.example/api/v1/feeds/fixture.ics",
+            createdAt: "2026-09-07T12:00:00Z",
+          },
+        });
+      } else if (request.method === "DELETE" && path === "/api/v1/me/calendar-feed") {
+        response.writeHead(204);
+        response.end();
       } else if (path.endsWith("/complete")) {
         send({ data: { ...task, isCompleted: true, version: 2 } });
       } else if (request.method === "GET" && path.startsWith("/api/v1/tasks/")) {
@@ -227,4 +237,26 @@ describe("an agent working from `morrow usage` alone", { timeout: 60_000 }, () =
     // Diagnostics never contaminate the JSON on stdout.
     expect(missing.stdout.trim().startsWith("{")).toBe(true);
   });
+});
+
+it("creates a calendar URL and revokes it through the executable", async () => {
+  const created = await morrow(["--json", "calendar", "url"]);
+  expect(created.code).toBe(0);
+  expect(JSON.parse(created.stdout)).toMatchObject({
+    ok: true,
+    data: { url: "https://tasks.example/api/v1/feeds/fixture.ics" },
+  });
+  const revoked = await morrow(["--json", "calendar", "revoke"]);
+  expect(revoked.code).toBe(0);
+  expect(JSON.parse(revoked.stdout)).toEqual({ ok: true });
+  expect(
+    recorded.some(
+      (entry) => entry.method === "POST" && entry.url.includes("/me/calendar-feed"),
+    ),
+  ).toBe(true);
+  expect(
+    recorded.some(
+      (entry) => entry.method === "DELETE" && entry.url.includes("/me/calendar-feed"),
+    ),
+  ).toBe(true);
 });

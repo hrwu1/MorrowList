@@ -325,3 +325,22 @@ describe("search and saved view requests", () => {
     await expect(requests[1]?.json()).resolves.toEqual({ afterViewId: PROJECT_ID });
   });
 });
+
+describe("calendar requests", () => {
+  it("passes inclusive ranges and exposes one-time feed creation and revocation", async () => {
+    const { client, requests } = recordingClient({
+      data: {
+        url: "https://tasks.example/feed.ics",
+        createdAt: "2026-09-07T12:00:00Z",
+      },
+    });
+    await client.getCalendarView({ from: "2026-09-01", to: "2026-09-30" });
+    expect(requests[0]!.url).toContain("from=2026-09-01&to=2026-09-30");
+    expect((await client.createCalendarFeed()).url).toBe(
+      "https://tasks.example/feed.ics",
+    );
+    expect(requests[1]!.method).toBe("POST");
+    await client.revokeCalendarFeed();
+    expect(requests[2]!.method).toBe("DELETE");
+  });
+});

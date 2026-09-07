@@ -18,6 +18,8 @@ import {
 } from "@morrowlist/domain";
 
 import type {
+  CalendarFeedToken,
+  CalendarFeedTokenRepository,
   ActivityEvent,
   ActivityEventInput,
   ActivityRepository,
@@ -71,6 +73,7 @@ import { BLOCKS_WALK_DEPTH, BOARD_TASK_LIMIT, UPCOMING_LIMIT } from "../ports/ta
  */
 
 export interface InMemoryData {
+  calendarFeedTokens: Map<string, CalendarFeedToken>;
   tasks: Map<string, Task>;
   counters: Map<string, number>;
   /** Keyed by `${taskId}:${planDate}`, mirroring the composite primary key. */
@@ -125,6 +128,7 @@ export function emptyData(): InMemoryData {
     activity: [],
     outbox: [],
     published: new Map(),
+    calendarFeedTokens: new Map(),
     webhookSubscriptions: new Map(),
     webhookDeliveries: new Map(),
   };
@@ -370,6 +374,33 @@ function taskRepository(data: InMemoryData): TaskRepository {
         .sort(byDueThenRank);
       const hasMore = items.length > limit;
       return { items: items.slice(0, limit), hasMore, truncated: hasMore };
+    },
+    async listCalendar(query) {
+      const limit = Math.max(1, Math.min(query.limit ?? 2000, 10000));
+      const items = [...data.tasks.values()]
+        .filter(
+          (task) =>
+            task.workspaceId === query.workspaceId &&
+            !task.completedAt &&
+            !task.deletedAt &&
+            [task.dueDate, task.deadline, task.deferUntil].some(
+              (date) =>
+                date !== null &&
+                (!query.from || date >= query.from) &&
+                (!query.to || date <= query.to),
+            ),
+        )
+        .sort(
+          (a, b) =>
+            (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999") ||
+            a.rank.localeCompare(b.rank) ||
+            a.id.localeCompare(b.id),
+        );
+      return {
+        items: items.slice(0, limit),
+        hasMore: items.length > limit,
+        truncated: items.length > limit,
+      };
     },
     async listUpcoming(query) {
       const limit = Math.max(
@@ -1396,6 +1427,7 @@ export function createInMemoryUnitOfWork(
     activity: [...source.activity],
     outbox: [...source.outbox],
     published: new Map(source.published),
+    calendarFeedTokens: new Map(source.calendarFeedTokens),
     webhookSubscriptions: new Map(source.webhookSubscriptions),
     webhookDeliveries: new Map(source.webhookDeliveries),
   });
@@ -1421,6 +1453,7 @@ export function createInMemoryUnitOfWork(
     target.activity = source.activity;
     target.outbox = source.outbox;
     target.published = source.published;
+    target.calendarFeedTokens = source.calendarFeedTokens;
     target.webhookSubscriptions = source.webhookSubscriptions;
     target.webhookDeliveries = source.webhookDeliveries;
   };
@@ -1450,6 +1483,7 @@ export function createInMemoryUnitOfWork(
         notifications: notificationRepository(working),
         notificationPreferences: notificationPreferenceRepository(working),
         pushSubscriptions: pushSubscriptionRepository(working),
+        calendarFeedTokens: calendarFeedTokenRepository(working),
         webhookSubscriptions: webhookSubscriptionRepository(working),
         webhookDeliveries: webhookDeliveryRepository(working),
         activity: activityRepository(working),
@@ -1469,6 +1503,31 @@ export function createInMemoryUnitOfWork(
         restore(data, before);
         throw error;
       }
+    },
+  };
+}
+
+function calendarFeedTokenRepository(data: InMemoryData): CalendarFeedTokenRepository {
+  return {
+    async find(userId, workspaceId) {
+      return data.calendarFeedTokens.get(`${userId}:${workspaceId}`) ?? null;
+    },
+    async findByHash(hash) {
+      return (
+        [...data.calendarFeedTokens.values()].find(
+          (token) => token.tokenHash === hash && token.revokedAt === null,
+        ) ?? null
+      );
+    },
+    async replace(token) {
+      data.calendarFeedTokens.set(`${token.userId}:${token.workspaceId}`, token);
+    },
+    async revoke(userId, workspaceId, now) {
+      const key = `${userId}:${workspaceId}`;
+      const token = data.calendarFeedTokens.get(key);
+      if (!token || token.revokedAt) return false;
+      data.calendarFeedTokens.set(key, { ...token, revokedAt: now });
+      return true;
     },
   };
 }

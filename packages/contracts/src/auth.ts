@@ -7,6 +7,7 @@
  */
 
 export const SCOPES = {
+  calendarWrite: "calendar:write",
   tasksRead: "tasks:read",
   tasksWrite: "tasks:write",
   projectsRead: "projects:read",
@@ -39,6 +40,7 @@ export type Scope = (typeof SCOPES)[keyof typeof SCOPES];
 export const SCOPE_PRESETS = {
   /** Everything the CLI needs to be a peer of the web app (spec 22.4). */
   cli: [
+    SCOPES.calendarWrite,
     SCOPES.tasksRead,
     SCOPES.tasksWrite,
     SCOPES.projectsRead,

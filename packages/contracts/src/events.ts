@@ -113,6 +113,9 @@ export const SAVED_VIEW_EVENTS = {
 } as const;
 
 export const WORKSPACE_EVENTS = {
+  /** Calendar feed credentials. Payload: `{ userId }`; no URL or secret is recorded. */
+  calendarFeedCreated: "workspace.calendar_feed_created",
+  calendarFeedRevoked: "workspace.calendar_feed_revoked",
   created: "workspace.created",
   /** Payload: `{ workspaceId, changes }` with the field-level diff (GAP-20). */
   updated: "workspace.updated",

@@ -1,6 +1,7 @@
 import { Command } from "commander";
 
 import { authCommand } from "./commands/auth.js";
+import { calendarCommand } from "./commands/calendar.js";
 import { exportCommand, importCommand } from "./commands/data.js";
 import { fieldCommand } from "./commands/field.js";
 import { notificationsCommand } from "./commands/notifications.js";
@@ -52,6 +53,7 @@ export function createProgram(): Command {
   program.addCommand(workspaceCommand());
   program.addCommand(searchCommand());
   program.addCommand(viewCommand());
+  program.addCommand(calendarCommand());
   program.addCommand(notificationsCommand());
   program.addCommand(exportCommand());
   program.addCommand(importCommand());

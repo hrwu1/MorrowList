@@ -1,4 +1,5 @@
 import {
+  CalendarFeedService,
   ActivityService,
   ExportService,
   FieldService,
@@ -20,7 +21,7 @@ import {
 } from "@morrowlist/application";
 import type { AuthPort, AuthenticatedUser } from "@morrowlist/auth";
 import { fixedClock, uuidv7 } from "@morrowlist/domain";
-import { silentLogger } from "@morrowlist/observability";
+import { createLogger, silentLogger } from "@morrowlist/observability";
 import {
   createInMemoryUnitOfWork,
   createRecordingEmailSender,
@@ -89,6 +90,12 @@ beforeEach(async () => {
   };
 
   deps = {
+    calendarFeedService: new CalendarFeedService({
+      unitOfWork,
+      signingSecret: "test-calendar-secret",
+      appUrl: "http://localhost",
+      clock: fixedClock(NOW),
+    }),
     auth,
     unitOfWork,
     workspaceService: new WorkspaceService({ unitOfWork, clock: fixedClock(NOW) }),
@@ -1902,4 +1909,51 @@ describe("export and import endpoints (GAP-07)", () => {
     });
     expect(importedBody.status).toBe(201);
   });
+});
+
+describe("Calendar API", () => {
+  it("validates ranges and protects token management while allowing signed feed subscriptions", async () => {
+    expect(
+      (await request("/api/v1/views/calendar?from=2026-09-30&to=2026-09-01")).status,
+    ).toBe(422);
+    expect(
+      (await request("/api/v1/views/calendar?from=2026-09-01&to=2026-09-30")).status,
+    ).toBe(200);
+    const created = await request("/api/v1/me/calendar-feed", { method: "POST" });
+    expect(created.status).toBe(201);
+    expect(created.headers.get("cache-control")).toBe("no-store");
+    const { data } = (await created.json()) as { data: { url: string } };
+    const user = currentUser;
+    currentUser = null;
+    expect((await request("/api/v1/me/calendar-feed", { method: "POST" })).status).toBe(
+      401,
+    );
+    const feed = await request(new URL(data.url).pathname);
+    expect(feed.status).toBe(200);
+    expect(feed.headers.get("content-type")).toContain("text/calendar");
+    expect(feed.headers.get("cache-control")).toContain("must-revalidate");
+    currentUser = user;
+    expect(
+      (await request("/api/v1/me/calendar-feed", { method: "DELETE" })).status,
+    ).toBe(204);
+    expect((await request(new URL(data.url).pathname)).status).toBe(404);
+    expect((await request("/api/v1/feeds/fake.ics")).status).toBe(404);
+  });
+  it("bounds unauthenticated feed request traffic", async () => {
+    for (let i = 0; i < 120; i++) await request("/api/v1/feeds/invalid.ics");
+    const limited = await request("/api/v1/feeds/invalid.ics");
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBe("60");
+  });
+});
+
+it("never writes a feed bearer URL into application access logs", async () => {
+  const lines: string[] = [];
+  const logged = createApiApp({
+    ...deps,
+    logger: createLogger({ write: (line) => lines.push(line) }),
+  });
+  await logged.request("http://localhost/api/v1/feeds/private-bearer-example.ics");
+  expect(lines.join("\n")).not.toContain("private-bearer-example");
+  expect(lines.join("\n")).toContain("/api/v1/feeds/[redacted]");
 });

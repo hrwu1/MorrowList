@@ -2,6 +2,7 @@ import "server-only";
 
 import { createApiApp, type ApiDependencies } from "@morrowlist/api";
 import {
+  CalendarFeedService,
   ActivityService,
   FieldService,
   ExportService,
@@ -128,6 +129,11 @@ export function getContainer(): Container {
   });
 
   const dependencies: ApiDependencies = {
+    calendarFeedService: new CalendarFeedService({
+      unitOfWork,
+      signingSecret: cursorSecret,
+      appUrl: env.APP_URL,
+    }),
     auth,
     unitOfWork,
     workspaceService: new WorkspaceService({ unitOfWork }),

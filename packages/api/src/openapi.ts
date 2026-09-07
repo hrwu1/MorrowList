@@ -30,6 +30,10 @@ import {
   listStatusesQuerySchema,
   listTasksQuerySchema,
   meResponseSchema,
+  calendarViewQuerySchema,
+  calendarViewResponseSchema,
+  calendarFeedResponseSchema,
+  calendarFeedStatusResponseSchema,
   notificationListResponseSchema,
   notificationPreferencesResponseSchema,
   notificationResponseSchema,
@@ -134,6 +138,9 @@ const registry = {
   AddTaskToDayRequest: addTaskToDayRequestSchema,
   TodayView: todayViewResponseSchema,
   BoardView: boardViewResponseSchema,
+  CalendarView: calendarViewResponseSchema,
+  CalendarFeed: calendarFeedResponseSchema,
+  CalendarFeedStatus: calendarFeedStatusResponseSchema,
   UpcomingView: upcomingViewResponseSchema,
   SetTaskParentRequest: setTaskParentRequestSchema,
   SearchResponse: searchResponseSchema,
@@ -1530,6 +1537,74 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
           responses: {
             "200": { description: "The moved view", ...jsonContent(ref("SavedView")) },
             "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/views/calendar": {
+        get: {
+          summary:
+            "Open tasks with planned, deadline, or defer dates in an inclusive range",
+          parameters: [workspaceIdParam, ...queryParameters(calendarViewQuerySchema)],
+          responses: {
+            "200": {
+              description:
+                "Calendar projection, capped at 2,000 tasks with explicit truncation",
+              ...jsonContent(ref("CalendarView")),
+            },
+            ...commonErrors,
+          },
+        },
+      },
+      "/me/calendar-feed": {
+        get: {
+          summary: "Current caller's calendar feed status, never its secret URL",
+          parameters: [workspaceIdParam],
+          responses: {
+            "200": {
+              description: "Feed status",
+              ...jsonContent(ref("CalendarFeedStatus")),
+            },
+            ...commonErrors,
+          },
+        },
+        post: {
+          summary: "Create a calendar feed URL and revoke the previous URL",
+          description:
+            "URL is returned once. Requires tasks:read and calendar:write for API credentials.",
+          parameters: [workspaceIdParam],
+          responses: {
+            "201": {
+              description: "Private calendar URL; store it now",
+              ...jsonContent(ref("CalendarFeed")),
+            },
+            ...commonErrors,
+          },
+        },
+        delete: {
+          summary: "Revoke the caller's calendar feed",
+          parameters: [workspaceIdParam],
+          responses: {
+            "204": { description: "Revoked; next feed request returns 404" },
+            ...commonErrors,
+          },
+        },
+      },
+      "/feeds/{token}.ics": {
+        get: {
+          summary: "Read-only RFC 5545 calendar of open task occurrences",
+          security: [],
+          parameters: [
+            { name: "token", in: "path", required: true, schema: { type: "string" } },
+          ],
+          responses: {
+            "200": {
+              description:
+                "Calendar; every request revalidates membership and revocation",
+              content: { "text/calendar": { schema: { type: "string" } } },
+            },
+            "404": { description: "Unknown, invalid, or revoked feed" },
+            "429": { description: "Process feed rate limit reached; Retry-After: 60" },
             ...commonErrors,
           },
         },

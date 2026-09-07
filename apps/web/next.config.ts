@@ -21,6 +21,8 @@ const config: NextConfig = {
     ? { output: "standalone" as const, outputFileTracingRoot: workspaceRoot }
     : {}),
   reactStrictMode: true,
+  // Feed paths contain bearer credentials; Hono logs a redacted path instead.
+  logging: { incomingRequests: { ignore: [/\/api\/v1\/feeds\//] } },
   // Workspace packages ship TypeScript sources compiled to ESM; Next must transpile them
   // rather than treat them as pre-built CommonJS dependencies.
   transpilePackages: [

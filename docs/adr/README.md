@@ -27,6 +27,8 @@ it costs, so a future change is a deliberate reversal rather than an accident.
 | [ADR-019](019-typed-fields.md)                       | Ten typed custom fields, no more   | Accepted |
 | [ADR-020](020-no-sqlite-mode.md)                     | No SQLite mode; PostgreSQL only    | Accepted |
 
+| [ADR-021](021-calendar-feed.md) | Calendar projection and revocable ICS subscriptions | Accepted |
+
 ## Adding a record
 
 Copy the shape above: state the decision, the reasoning, and the consequences —

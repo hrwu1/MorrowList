@@ -23,6 +23,7 @@ export function requestContext(logger: Logger): MiddlewareHandler<ApiEnv> {
     c.set("logger", requestLogger);
     c.header(REQUEST_ID_HEADER, requestId);
 
+    const safePath = c.req.path.replace(/(\/feeds\/)[^/]+/, "$1[redacted]");
     const started = performance.now();
     try {
       await next();
@@ -31,7 +32,7 @@ export function requestContext(logger: Logger): MiddlewareHandler<ApiEnv> {
       // The full error stays server-side; the client receives only the envelope.
       requestLogger.error("request failed", {
         method: c.req.method,
-        path: c.req.path,
+        path: safePath,
         status,
         code: body.error.code,
         error,
@@ -40,7 +41,7 @@ export function requestContext(logger: Logger): MiddlewareHandler<ApiEnv> {
     } finally {
       requestLogger.info("request completed", {
         method: c.req.method,
-        path: c.req.path,
+        path: safePath,
         status: c.res.status,
         durationMs: Math.round(performance.now() - started),
       });

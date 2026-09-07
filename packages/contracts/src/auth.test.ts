@@ -39,6 +39,12 @@ describe("SCOPE_PRESETS", () => {
     expect(SCOPE_PRESETS.agent.length).toBeLessThan(SCOPE_PRESETS.cli.length);
   });
 
+  it("reserves calendar credential issuance for the CLI preset", () => {
+    expect(SCOPE_PRESETS.cli).toContain(SCOPES.calendarWrite);
+    expect(SCOPE_PRESETS.agent).not.toContain(SCOPES.calendarWrite);
+    expect(SCOPE_PRESETS.readonly).not.toContain(SCOPES.calendarWrite);
+  });
+
   it("never grants workspace:write from a preset at all", () => {
     // A key that can manage webhook endpoints or workspace settings is created
     // deliberately, one scope at a time — never by picking a convenient preset.
