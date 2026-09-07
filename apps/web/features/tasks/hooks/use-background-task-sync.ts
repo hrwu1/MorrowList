@@ -2,10 +2,11 @@
 
 import type { TaskDto } from "@morrowlist/contracts";
 import { useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { activityKeys } from "../../activity/hooks/use-activity";
 import { boardViewKeys } from "../../board/lib/board-keys";
+import { calendarKeys } from "../../calendar/lib/calendar-view";
 import { flowKeys } from "../../flow/hooks/use-flow";
 import { projectKeys } from "../../projects/hooks/use-projects";
 import { searchKeys } from "../../search/hooks/use-search";
@@ -22,6 +23,7 @@ const projectionKeys: readonly QueryKey[] = [
   boardViewKeys.all,
   todayKeys.all,
   upcomingKeys.all,
+  calendarKeys.all,
   activityKeys.all,
   flowKeys.all,
   searchKeys.all,
@@ -61,8 +63,13 @@ export async function refreshActiveTaskProjections(client: QueryClient): Promise
  * A focused editor keeps its draft until focus leaves it; local optimistic mutations
  * cancel these same queries through the existing shared task mutation path.
  */
-export function useBackgroundTaskSync(): void {
+export function useBackgroundTaskSync(): () => void {
   const queryClient = useQueryClient();
+  const cleanup = useRef<(() => void) | null>(null);
+  const stop = useCallback(() => {
+    cleanup.current?.();
+    cleanup.current = null;
+  }, []);
   useEffect(() => {
     let pointerDown = false;
     const beginPointer = () => {
@@ -93,12 +100,14 @@ export function useBackgroundTaskSync(): void {
       }
       void refreshActiveTaskProjections(queryClient);
     }, REFRESH_INTERVAL_MS);
-    return () => {
+    cleanup.current = () => {
       window.clearInterval(timer);
       window.removeEventListener("pointerdown", beginPointer, true);
       window.removeEventListener("pointerup", endPointer, true);
       window.removeEventListener("pointercancel", endPointer, true);
       window.removeEventListener("blur", endPointer);
     };
-  }, [queryClient]);
+    return stop;
+  }, [queryClient, stop]);
+  return stop;
 }

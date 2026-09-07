@@ -99,6 +99,14 @@ const CATALOGUE: Record<string, Partial<ActivityEntryDto>> = {
     aggregateType: "workspace",
     summary: "Updated notification preferences",
   },
+  [WORKSPACE_EVENTS.calendarFeedCreated]: {
+    aggregateType: "workspace",
+    summary: "Created a calendar feed URL",
+  },
+  [WORKSPACE_EVENTS.calendarFeedRevoked]: {
+    aggregateType: "workspace",
+    summary: "Revoked the calendar feed URL",
+  },
   [WORKSPACE_EVENTS.imported]: {
     aggregateType: "workspace",
     summary: "Imported 24 tasks from Trello into Website Relaunch",

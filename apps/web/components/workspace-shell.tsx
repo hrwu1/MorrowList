@@ -83,7 +83,7 @@ export function WorkspaceShell({
   const projects = useProjects();
   useSyncCacheScope();
   useWarmCurrentView();
-  useBackgroundTaskSync();
+  const stopBackgroundTaskSync = useBackgroundTaskSync();
   const inbox = useTaskList({
     inbox: true,
     isCompleted: false,
@@ -136,6 +136,8 @@ export function WorkspaceShell({
   async function signOut() {
     // Nothing private may outlive the session on this device (spec 25.3): the worker's
     // partitioned caches, unsent drafts, and the in-memory query cache all go.
+    stopBackgroundTaskSync();
+    await queryClient.cancelQueries();
     await purgeOfflineCaches();
     clearCacheScope();
     await authClient.signOut();

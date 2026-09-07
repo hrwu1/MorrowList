@@ -31,13 +31,14 @@ describe("background task synchronization", () => {
     const board = observe(value, ["projects", "board", "p1"], "ready", "done");
     const day = observe(value, ["views", "today", "current"], 0, 1);
     const detail = observe(value, ["tasks", "detail", "t1"], "high", "urgent");
+    const calendar = observe(value, ["views", "calendar", "month"], [], ["scheduled"]);
     const count = observe(value, ["workspace", "me"], 1, 0);
     const settings = observe(value, ["webhooks"], [], ["new"]);
     value.setQueryData(["tasks", "list", "inactive"], ["retained"]);
 
     await refreshActiveTaskProjections(value);
 
-    for (const request of [inbox, board, day, detail, count]) {
+    for (const request of [inbox, board, day, detail, calendar, count]) {
       expect(request).toHaveBeenCalledTimes(1);
     }
     expect(value.getQueryData(["tasks", "list"])).toEqual(["old", "email"]);
