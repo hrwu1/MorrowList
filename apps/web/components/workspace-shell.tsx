@@ -44,6 +44,7 @@ import {
 } from "@/features/shortcuts/components/shortcuts-provider";
 import { QuickAdd } from "@/features/tasks/components/quick-add";
 import { UndoToast } from "@/features/tasks/components/undo-toast";
+import { useBackgroundTaskSync } from "@/features/tasks/hooks/use-background-task-sync";
 import { useMoveTaskToProject, useTaskList } from "@/features/tasks/hooks/use-tasks";
 import {
   destinationDroppableId,
@@ -82,6 +83,7 @@ export function WorkspaceShell({
   const projects = useProjects();
   useSyncCacheScope();
   useWarmCurrentView();
+  useBackgroundTaskSync();
   const inbox = useTaskList({
     inbox: true,
     isCompleted: false,
