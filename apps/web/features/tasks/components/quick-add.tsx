@@ -52,6 +52,7 @@ import { useAddTaskTag, useCreateTag, useTags } from "@/features/tags/hooks/use-
  * never sent on its own (ADR-008).
  */
 export interface QuickAddProps {
+  readonly initialDueDate?: string | undefined;
   readonly projectId?: string | undefined;
   readonly statusId?: string | undefined;
   readonly destinationLabel?: string | undefined;
@@ -65,6 +66,7 @@ interface QuickAddDraft {
 }
 
 export function QuickAdd({
+  initialDueDate,
   projectId,
   statusId,
   destinationLabel,
@@ -72,8 +74,8 @@ export function QuickAdd({
 }: QuickAddProps = {}) {
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<Priority>("none");
-  const [dueDate, setDueDate] = useState<string | null>(null);
-  const [showDetails, setShowDetails] = useState(false);
+  const [dueDate, setDueDate] = useState<string | null>(initialDueDate ?? null);
+  const [showDetails, setShowDetails] = useState(Boolean(initialDueDate));
   const [unsent, setUnsent] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -86,7 +88,12 @@ export function QuickAdd({
   const online = useOnline();
   const scope = useCacheScope();
   const storageKey = scope
-    ? draftKey(scope.workspaceId, statusId ?? projectId ?? "inbox")
+    ? draftKey(
+        scope.workspaceId,
+        initialDueDate
+          ? `calendar:${initialDueDate}`
+          : (statusId ?? projectId ?? "inbox"),
+      )
     : null;
 
   const parsingEnabled = useParsingEnabled();
@@ -104,6 +111,10 @@ export function QuickAdd({
     [parsingEnabled, title, names],
   );
   const spans = parsed?.spans ?? [];
+
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus();
+  }, [autoFocus]);
 
   // Restore an unsent capture once the workspace is known, without overwriting typing.
   useEffect(() => {
@@ -176,7 +187,7 @@ export function QuickAdd({
       // The optional fields reset too: they belong to the thought just captured, and
       // carrying them into the next one silently mislabels it.
       setPriority("none");
-      setDueDate(null);
+      setDueDate(initialDueDate ?? null);
       setAnnouncement(`Added ${task.key} to ${destinationLabel ?? "your Inbox"}.`);
       inputRef.current?.focus();
     } catch {

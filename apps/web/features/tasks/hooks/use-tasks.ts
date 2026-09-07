@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  CalendarViewResponse,
   CreateTaskRequest,
   ListTasksQuery,
   ProjectBoardResponse,
@@ -36,6 +37,10 @@ import { neighboursOf, undoLabel, type UndoOffer } from "../lib/undo";
 
 import { useUndo } from "./use-undo";
 
+import {
+  calendarKeys,
+  patchTaskInCalendar,
+} from "@/features/calendar/lib/calendar-view";
 import { searchKeys } from "@/features/search/hooks/use-search";
 import { todayKeys } from "@/features/today/hooks/use-today";
 import { upcomingKeys } from "@/features/upcoming/hooks/use-upcoming";
@@ -68,6 +73,7 @@ interface TaskProjectionSnapshot {
   readonly boards: Snapshot<ProjectBoardResponse>;
   readonly today: Snapshot<TodayViewResponse>;
   readonly upcoming: Snapshot<UpcomingViewResponse>;
+  readonly calendar: Snapshot<CalendarViewResponse>;
   readonly details: Snapshot<TaskDto>;
 }
 
@@ -109,6 +115,12 @@ export function cachedTasks(queryClient: QueryClient): readonly TaskDto[] {
   for (const [, current] of snapshotBoards(queryClient)) {
     for (const task of current?.data.tasks ?? []) seen.set(task.id, task);
   }
+  for (const [, current] of snapshotViews<CalendarViewResponse>(
+    queryClient,
+    calendarKeys.all,
+  )) {
+    for (const task of current?.data.tasks ?? []) seen.set(task.id, task);
+  }
   return [...seen.values()];
 }
 
@@ -121,6 +133,13 @@ function findCachedTask(queryClient: QueryClient, taskId: string): TaskDto | und
     if (hit) return hit;
   }
   for (const [, current] of snapshotBoards(queryClient)) {
+    const hit = current?.data.tasks.find((candidate) => candidate.id === taskId);
+    if (hit) return hit;
+  }
+  for (const [, current] of snapshotViews<CalendarViewResponse>(
+    queryClient,
+    calendarKeys.all,
+  )) {
     const hit = current?.data.tasks.find((candidate) => candidate.id === taskId);
     if (hit) return hit;
   }
@@ -168,6 +187,13 @@ function replaceTaskInCaches(queryClient: QueryClient, task: TaskDto): void {
     if (current) queryClient.setQueryData(key, patchTaskInUpcoming(current, task));
   }
 
+  for (const [key, current] of snapshotViews<CalendarViewResponse>(
+    queryClient,
+    calendarKeys.all,
+  )) {
+    if (current) queryClient.setQueryData(key, patchTaskInCalendar(current, task));
+  }
+
   // Only refresh detail entries that are actually cached; never conjure one.
   for (const [key, current] of snapshotDetails(queryClient)) {
     if (current?.id === task.id) queryClient.setQueryData(key, task);
@@ -198,6 +224,7 @@ function snapshotTaskProjections(queryClient: QueryClient): TaskProjectionSnapsh
     boards: snapshotBoards(queryClient),
     today: snapshotViews(queryClient, todayKeys.all),
     upcoming: snapshotViews(queryClient, upcomingKeys.all),
+    calendar: snapshotViews(queryClient, calendarKeys.all),
     details: snapshotDetails(queryClient),
   };
 }
@@ -214,6 +241,7 @@ function restoreTaskProjections(
   restoreSnapshot(queryClient, snapshot.boards);
   restoreSnapshot(queryClient, snapshot.today);
   restoreSnapshot(queryClient, snapshot.upcoming);
+  restoreSnapshot(queryClient, snapshot.calendar);
   restoreSnapshot(queryClient, snapshot.details);
 }
 
@@ -231,6 +259,7 @@ export function invalidateTaskProjections(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: flowKeys.all });
   void queryClient.invalidateQueries({ queryKey: todayKeys.all });
   void queryClient.invalidateQueries({ queryKey: upcomingKeys.all });
+  void queryClient.invalidateQueries({ queryKey: calendarKeys.all });
   // The shell's in-progress counter follows every move, complete, and reopen (GAP-20).
   void queryClient.invalidateQueries({ queryKey: workspaceKeys.me() });
   void queryClient.invalidateQueries({ queryKey: searchKeys.all });
@@ -243,6 +272,7 @@ async function cancelTaskProjections(queryClient: QueryClient): Promise<void> {
     queryClient.cancelQueries({ queryKey: boardViewKeys.all }),
     queryClient.cancelQueries({ queryKey: todayKeys.all }),
     queryClient.cancelQueries({ queryKey: upcomingKeys.all }),
+    queryClient.cancelQueries({ queryKey: calendarKeys.all }),
   ]);
 }
 

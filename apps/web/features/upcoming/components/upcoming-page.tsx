@@ -3,6 +3,7 @@
 import type { UpcomingHorizon } from "@morrowlist/contracts";
 import { UPCOMING_HORIZONS } from "@morrowlist/contracts";
 import { Alert, Button, EmptyState, Select, Spinner } from "@morrowlist/ui";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useId, useRef } from "react";
 
@@ -74,6 +75,7 @@ export function UpcomingPage() {
       <div className="stack">
         <header className="page-header">
           <h1>Upcoming</h1>
+          <Link href="/calendar">Open Calendar</Link>
           <p className="page-header__subtitle">
             What is due after today, one day at a time.
           </p>
