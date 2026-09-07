@@ -38,6 +38,7 @@ export interface ShortcutDeps {
   readonly announce: (message: string) => void;
   readonly openSearch: () => void;
   readonly openCapture: () => void;
+  readonly openCaptureWindow?: () => void;
   readonly openPalette: () => void;
   readonly openCheatSheet: () => void;
   /** The undo stack (GAP-08): whether an offer is live, and how to take it. */
@@ -89,6 +90,17 @@ export function buildCommands(deps: ShortcutDeps): readonly Command[] {
   }
 
   return [
+    {
+      id: "app.capture-window",
+      title: "Open quick capture",
+      keywords: "capture inbox window",
+      keys: ["mod+shift+space"],
+      scope: "global",
+      group: "Global",
+      alwaysEnabled: true,
+      run: () =>
+        deps.openCaptureWindow ? deps.openCaptureWindow() : deps.navigate("/capture"),
+    },
     {
       id: "app.palette",
       title: "Open the command palette",

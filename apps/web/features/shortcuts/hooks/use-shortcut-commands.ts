@@ -168,6 +168,14 @@ export function useShortcutCommands(input: CommandsInput): readonly Command[] {
     announce: input.announce,
     openSearch: () => input.surface?.openSearch(),
     openCapture: () => input.surface?.openCapture(),
+    openCaptureWindow: () => {
+      const popup = window.open(
+        "/capture",
+        "morrowlist-capture",
+        "popup,width=560,height=600",
+      );
+      if (!popup) router.push("/capture");
+    },
     openPalette: input.openPalette,
     openCheatSheet: input.openCheatSheet,
     canUndo: () => undo.entry !== null,

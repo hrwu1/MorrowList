@@ -16,7 +16,13 @@ import { authClient } from "@/lib/auth-client";
 
 const MIN_PASSWORD_LENGTH = 12;
 
-export function AuthForm({ mode }: { readonly mode: "sign-in" | "sign-up" }) {
+export function AuthForm({
+  mode,
+  returnTo = "/inbox",
+}: {
+  readonly mode: "sign-in" | "sign-up";
+  readonly returnTo?: string;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -62,7 +68,7 @@ export function AuthForm({ mode }: { readonly mode: "sign-in" | "sign-up" }) {
         return;
       }
 
-      router.push("/inbox");
+      router.push(returnTo);
       router.refresh();
     } catch {
       setSubmitError("Something went wrong. Please try again.");
@@ -139,11 +145,29 @@ export function AuthForm({ mode }: { readonly mode: "sign-in" | "sign-up" }) {
       <p className="auth-form__switch">
         {isSignUp ? (
           <>
-            Already have an account? <Link href="/sign-in">Sign in</Link>
+            Already have an account?{" "}
+            <Link
+              href={
+                returnTo === "/inbox"
+                  ? "/sign-in"
+                  : `/sign-in?returnTo=${encodeURIComponent(returnTo)}`
+              }
+            >
+              Sign in
+            </Link>
           </>
         ) : (
           <>
-            New here? <Link href="/sign-up">Create an account</Link>
+            New here?{" "}
+            <Link
+              href={
+                returnTo === "/inbox"
+                  ? "/sign-up"
+                  : `/sign-up?returnTo=${encodeURIComponent(returnTo)}`
+              }
+            >
+              Create an account
+            </Link>
           </>
         )}
       </p>
