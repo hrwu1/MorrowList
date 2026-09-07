@@ -1715,6 +1715,10 @@
     max-width: var(--content-max);
     margin: 0 auto;
   }
+  .capture-page {
+    max-width: 38rem;
+    padding: 2rem max(1rem, env(safe-area-inset-left)) 3rem;
+  }
   .board-page__actions {
     display: flex;
     flex-wrap: wrap;

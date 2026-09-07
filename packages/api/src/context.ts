@@ -1,5 +1,6 @@
 import type {
   CalendarFeedService,
+  InboundEmailService,
   ActivityService,
   ActorContext,
   FieldService,
@@ -27,6 +28,7 @@ import type { Logger, Metrics } from "@morrowlist/observability";
  */
 export interface ApiDependencies {
   readonly calendarFeedService: CalendarFeedService;
+  readonly inboundEmailService: InboundEmailService;
   readonly auth: AuthPort;
   readonly unitOfWork: UnitOfWork;
   readonly workspaceService: WorkspaceService;

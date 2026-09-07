@@ -4,6 +4,7 @@ import { authCommand } from "./commands/auth.js";
 import { calendarCommand } from "./commands/calendar.js";
 import { exportCommand, importCommand } from "./commands/data.js";
 import { fieldCommand } from "./commands/field.js";
+import { captureCommand } from "./commands/inbound.js";
 import { notificationsCommand } from "./commands/notifications.js";
 import { projectCommand } from "./commands/project.js";
 import { relationCommand } from "./commands/relation.js";
@@ -43,6 +44,7 @@ export function createProgram(): Command {
     .showHelpAfterError();
 
   program.addCommand(authCommand());
+  program.addCommand(captureCommand());
   program.addCommand(projectCommand());
   program.addCommand(statusCommand());
   program.addCommand(taskCommand());

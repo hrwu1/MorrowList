@@ -3,6 +3,7 @@ import type { DayPlanRepository } from "./day-plans.js";
 import type { ActivityRepository, OutboxRepository } from "./events.js";
 import type { FieldDefinitionRepository } from "./fields.js";
 import type { StatusIntervalRepository } from "./flow.js";
+import type { InboundAddressRepository } from "./inbound-email.js";
 import type {
   NotificationPreferenceRepository,
   NotificationRepository,
@@ -26,6 +27,7 @@ import type { WorkspaceRepository } from "./workspace.js";
  */
 export interface TransactionContext {
   readonly calendarFeedTokens: CalendarFeedTokenRepository;
+  readonly inboundAddresses: InboundAddressRepository;
   readonly tasks: TaskRepository;
   readonly taskCounters: TaskCounterRepository;
   readonly dayPlans: DayPlanRepository;

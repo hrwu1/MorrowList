@@ -7,6 +7,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 import { useDefaultWorkspace, useMe, useUpdateWorkspace } from "../hooks/use-workspace";
 import { describeInProgress } from "../lib/wip";
 
+import { CaptureSettings } from "@/features/capture/components/capture-settings";
 import { describeWorkflowError } from "@/features/projects/hooks/use-workflow";
 import {
   useParsingEnabled,
@@ -132,6 +133,8 @@ export function WorkspaceSettingsPage() {
           setting is kept on this device.
         </p>
       </section>
+
+      <CaptureSettings />
 
       {/* Webhooks live behind this page rather than in the sidebar, which stays short
           enough to hold the places a person actually goes (spec 9). */}

@@ -2,6 +2,7 @@ import { loadRootEnv } from "@morrowlist/config/load-env";
 import { defineConfig, devices } from "@playwright/test";
 
 import { e2eDatabaseUrl } from "./e2e/database";
+import { INBOUND_TEST_DOMAIN, INBOUND_TEST_SECRET } from "./e2e/inbound-config";
 
 // Playwright reads no env file of its own; the suite's database comes from the root `.env`.
 loadRootEnv();
@@ -57,6 +58,8 @@ export default defineConfig({
     env: {
       PORT: String(PORT),
       DATABASE_URL: databaseUrl,
+      INBOUND_EMAIL_DOMAIN: INBOUND_TEST_DOMAIN,
+      INBOUND_EMAIL_SECRET: INBOUND_TEST_SECRET,
       // The suite signs up and out repeatedly from its own origin, so that origin must be
       // the one auth trusts, whatever the developer's `.env` says (CI sets the same).
       APP_URL: baseURL,

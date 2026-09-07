@@ -16,6 +16,7 @@ export interface KeyStroke {
   readonly metaKey: boolean;
   readonly ctrlKey: boolean;
   readonly altKey: boolean;
+  readonly shiftKey?: boolean;
 }
 
 const MODIFIER_KEYS = new Set(["Control", "Meta", "Alt", "Shift", "OS", "AltGraph"]);
@@ -30,6 +31,8 @@ const MODIFIER_KEYS = new Set(["Control", "Meta", "Alt", "Shift", "OS", "AltGrap
 export function strokeChord(stroke: KeyStroke): string | null {
   if (MODIFIER_KEYS.has(stroke.key)) return null;
   if (stroke.altKey) return null;
+  if ((stroke.metaKey || stroke.ctrlKey) && stroke.shiftKey && stroke.key === " ")
+    return "mod+shift+space";
   const key = stroke.key.length === 1 ? stroke.key.toLowerCase() : stroke.key;
   if (stroke.metaKey || stroke.ctrlKey) return `mod+${key}`;
   return key;
@@ -49,6 +52,7 @@ export function isChordPrefix(prefix: string, chord: string): boolean {
 }
 
 const KEY_LABELS: Record<string, string> = {
+  "mod+shift+space": "Ctrl/⌘ Shift Space",
   "mod+k": "Ctrl/⌘ K",
   "mod+z": "Ctrl/⌘ Z",
   ArrowUp: "↑",

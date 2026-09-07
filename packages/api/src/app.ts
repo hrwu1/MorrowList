@@ -10,6 +10,7 @@ import { exportRoutes } from "./routes/exports.js";
 import { fieldRoutes } from "./routes/fields.js";
 import { healthRoutes } from "./routes/health.js";
 import { importRoutes } from "./routes/imports.js";
+import { inboundRoutes } from "./routes/inbound.js";
 import { meRoutes } from "./routes/me.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { projectRoutes } from "./routes/projects.js";
@@ -54,6 +55,7 @@ export function createApiApp(deps: ApiDependencies) {
     return workspaces.map((workspace) => workspace.id);
   };
 
+  app.use("/capture/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/me", authenticate(deps.auth, listWorkspaceIds));
   app.use("/me/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/notifications", authenticate(deps.auth, listWorkspaceIds));
@@ -76,6 +78,7 @@ export function createApiApp(deps: ApiDependencies) {
   app.use("/imports/*", authenticate(deps.auth, listWorkspaceIds));
 
   app.route("/", calendarRoutes(deps));
+  app.route("/", inboundRoutes(deps));
   app.route("/", exportRoutes(deps));
   app.route("/", importRoutes(deps));
   app.route("/", meRoutes(deps));

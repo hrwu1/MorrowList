@@ -40,6 +40,11 @@ export const domainEventSchema = z.object({
 });
 
 /** Event catalogue implemented in this slice (spec 19.5). */
+/** Address lifecycle events never contain the capability or email body. */
+export const INBOUND_EVENTS = {
+  addressRotated: "workspace.inbound_address_rotated",
+} as const;
+
 export const TASK_EVENTS = {
   /**
    * Payload: `{ taskId, taskNumber, projectId, statusId, priority, parentTaskId,

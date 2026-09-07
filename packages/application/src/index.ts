@@ -12,6 +12,7 @@ export { decodeCursor, encodeCursor, type CursorPayload } from "./shared/cursor.
 export { recordEvent, type RecordEventInput } from "./shared/event-recorder.js";
 
 export * from "./activity/index.js";
+export * from "./inbound/index.js";
 export * from "./fields/index.js";
 export * from "./board/index.js";
 export * from "./exports/index.js";

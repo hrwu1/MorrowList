@@ -26,6 +26,7 @@ it costs, so a future change is a deliberate reversal rather than an accident.
 | [ADR-018](018-mcp-server.md)                         | MCP server over the REST API       | Accepted |
 | [ADR-019](019-typed-fields.md)                       | Ten typed custom fields, no more   | Accepted |
 | [ADR-020](020-no-sqlite-mode.md)                     | No SQLite mode; PostgreSQL only    | Accepted |
+| [ADR-022](022-inbound-capture.md)                    | External capture uses canonical tasks | Accepted |
 
 | [ADR-021](021-calendar-feed.md) | Calendar projection and revocable ICS subscriptions | Accepted |
 

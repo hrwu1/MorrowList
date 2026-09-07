@@ -344,3 +344,23 @@ describe("calendar requests", () => {
     expect(requests[2]!.method).toBe("DELETE");
   });
 });
+
+describe("capture address requests", () => {
+  it("keeps selected workspace on both address read and rotation", async () => {
+    const data = {
+      enabled: true,
+      address: "secret@inbox.example.com",
+      createdAt: null,
+    };
+    const { client, requests } = recordingClient({ data });
+    expect(await client.getInboundAddress({ workspaceId: PROJECT_ID })).toEqual(data);
+    await client.rotateInboundAddress({ workspaceId: PROJECT_ID });
+    expect(requests[0]?.url).toBe(
+      `https://example.test/api/v1/capture/address?workspaceId=${PROJECT_ID}`,
+    );
+    expect(requests[1]?.url).toBe(
+      `https://example.test/api/v1/capture/address/rotate?workspaceId=${PROJECT_ID}`,
+    );
+    expect(requests[1]?.method).toBe("POST");
+  });
+});

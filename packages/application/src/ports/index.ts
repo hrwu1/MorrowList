@@ -1,3 +1,4 @@
+export * from "./inbound-email.js";
 export type { TransactionContext, UnitOfWork } from "./unit-of-work.js";
 export {
   BLOCKS_WALK_DEPTH,

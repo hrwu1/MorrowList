@@ -3,6 +3,7 @@ import type {
   CalendarViewResponse,
   CalendarFeedDto,
   CalendarFeedStatus,
+  InboundAddressDto,
   ActivityListResponse,
   ActivityQuery,
   AddTaskRelationRequest,
@@ -137,6 +138,27 @@ export class ApiClient {
     this.options = options;
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.doFetch = options.fetch ?? globalThis.fetch.bind(globalThis);
+  }
+
+  async getInboundAddress(options: RequestOptions = {}): Promise<InboundAddressDto> {
+    return (
+      await this.send<{ data: InboundAddressDto }>(
+        "GET",
+        `/capture/address${this.queryString({}, options)}`,
+        undefined,
+        options,
+      )
+    ).data;
+  }
+  async rotateInboundAddress(options: RequestOptions = {}): Promise<InboundAddressDto> {
+    return (
+      await this.send<{ data: InboundAddressDto }>(
+        "POST",
+        `/capture/address/rotate${this.queryString({}, options)}`,
+        undefined,
+        options,
+      )
+    ).data;
   }
 
   async me(options: RequestOptions = {}): Promise<MeResponse["data"]> {
