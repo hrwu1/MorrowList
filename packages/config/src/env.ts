@@ -47,6 +47,9 @@ export const serverEnvSchema = z
     GITHUB_CLIENT_ID: optionalString,
     GITHUB_CLIENT_SECRET: optionalString,
 
+    INBOUND_EMAIL_DOMAIN: optionalString,
+    INBOUND_EMAIL_SECRET: optionalString,
+
     EMAIL_PROVIDER: z.enum(["console", "smtp"]).default("console"),
     EMAIL_FROM: z.string().default("morrowlist@localhost"),
 
@@ -62,6 +65,39 @@ export const serverEnvSchema = z
     OUTBOX_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
   })
   .superRefine((env, ctx) => {
+    if (env.INBOUND_EMAIL_DOMAIN && !env.AUTH_SECRET) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["AUTH_SECRET"],
+        message: "AUTH_SECRET is required when email capture is enabled.",
+      });
+    }
+    if (Boolean(env.INBOUND_EMAIL_DOMAIN) !== Boolean(env.INBOUND_EMAIL_SECRET)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["INBOUND_EMAIL_DOMAIN"],
+        message: "INBOUND_EMAIL_DOMAIN and INBOUND_EMAIL_SECRET must be set together.",
+      });
+    }
+    if (
+      env.INBOUND_EMAIL_DOMAIN &&
+      !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(
+        env.INBOUND_EMAIL_DOMAIN,
+      )
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["INBOUND_EMAIL_DOMAIN"],
+        message: "Use a receiving domain, without an address or URL.",
+      });
+    }
+    if (env.INBOUND_EMAIL_SECRET && env.INBOUND_EMAIL_SECRET.length < 32) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["INBOUND_EMAIL_SECRET"],
+        message: "INBOUND_EMAIL_SECRET must be at least 32 characters.",
+      });
+    }
     if (env.NODE_ENV === "production" && !env.AUTH_SECRET) {
       ctx.addIssue({
         code: "custom",

@@ -57,3 +57,20 @@ describe("parseServerEnv", () => {
     ]);
   });
 });
+
+it("enables inbound email only with a valid receiving domain, ingress secret and application secret", () => {
+  const valid = {
+    ...base,
+    AUTH_SECRET: "a".repeat(32),
+    INBOUND_EMAIL_DOMAIN: "inbox.example.com",
+    INBOUND_EMAIL_SECRET: "b".repeat(32),
+  };
+  expect(parseServerEnv(valid).INBOUND_EMAIL_DOMAIN).toBe("inbox.example.com");
+  for (const values of [
+    { ...valid, AUTH_SECRET: "" },
+    { ...valid, INBOUND_EMAIL_SECRET: "short" },
+    { ...valid, INBOUND_EMAIL_DOMAIN: "https://inbox.example.com" },
+    { ...valid, INBOUND_EMAIL_SECRET: "" },
+  ])
+    expect(() => parseServerEnv(values)).toThrow(EnvironmentValidationError);
+});

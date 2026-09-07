@@ -1,4 +1,5 @@
 import type {
+  InboundEmailService,
   ActivityService,
   ActorContext,
   FieldService,
@@ -25,6 +26,7 @@ import type { Logger, Metrics } from "@morrowlist/observability";
  * itself. This keeps routes testable with fakes and keeps wiring in one place.
  */
 export interface ApiDependencies {
+  readonly inboundEmailService: InboundEmailService;
   readonly auth: AuthPort;
   readonly unitOfWork: UnitOfWork;
   readonly workspaceService: WorkspaceService;

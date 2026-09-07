@@ -1,4 +1,5 @@
 export * from "./common.js";
+export * from "./capture.js";
 export * from "./auth.js";
 export * from "./field.js";
 export * from "./tag.js";

@@ -1,4 +1,7 @@
 import {
+  inboundAddressResponseSchema,
+  inboundEmailSchema,
+  inboundEmailResultSchema,
   activityListResponseSchema,
   activityQuerySchema,
   addTaskRelationRequestSchema,
@@ -95,6 +98,9 @@ import { API_BASE_PATH } from "./app.js";
  */
 
 const registry = {
+  InboundAddress: inboundAddressResponseSchema,
+  InboundEmail: inboundEmailSchema,
+  InboundEmailResult: z.object({ data: inboundEmailResultSchema }),
   Task: taskResponseSchema.shape.data,
   TaskCommandResult: taskCommandResponseSchema,
   TaskList: taskListResponseSchema,
@@ -510,6 +516,51 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
               ...jsonContent(ref("Notification")),
             },
             "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/capture/address": {
+        get: {
+          summary: "Read your email capture address (session required)",
+          parameters: [workspaceIdParam],
+          responses: {
+            "200": {
+              description: "Address and server availability",
+              ...jsonContent(ref("InboundAddress")),
+            },
+            ...commonErrors,
+          },
+        },
+      },
+      "/capture/address/rotate": {
+        post: {
+          summary: "Create or rotate your email capture address (session required)",
+          parameters: [workspaceIdParam],
+          responses: {
+            "200": {
+              description: "New address; old address revoked",
+              ...jsonContent(ref("InboundAddress")),
+            },
+            ...commonErrors,
+          },
+        },
+      },
+      "/inbound/email": {
+        post: {
+          summary: "Deliver email from an authenticated adapter",
+          description:
+            "Requires deployment INBOUND_EMAIL_SECRET as a Bearer token and a valid recipient capability. Defaults to the normalized envelope; provider=postmark, mailgun, ses, or imap selects a provider adapter. SES requires a verified relay with extracted MIME text. Body limit: 1 MB. Retries deduplicate by provider, messageId and recipient.",
+          requestBody: { required: true, ...jsonContent(ref("InboundEmail")) },
+          responses: {
+            "200": {
+              description: "Already captured",
+              ...jsonContent(ref("InboundEmailResult")),
+            },
+            "201": {
+              description: "Task captured",
+              ...jsonContent(ref("InboundEmailResult")),
+            },
             ...commonErrors,
           },
         },

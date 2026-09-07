@@ -59,6 +59,8 @@ services:
       # One container is enough: the reminder loop runs inside the web process.
       WORKER_MODE: ${WORKER_MODE:-embedded}
       WORKER_POLL_SECONDS: ${WORKER_POLL_SECONDS:-30}
+      INBOUND_EMAIL_DOMAIN: ${INBOUND_EMAIL_DOMAIN:-}
+      INBOUND_EMAIL_SECRET: ${INBOUND_EMAIL_SECRET:-}
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
       EMAIL_FROM: ${EMAIL_FROM:-morrowlist@localhost}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}

@@ -18,6 +18,8 @@ import {
 } from "@morrowlist/domain";
 
 import type {
+  InboundAddress,
+  InboundAddressRepository,
   ActivityEvent,
   ActivityEventInput,
   ActivityRepository,
@@ -71,6 +73,8 @@ import { BLOCKS_WALK_DEPTH, BOARD_TASK_LIMIT, UPCOMING_LIMIT } from "../ports/ta
  */
 
 export interface InMemoryData {
+  inboundAddresses: Map<string, InboundAddress>;
+  inboundReceipts: Map<string, string>;
   tasks: Map<string, Task>;
   counters: Map<string, number>;
   /** Keyed by `${taskId}:${planDate}`, mirroring the composite primary key. */
@@ -105,6 +109,8 @@ export type InMemoryInterval = StatusIntervalInput & { readonly leftAt: Date | n
 
 export function emptyData(): InMemoryData {
   return {
+    inboundAddresses: new Map(),
+    inboundReceipts: new Map(),
     tasks: new Map(),
     counters: new Map(),
     dayPlans: new Map(),
@@ -1376,6 +1382,8 @@ export function createInMemoryUnitOfWork(
   let pendingFailure: Error | null = null;
 
   const snapshot = (source: InMemoryData): InMemoryData => ({
+    inboundAddresses: new Map(source.inboundAddresses),
+    inboundReceipts: new Map(source.inboundReceipts),
     tasks: new Map(source.tasks),
     counters: new Map(source.counters),
     dayPlans: new Map(source.dayPlans),
@@ -1401,6 +1409,8 @@ export function createInMemoryUnitOfWork(
   });
 
   const restore = (target: InMemoryData, source: InMemoryData): void => {
+    target.inboundAddresses = source.inboundAddresses;
+    target.inboundReceipts = source.inboundReceipts;
     target.tasks = source.tasks;
     target.counters = source.counters;
     target.dayPlans = source.dayPlans;
@@ -1436,6 +1446,7 @@ export function createInMemoryUnitOfWork(
       const before = snapshot(data);
       const working = snapshot(data);
       const tx: TransactionContext = {
+        inboundAddresses: inboundAddressRepository(working),
         tasks: taskRepository(working),
         taskCounters: counterRepository(working),
         dayPlans: dayPlanRepository(working),
@@ -1469,6 +1480,43 @@ export function createInMemoryUnitOfWork(
         restore(data, before);
         throw error;
       }
+    },
+  };
+}
+
+function inboundAddressRepository(data: InMemoryData): InboundAddressRepository {
+  return {
+    async lock() {},
+    async findCurrent(workspaceId, userId) {
+      return (
+        [...data.inboundAddresses.values()].find(
+          (a) =>
+            a.workspaceId === workspaceId &&
+            a.userId === userId &&
+            a.revokedAt === null,
+        ) ?? null
+      );
+    },
+    async findByTokenHash(hash) {
+      return (
+        [...data.inboundAddresses.values()].find(
+          (a) => a.tokenHash === hash && a.revokedAt === null,
+        ) ?? null
+      );
+    },
+    async insert(address) {
+      data.inboundAddresses.set(address.id, address);
+    },
+    async revoke(workspaceId, userId, now) {
+      for (const a of data.inboundAddresses.values())
+        if (a.workspaceId === workspaceId && a.userId === userId && !a.revokedAt)
+          data.inboundAddresses.set(a.id, { ...a, revokedAt: now });
+    },
+    async findReceipt(addressId, key) {
+      return data.inboundReceipts.get(`${addressId}:${key}`) ?? null;
+    },
+    async insertReceipt(addressId, key, taskId) {
+      data.inboundReceipts.set(`${addressId}:${key}`, taskId);
     },
   };
 }

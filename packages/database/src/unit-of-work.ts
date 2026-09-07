@@ -8,6 +8,7 @@ import {
 } from "./repositories/events.js";
 import { createFieldDefinitionRepository } from "./repositories/fields.js";
 import { createStatusIntervalRepository } from "./repositories/flow.js";
+import { createInboundAddressRepository } from "./repositories/inbound.js";
 import {
   createNotificationPreferenceRepository,
   createNotificationRepository,
@@ -39,6 +40,7 @@ import { createWorkspaceRepository } from "./repositories/workspaces.js";
  */
 export function buildTransactionContext(db: Database): TransactionContext {
   return {
+    inboundAddresses: createInboundAddressRepository(db),
     tasks: createTaskRepository(db),
     taskCounters: createTaskCounterRepository(db),
     dayPlans: createDayPlanRepository(db),

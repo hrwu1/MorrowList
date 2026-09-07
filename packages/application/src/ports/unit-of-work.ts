@@ -2,6 +2,7 @@ import type { DayPlanRepository } from "./day-plans.js";
 import type { ActivityRepository, OutboxRepository } from "./events.js";
 import type { FieldDefinitionRepository } from "./fields.js";
 import type { StatusIntervalRepository } from "./flow.js";
+import type { InboundAddressRepository } from "./inbound-email.js";
 import type {
   NotificationPreferenceRepository,
   NotificationRepository,
@@ -24,6 +25,7 @@ import type { WorkspaceRepository } from "./workspace.js";
  * activity row, and its outbox row cannot be committed separately.
  */
 export interface TransactionContext {
+  readonly inboundAddresses: InboundAddressRepository;
   readonly tasks: TaskRepository;
   readonly taskCounters: TaskCounterRepository;
   readonly dayPlans: DayPlanRepository;

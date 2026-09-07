@@ -12,6 +12,133 @@
   ],
   "components": {
     "schemas": {
+      "InboundAddress": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "address": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "address",
+              "enabled",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "InboundEmail": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "recipient": {
+            "type": "string",
+            "maxLength": 320,
+            "format": "email",
+            "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "from": {
+            "default": "",
+            "type": "string",
+            "maxLength": 500
+          },
+          "subject": {
+            "default": "",
+            "type": "string",
+            "maxLength": 2000
+          },
+          "text": {
+            "default": "",
+            "type": "string",
+            "maxLength": 200000
+          },
+          "html": {
+            "default": "",
+            "type": "string",
+            "maxLength": 500000
+          },
+          "attachmentCount": {
+            "default": 0,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "messageId",
+          "recipient",
+          "from",
+          "subject",
+          "text",
+          "html",
+          "attachmentCount"
+        ],
+        "additionalProperties": false
+      },
+      "InboundEmailResult": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "duplicate": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "taskId",
+              "duplicate"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
       "Task": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -16380,6 +16507,222 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/capture/address": {
+      "get": {
+        "summary": "Read your email capture address (session required)",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "required": false,
+            "description": "Target workspace. Optional when the caller can reach exactly one workspace.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Address and server availability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboundAddress"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/capture/address/rotate": {
+      "post": {
+        "summary": "Create or rotate your email capture address (session required)",
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "required": false,
+            "description": "Target workspace. Optional when the caller can reach exactly one workspace.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "New address; old address revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboundAddress"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/email": {
+      "post": {
+        "summary": "Deliver email from an authenticated adapter",
+        "description": "Requires deployment INBOUND_EMAIL_SECRET as a Bearer token and a valid recipient capability. Defaults to the normalized envelope; provider=postmark, mailgun, ses, or imap selects a provider adapter. SES requires a verified relay with extracted MIME text. Body limit: 1 MB. Retries deduplicate by provider, messageId and recipient.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InboundEmail"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Already captured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboundEmailResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Task captured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboundEmailResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {

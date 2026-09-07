@@ -1,4 +1,5 @@
 import {
+  InboundEmailService,
   ActivityService,
   ExportService,
   FieldService,
@@ -89,6 +90,13 @@ beforeEach(async () => {
   };
 
   deps = {
+    inboundEmailService: new InboundEmailService({
+      unitOfWork,
+      domain: "inbox.example.com",
+      webhookSecret: "test-inbound-secret",
+      addressSecret: "test-address-secret",
+      clock: fixedClock(NOW),
+    }),
     auth,
     unitOfWork,
     workspaceService: new WorkspaceService({ unitOfWork, clock: fixedClock(NOW) }),
@@ -1901,5 +1909,58 @@ describe("export and import endpoints (GAP-07)", () => {
       body: JSON.stringify({ content: "title\nFrom a big file" }),
     });
     expect(importedBody.status).toBe(201);
+  });
+});
+
+describe("inbound capture endpoints", () => {
+  it("requires authentication before parsing and keeps address responses private", async () => {
+    const missing = await jsonRequest("/api/v1/inbound/email", "POST", {});
+    expect(missing.status).toBe(403);
+    const address = await jsonRequest("/api/v1/capture/address/rotate", "POST");
+    expect(address.status).toBe(200);
+    expect(address.headers.get("cache-control")).toBe("private, no-store");
+    const body = await address.json();
+    const envelope = {
+      messageId: "route-1",
+      recipient: body.data.address,
+      subject: "Route capture tomorrow",
+      text: "Notes",
+    };
+    const send = () =>
+      request("/api/v1/inbound/email", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer test-inbound-secret",
+        },
+        body: JSON.stringify(envelope),
+      });
+    expect((await send()).status).toBe(201);
+    expect((await send()).status).toBe(200);
+    expect(unitOfWork.data.tasks.size).toBe(1);
+    await jsonRequest("/api/v1/capture/address/rotate", "POST");
+    expect((await send()).status).toBe(403);
+    currentUser = null;
+    expect((await request("/api/v1/capture/address")).status).toBe(401);
+  });
+  it("rejects oversized inbound bodies and malformed authenticated provider shapes", async () => {
+    const oversized = await request("/api/v1/inbound/email", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer test-inbound-secret",
+      },
+      body: JSON.stringify({ text: "x".repeat(1_000_001) }),
+    });
+    expect(oversized.status).toBe(422);
+    const malformed = await request("/api/v1/inbound/email?provider=ses", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer test-inbound-secret",
+      },
+      body: JSON.stringify({ Message: "unverified SNS" }),
+    });
+    expect(malformed.status).toBe(422);
   });
 });

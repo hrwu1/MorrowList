@@ -2,6 +2,7 @@ import "server-only";
 
 import { createApiApp, type ApiDependencies } from "@morrowlist/api";
 import {
+  InboundEmailService,
   ActivityService,
   FieldService,
   ExportService,
@@ -128,6 +129,12 @@ export function getContainer(): Container {
   });
 
   const dependencies: ApiDependencies = {
+    inboundEmailService: new InboundEmailService({
+      unitOfWork,
+      domain: env.INBOUND_EMAIL_DOMAIN,
+      webhookSecret: env.INBOUND_EMAIL_SECRET,
+      addressSecret: cursorSecret,
+    }),
     auth,
     unitOfWork,
     workspaceService: new WorkspaceService({ unitOfWork }),
