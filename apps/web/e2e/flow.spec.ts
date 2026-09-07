@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { openSection } from "./disclosures";
+import { openProjectBoard, openSection } from "./disclosures";
 
 /**
  * Flow metrics (GAP-17): moving work across the board records the intervals the Flow
@@ -34,7 +34,8 @@ async function createProject(page: Page, name: string) {
 async function addReadyTask(page: Page, title: string) {
   const capture = page.getByPlaceholder("Add to Ready and press Enter");
   if (!(await capture.isVisible())) {
-    await page.getByRole("button", { name: "+ Add to Ready" }).click();
+    await openProjectBoard(page);
+    await page.getByRole("button", { name: "+ Add a task" }).click();
   }
   await capture.fill(title);
   await capture.press("Enter");
@@ -55,6 +56,7 @@ test("the Flow view and the card age badge follow the board's moves", async ({
 }) => {
   await signUp(page);
   await createProject(page, "Research Launch");
+  await openProjectBoard(page);
 
   await addReadyTask(page, "Draft brief");
   await addReadyTask(page, "Write outline");
@@ -95,6 +97,7 @@ test("the Flow view and the card age badge follow the board's moves", async ({
 
   // Two weeks later the card in progress is stale and says so; the toggle hides it.
   await page.getByRole("link", { name: "Research Launch board" }).click();
+  await openProjectBoard(page);
   await expect(
     page.getByRole("heading", { level: 1, name: "Research Launch" }),
   ).toBeVisible();
@@ -114,7 +117,7 @@ test("the Flow view and the card age badge follow the board's moves", async ({
   ).not.toHaveAttribute("data-age", /./);
   await page.screenshot({ path: "test-results/flow-board-stale.png", fullPage: true });
 
-  const controls = page.getByRole("region", { name: "Board controls" });
+  const controls = page.getByRole("region", { name: "Project views and controls" });
   await controls.locator("summary").click();
   await controls.getByLabel("Card age shown").selectOption("hide");
   await expect(page).toHaveURL(/age=off/);

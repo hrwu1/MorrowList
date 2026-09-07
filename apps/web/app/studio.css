@@ -156,6 +156,17 @@
   }
   .workspace-nav {
     gap: 0.28rem;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+  .workspace-nav > * {
+    flex-shrink: 0;
+  }
+  .workspace-nav .workspace-nav__section {
+    flex: 1 0 auto;
+  }
+  .workspace-nav .workspace-projects {
+    flex: 0 0 auto;
   }
   .workspace-nav__link,
   .workspace-project-link {
@@ -611,6 +622,7 @@
       font-size: 0.88rem;
     }
     .task-row__main > .ml-button {
+      min-width: 2.75rem;
       padding-inline: 0.5rem;
     }
     .auth-shell {

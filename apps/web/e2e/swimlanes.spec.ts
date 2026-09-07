@@ -1,5 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { openProjectBoard } from "./disclosures";
+
 /**
  * Swimlanes and the board that spans projects (spec 9.5, GAP-19). The board is still a
  * view over the one task model: pivoting it changes nothing, and dragging across a lane
@@ -51,8 +53,9 @@ test("a board pivots into priority lanes and a cross-lane drag re-prioritises", 
 }) => {
   await signUp(page);
   const projectId = await createProject(page, "Lane Launch");
+  await openProjectBoard(page);
 
-  await page.getByRole("button", { name: "+ Add to Ready" }).click();
+  await page.getByRole("button", { name: "+ Add a task" }).click();
   const capture = page.getByPlaceholder("Add to Ready and press Enter");
   await capture.fill("Rewrite the brief");
   await capture.press("Enter");
@@ -65,11 +68,17 @@ test("a board pivots into priority lanes and a cross-lane drag re-prioritises", 
 
   const urgentLane = page.getByRole("region", { name: "Urgent" });
   const noPriorityLane = page.getByRole("region", { name: "No priority" });
-  await expect(noPriorityLane.getByRole("link", { name: "Rewrite the brief" })).toBeVisible();
+  await expect(
+    noPriorityLane.getByRole("link", { name: "Rewrite the brief" }),
+  ).toBeVisible();
   await expect(urgentLane).toBeVisible();
 
   const handle = noPriorityLane.getByRole("button", { name: /Drag Rewrite the brief/ });
-  await drag(handle, urgentLane.getByRole("list", { name: /Urgent, Ready tasks/ }), page);
+  await drag(
+    handle,
+    urgentLane.getByRole("list", { name: /Urgent, Ready tasks/ }),
+    page,
+  );
 
   await expect(
     urgentLane.getByRole("link", { name: "Rewrite the brief" }),
@@ -82,7 +91,7 @@ test("a board pivots into priority lanes and a cross-lane drag re-prioritises", 
       .getByRole("region", { name: "Urgent" })
       .getByRole("link", { name: "Rewrite the brief" }),
   ).toBeVisible();
-  await page.goto(`/projects/${projectId}/board`);
+  await page.goto(`/projects/${projectId}/board?canvas=board`);
   await expect(page.locator(".board-card__meta").getByText("Urgent")).toBeVisible();
 });
 
@@ -91,8 +100,9 @@ test("Today opens as a board across projects and a card can be finished there", 
 }) => {
   await signUp(page);
   await createProject(page, "Cross Project");
+  await openProjectBoard(page);
 
-  await page.getByRole("button", { name: "+ Add to Ready" }).click();
+  await page.getByRole("button", { name: "+ Add a task" }).click();
   const capture = page.getByPlaceholder("Add to Ready and press Enter");
   await capture.fill("Finish on the board");
   await capture.press("Enter");

@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { openSection } from "./disclosures";
+import { openProjectBoard, openSection } from "./disclosures";
 
 /**
  * Tags end to end (GAP-03, spec 12.1): create a tag from the task detail, see it on the
@@ -31,7 +31,8 @@ async function createProject(page: Page) {
 }
 
 async function addReadyTask(page: Page, title: string) {
-  await page.getByRole("button", { name: "+ Add to Ready" }).click();
+  await openProjectBoard(page);
+  await page.getByRole("button", { name: "+ Add a task" }).click();
   const capture = page.getByPlaceholder("Add to Ready and press Enter");
   await capture.fill(title);
   await capture.press("Enter");
@@ -55,6 +56,7 @@ test("tags travel from the detail to the card, the filter, and settings", async 
 }) => {
   await signUp(page);
   await createProject(page);
+  await openProjectBoard(page);
   await addReadyTask(page, "Draft research brief");
 
   // Create a tag from the detail and see it on the card.
@@ -163,6 +165,7 @@ test("tags travel from the detail to the card, the filter, and settings", async 
   await expect(renamedChip.locator("..")).toHaveAttribute("data-color", "teal");
 
   await page.getByRole("link", { name: "Research Launch", exact: true }).click();
+  await openProjectBoard(page, "Research Launch");
   const boardCard = page
     .getByRole("region", { name: "Ready" })
     .getByRole("listitem")

@@ -1,5 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { openProjectBoard } from "./disclosures";
+
 /**
  * Undo and bulk edit (GAP-08, spec 10.3, 10.4).
  *
@@ -113,8 +115,9 @@ test("undoes a soft delete, putting the task back out of the Trash", async ({
 test("undoes a dragged card back into the column it came from", async ({ page }) => {
   await signUp(page, "undo-drag");
   await createProject(page, "Research Launch");
+  await openProjectBoard(page);
 
-  await page.getByRole("button", { name: "+ Add to Ready" }).click();
+  await page.getByRole("button", { name: "+ Add a task" }).click();
   await capture(page, "Draft research brief");
 
   const ready = page.getByRole("region", { name: "Ready" });
@@ -144,8 +147,9 @@ test("selects three rows with Shift, moves them, and undoes the whole batch", as
 }) => {
   await signUp(page, "bulk");
   await createProject(page, "Research Launch");
+  await openProjectBoard(page);
 
-  await page.getByRole("button", { name: "+ Add to Ready" }).click();
+  await page.getByRole("button", { name: "+ Add a task" }).click();
   for (const title of ["First card", "Second card", "Third card", "Fourth card"]) {
     await capture(page, title);
   }

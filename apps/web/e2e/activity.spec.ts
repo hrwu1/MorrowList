@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { openSection } from "./disclosures";
+import { openProjectBoard, openSection } from "./disclosures";
 
 /**
  * Activity history (GAP-09, ACT-001): a move and a title edit show up in the task's
@@ -34,8 +34,9 @@ test("a move and a title edit appear in the task's and the project's activity", 
 }) => {
   await signUp(page);
   await createProject(page, "Research Launch");
+  await openProjectBoard(page);
 
-  await page.getByRole("button", { name: "+ Add to Ready" }).click();
+  await page.getByRole("button", { name: "+ Add a task" }).click();
   const capture = page.getByPlaceholder("Add to Ready and press Enter");
   await capture.fill("Draft research brief");
   await capture.press("Enter");

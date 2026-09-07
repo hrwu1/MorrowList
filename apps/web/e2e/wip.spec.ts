@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { openSection } from "./disclosures";
+import { openProjectBoard, openSection } from "./disclosures";
 
 const PASSWORD = "correct-horse-battery-staple";
 
@@ -24,7 +24,8 @@ async function createProject(page: Page, name: string) {
 }
 
 async function startTask(page: Page, title: string) {
-  await page.getByRole("button", { name: "+ Add to Ready" }).click();
+  await openProjectBoard(page);
+  await page.getByRole("button", { name: "+ Add a task" }).click();
   const capture = page.getByPlaceholder("Add to Ready and press Enter");
   await capture.fill(title);
   await capture.press("Enter");
@@ -63,6 +64,7 @@ test("warns across projects when the in-progress limit is exceeded, never blocki
 
   // One started task fills the limit; the counter changes tone but nothing warns.
   await createProject(page, "Alpha");
+  await openProjectBoard(page);
   await startTask(page, "Alpha work");
   await expect(counter(page)).toHaveText("1 of 1 in progress");
   await expect(counter(page)).toHaveAttribute("data-tone", "at");
@@ -71,6 +73,7 @@ test("warns across projects when the in-progress limit is exceeded, never blocki
   // Starting work in another project crosses the workspace limit: the move succeeds
   // and the warning names every task in progress, across both projects.
   await createProject(page, "Beta");
+  await openProjectBoard(page);
   await startTask(page, "Beta work");
   const warning = page.locator(".ml-alert--warning");
   await expect(warning).toContainText("Over your in-progress limit");
@@ -100,6 +103,7 @@ test("writes a column policy from the header menu and reads it back", async ({
 }) => {
   await signUp(page);
   await createProject(page, "Policies");
+  await openProjectBoard(page);
 
   const ready = page.getByRole("region", { name: "Ready" });
   await expect(

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { openSection } from "./disclosures";
+import { openProjectBoard, openSection } from "./disclosures";
 
 const PASSWORD = "correct-horse-battery-staple";
 
@@ -24,7 +24,8 @@ async function createProject(page: Page, name = "Research Launch") {
 }
 
 async function addReadyTask(page: Page, title: string) {
-  await page.getByRole("button", { name: "+ Add to Ready" }).click();
+  await openProjectBoard(page);
+  await page.getByRole("button", { name: "+ Add a task" }).click();
   const capture = page.getByPlaceholder("Add to Ready and press Enter");
   await capture.fill(title);
   await capture.press("Enter");
@@ -44,6 +45,7 @@ function columnOrder(page: Page) {
 test("edits columns from the board header menu", async ({ page }) => {
   await signUp(page);
   await createProject(page);
+  await openProjectBoard(page);
 
   // Rename inline: the category, and so the meaning, stays the same.
   await page.getByLabel("Options for Backlog").click();
@@ -109,9 +111,11 @@ test("edits columns from the board header menu", async ({ page }) => {
   await expect(
     destination.getByRole("link", { name: "Interview two customers" }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "+ Add a task" }).click();
   await expect(
-    page.getByRole("button", { name: "+ Add to In Progress" }),
+    page.getByPlaceholder("Add to In Progress and press Enter"),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
 
   // The last Done column is protected; the server's reason is shown on the column.
   await page.getByLabel("Options for Done").click();
@@ -127,6 +131,7 @@ test("edits columns from the board header menu", async ({ page }) => {
 test("edits the workflow and the project from the settings page", async ({ page }) => {
   await signUp(page);
   await createProject(page);
+  await openProjectBoard(page);
   await addReadyTask(page, "Write launch FAQ");
 
   await page.getByRole("link", { name: "Project settings" }).click();
@@ -233,12 +238,14 @@ test("edits the workflow and the project from the settings page", async ({ page 
     "Default for new tasks",
   );
   await page.getByRole("link", { name: "Open board" }).click();
+  await openProjectBoard(page);
   await expect(
     page
       .getByRole("region", { name: "In Progress" })
       .getByRole("link", { name: "Write launch FAQ" }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "+ Add to Backlog" })).toBeVisible();
+  await page.getByRole("button", { name: "+ Add a task" }).click();
+  await expect(page.getByPlaceholder("Add to Backlog and press Enter")).toBeVisible();
 
   // Rename the project, then archive and restore it from the projects list.
   await page.getByRole("link", { name: "Project settings" }).click();

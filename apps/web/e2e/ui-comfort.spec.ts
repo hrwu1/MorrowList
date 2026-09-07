@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { openSection } from "./disclosures";
+import { openProjectBoard, openSection } from "./disclosures";
 
 async function signUp(page: Page) {
   await page.goto("/sign-up");
@@ -25,7 +25,8 @@ async function board(page: Page) {
   await expect(
     page.getByRole("heading", { name: "Quiet workspace", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "+ Add to Ready" }).click();
+  await openProjectBoard(page);
+  await page.getByRole("button", { name: "+ Add a task" }).click();
   const input = page.getByPlaceholder("Add to Ready and press Enter");
   await input.fill("Prepare the next release with a readable title");
   await input.press("Enter");
@@ -61,6 +62,13 @@ test("card titles lead, settings fit, and disclosed task fields still save", asy
   await expect(
     page.getByRole("link", { name: "Manage projects", exact: true }),
   ).toBeVisible();
+  // Expanding utilities on a short screen must not collapse the project section
+  // underneath History or block its Add project control.
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const addProject = page.getByRole("button", { name: "Add project", exact: true });
+  await addProject.click();
+  await expect(page.getByRole("form", { name: "Quick add project" })).toBeVisible();
+  await addProject.click();
 
   await title.click();
   const panel = page.getByRole("complementary", { name: /Task details for/ });

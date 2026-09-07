@@ -3,7 +3,7 @@ import { createServer, type Server } from "node:http";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { openSection } from "./disclosures";
+import { openProjectBoard, openSection } from "./disclosures";
 
 /**
  * Webhooks end to end (GAP-18).
@@ -160,7 +160,9 @@ test("a moved card produces one signed delivery a subscriber can verify", async 
       page.getByRole("heading", { level: 1, name: "Webhook Launch" }),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "+ Add to Ready" }).click();
+    await openProjectBoard(page);
+
+    await page.getByRole("button", { name: "+ Add a task" }).click();
     const capture = page.getByPlaceholder("Add to Ready and press Enter");
     await capture.fill("Wire the receiver");
     await capture.press("Enter");

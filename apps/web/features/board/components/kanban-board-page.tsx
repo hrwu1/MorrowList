@@ -40,6 +40,8 @@ import {
 } from "../lib/board-view";
 
 import { KanbanColumn, type ColumnEditing } from "./kanban-column";
+import { groupProjectTasks, ProjectStudio } from "./project-studio";
+import styles from "./project-studio.module.css";
 
 import { ActivityList } from "@/features/activity/components/activity-list";
 import { useProjectFlow } from "@/features/flow/hooks/use-flow";
@@ -68,6 +70,7 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const isBoardCanvas = searchParams.get("canvas") === "board";
   const updateStatus = useUpdateStatus(projectId);
   const archiveStatus = useArchiveStatus(projectId);
   const collapsedColumns = useCollapsedColumns(projectId);
@@ -107,7 +110,10 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
     const previous = lastOpenTask.current;
     lastOpenTask.current = selectedTaskKey;
     if (previous && !selectedTaskKey) {
-      document.getElementById(`board-task-link-${previous}`)?.focus();
+      (
+        document.getElementById(`board-task-link-${previous}`) ??
+        document.getElementById(`task-link-${previous}`)
+      )?.focus();
     }
   }, [selectedTaskKey]);
 
@@ -130,11 +136,23 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
     () => statuses.flatMap((status) => tasksInStatus(tasks, status.id, "manual")),
     [statuses, tasks],
   );
-  // Multi-select order is the board read column by column, which is what a Shift-click
-  // range and a select-all mean here (GAP-08).
+  const studioGroups = useMemo(
+    () => groupProjectTasks(manuallyOrderedTasks, statuses, sort),
+    [manuallyOrderedTasks, statuses, sort],
+  );
+  // Range selection follows the layout the user is reading (GAP-08).
   const selectionOrder = useMemo(
-    () => manuallyOrderedTasks.map((task) => task.id),
-    [manuallyOrderedTasks],
+    () =>
+      (isBoardCanvas
+        ? manuallyOrderedTasks
+        : [
+            ...studioGroups.motion,
+            ...studioGroups.next,
+            ...studioGroups.blocked,
+            ...studioGroups.completed,
+          ]
+      ).map((task) => task.id),
+    [isBoardCanvas, manuallyOrderedTasks, studioGroups],
   );
   const [boardRoot, setBoardRoot] = useState<HTMLDivElement | null>(null);
   const lanes = response?.data.lanes ?? [];
@@ -213,6 +231,14 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("task", taskKey);
     return `${pathname}?${params.toString()}`;
+  }
+
+  function hrefForCanvas(canvas: "overview" | "board"): string {
+    const params = new URLSearchParams(searchParams.toString());
+    if (canvas === "board") params.set("canvas", "board");
+    else params.delete("canvas");
+    const query = params.toString();
+    return query ? `${pathname}?${query}` : pathname;
   }
 
   async function commitMove(
@@ -321,6 +347,7 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   }
 
   function onDragEnd(event: DragEndEvent) {
+    if (!isBoardCanvas) return;
     const task = tasks.find((candidate) => candidate.id === String(event.active.id));
     const target = dropTarget(event);
     if (!task || !target || !event.over) return;
@@ -413,27 +440,33 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   const project = board.data.data.project;
   const adjustedViewCount = [
     sort !== "manual",
-    stageView === "all",
-    swimlaned,
+    isBoardCanvas && stageView === "all",
+    isBoardCanvas && swimlaned,
     showSubtasks,
-    !showAge,
+    isBoardCanvas && !showAge,
     showDeferred,
   ].filter(Boolean).length;
 
   return (
     <SelectionProvider order={selectionOrder}>
       <BoardSelectionKeys container={boardRoot} />
-      <div className="board-page" ref={setBoardRoot}>
+      <div
+        className={`board-page ${styles.page}`}
+        data-canvas={isBoardCanvas ? "board" : "overview"}
+        ref={setBoardRoot}
+      >
         <SelectionToolbar tasks={tasks} statuses={statuses} projectId={project.id} />
-        <header className="board-page__header">
+        <header className={`board-page__header ${styles.header}`}>
           <div>
-            <p className="board-page__eyebrow">Project board</p>
+            <p className="board-page__eyebrow">Your project studio</p>
             <h1>{project.name}</h1>
             <p className="board-page__summary">
-              {tasks.length} {tasks.length === 1 ? "task" : "tasks"} across{" "}
-              {statuses.length} stages
+              {tasks.length - studioGroups.completed.length} active
               {" · "}
-              <Link href={`/projects/${project.id}/flow`}>Flow</Link>
+              {studioGroups.completed.length} completed
+              <span className={styles.summaryMotto}>
+                {" · "}A little clarity for your next step.
+              </span>
             </p>
           </div>
           <div className="board-page__actions">
@@ -448,7 +481,7 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
                 variant="primary"
                 onClick={() => setShowQuickAdd((open) => !open)}
               >
-                {showQuickAdd ? "Close" : `+ Add to ${defaultStatus.name}`}
+                {showQuickAdd ? "Close" : "+ Add a task"}
               </Button>
             ) : null}
           </div>
@@ -464,8 +497,49 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
           </div>
         ) : null}
 
-        <section className="board-toolbar" aria-label="Board controls">
-          <strong>Board</strong>
+        <section
+          className={`board-toolbar ${styles.toolbar}`}
+          aria-label="Project views and controls"
+        >
+          <nav className={styles.tabs} aria-label="Project views">
+            <Link
+              href={hrefForCanvas("overview")}
+              aria-current={!isBoardCanvas ? "page" : undefined}
+              scroll={false}
+            >
+              <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                aria-hidden="true"
+              >
+                <rect x="3" y="3" width="6" height="6" rx="1.5" />
+                <rect x="12" y="3" width="5" height="14" rx="1.5" />
+                <rect x="3" y="12" width="6" height="5" rx="1.5" />
+              </svg>
+              Overview
+            </Link>
+            <Link
+              href={hrefForCanvas("board")}
+              aria-current={isBoardCanvas ? "page" : undefined}
+              scroll={false}
+            >
+              <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                aria-hidden="true"
+              >
+                <rect x="3" y="3" width="3.5" height="14" rx="1" />
+                <rect x="8.25" y="3" width="3.5" height="9" rx="1" />
+                <rect x="13.5" y="3" width="3.5" height="12" rx="1" />
+              </svg>
+              Board
+            </Link>
+            <Link href={`/projects/${project.id}/flow`}>Flow</Link>
+          </nav>
           <details className="view-disclosure board-toolbar__view">
             <summary className="view-disclosure__summary">
               <span className="view-disclosure__summary-label">View</span>
@@ -479,7 +553,7 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
                 <span className="ml-field__label">Sort by</span>
                 <Select
                   value={sort}
-                  aria-label="Sort board"
+                  aria-label={isBoardCanvas ? "Sort board" : "Sort project overview"}
                   onChange={(event) => changeSort(event.target.value as BoardSort)}
                 >
                   {Object.entries(SORT_LABELS).map(([value, label]) => (
@@ -489,35 +563,39 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
                   ))}
                 </Select>
               </label>
-              <label className="filters__control">
-                <span className="ml-field__label">Stages</span>
-                <Select
-                  value={stageView}
-                  aria-label="Stages shown"
-                  onChange={(event) =>
-                    changeStageView(event.target.value as BoardStageView)
-                  }
-                >
-                  <option value="focus">Focused stages</option>
-                  <option value="all">All stages</option>
-                </Select>
-              </label>
-              <label className="filters__control">
-                <span className="ml-field__label">Swimlanes</span>
-                <Select
-                  value={swimlaneBy}
-                  aria-label="Swimlanes"
-                  onChange={(event) =>
-                    changeSwimlane(event.target.value as BoardSwimlane)
-                  }
-                >
-                  {BOARD_SWIMLANES.map((value) => (
-                    <option key={value} value={value}>
-                      {SWIMLANE_LABELS[value]}
-                    </option>
-                  ))}
-                </Select>
-              </label>
+              {isBoardCanvas ? (
+                <label className="filters__control">
+                  <span className="ml-field__label">Stages</span>
+                  <Select
+                    value={stageView}
+                    aria-label="Stages shown"
+                    onChange={(event) =>
+                      changeStageView(event.target.value as BoardStageView)
+                    }
+                  >
+                    <option value="focus">Focused stages</option>
+                    <option value="all">All stages</option>
+                  </Select>
+                </label>
+              ) : null}
+              {isBoardCanvas ? (
+                <label className="filters__control">
+                  <span className="ml-field__label">Swimlanes</span>
+                  <Select
+                    value={swimlaneBy}
+                    aria-label="Swimlanes"
+                    onChange={(event) =>
+                      changeSwimlane(event.target.value as BoardSwimlane)
+                    }
+                  >
+                    {BOARD_SWIMLANES.map((value) => (
+                      <option key={value} value={value}>
+                        {SWIMLANE_LABELS[value]}
+                      </option>
+                    ))}
+                  </Select>
+                </label>
+              ) : null}
               <label className="filters__control">
                 <span className="ml-field__label">Subtasks</span>
                 <Select
@@ -529,17 +607,19 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
                   <option value="show">Shown as cards</option>
                 </Select>
               </label>
-              <label className="filters__control">
-                <span className="ml-field__label">Card age</span>
-                <Select
-                  value={showAge ? "show" : "hide"}
-                  aria-label="Card age shown"
-                  onChange={(event) => changeAge(event.target.value === "show")}
-                >
-                  <option value="show">Days in column, fading after 7 and 14</option>
-                  <option value="hide">Hidden</option>
-                </Select>
-              </label>
+              {isBoardCanvas ? (
+                <label className="filters__control">
+                  <span className="ml-field__label">Card age</span>
+                  <Select
+                    value={showAge ? "show" : "hide"}
+                    aria-label="Card age shown"
+                    onChange={(event) => changeAge(event.target.value === "show")}
+                  >
+                    <option value="show">Days in column, fading after 7 and 14</option>
+                    <option value="hide">Hidden</option>
+                  </Select>
+                </label>
+              ) : null}
               <label className="filters__control">
                 <span className="ml-field__label">Deferred</span>
                 <Select
@@ -552,11 +632,17 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
                 </Select>
               </label>
               <p className="board-toolbar__hint" id="board-drag-hint">
-                {sort === "manual"
-                  ? "Drag cards or press Space on a drag handle, then use arrow keys. Drop a card on a project in the sidebar to move it there."
-                  : "Drag between stages is off while automatically sorted. Move menus and dragging to a sidebar project still work."}
-                <br />
-                Blocked and Review appear automatically when they contain work.
+                {!isBoardCanvas
+                  ? "Tasks are grouped by their current stage. Use a task’s stage menu to move it, or switch to Board to arrange your workflow."
+                  : sort === "manual"
+                    ? "Drag cards or press Space on a drag handle, then use arrow keys. Drop a card on a project in the sidebar to move it there."
+                    : "Drag between stages is off while automatically sorted. Move menus and dragging to a sidebar project still work."}
+                {isBoardCanvas ? (
+                  <>
+                    <br />
+                    Blocked and Review appear automatically when they contain work.
+                  </>
+                ) : null}
               </p>
             </div>
           </details>
@@ -621,143 +707,169 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
             data-panel-open={selectedTaskKey || undefined}
           >
             <div className="board-page__canvas">
-              <label className="board-mobile-status">
-                {/* A column, not a swimlane: on a phone the board shows one stage at a time. */}
-                <span>Stage</span>
-                <Select
-                  value={selectedMobileStatus?.id ?? ""}
-                  aria-label="Board stage"
-                  onChange={(event) => setMobileStatusId(event.target.value)}
-                >
-                  {visibleStatuses.map((status) => (
-                    <option key={status.id} value={status.id}>
-                      {status.name} · {tasksInStatus(tasks, status.id, sort).length}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-
-              {swimlaned ? (
-                <div className="board-swimlanes" aria-label={`${project.name} board`}>
-                  {/* The columns are named once, above the lanes, so a card's column and
-                    its lane each have exactly one heading. */}
-                  <div className="kanban-board kanban-board--headings">
-                    {visibleStatuses.map((status) => (
-                      <KanbanColumn
-                        key={status.id}
-                        status={status}
-                        tasks={tasksInColumn(tasks, placements, `status:${status.id}`)}
-                        statuses={statuses}
-                        bodyHidden
-                        selectedTaskKey={selectedTaskKey}
-                        mobileActive={status.id === selectedMobileStatus?.id}
-                        dragDisabled
-                        reorderDisabled
-                        moveDisabled={moveDisabled}
-                        collapsed={collapsedColumns.collapsed.includes(status.id)}
-                        showAge={showAge}
-                        hint={status.category === "in_progress" ? doneHint : null}
-                        hrefForTask={hrefForTask}
-                        onMove={moveFromMenu}
-                        onToggleCollapse={collapsedColumns.toggle}
-                        editing={editing}
-                      />
-                    ))}
-                  </div>
-
-                  {lanes.map((lane) => {
-                    const laneCollapsed = collapsedLanes.collapsed.includes(lane.key);
-                    return (
-                      <section
-                        key={lane.key}
-                        className="board-lane"
-                        data-collapsed={laneCollapsed || undefined}
-                        data-writable={lane.writable || undefined}
-                        aria-labelledby={`board-lane-${lane.key}`}
-                      >
-                        <header className="board-lane__header">
-                          <button
-                            type="button"
-                            className="board-lane__toggle"
-                            aria-expanded={!laneCollapsed}
-                            aria-label={`${laneCollapsed ? "Expand" : "Collapse"} ${lane.label}`}
-                            onClick={() => collapsedLanes.toggle(lane.key)}
-                          >
-                            <span aria-hidden="true">{laneCollapsed ? "›" : "⌄"}</span>
-                          </button>
-                          <h2 id={`board-lane-${lane.key}`}>{lane.label}</h2>
-                          <span
-                            className="board-lane__count"
-                            aria-label={`${lane.count} cards`}
-                          >
-                            {lane.count}
-                          </span>
-                          {lane.writable ? null : (
-                            <span className="board-lane__hint">Read-only lane</span>
-                          )}
-                        </header>
-                        {laneCollapsed ? null : (
-                          <div className="kanban-board">
-                            {visibleStatuses.map((status) => (
-                              <KanbanColumn
-                                key={status.id}
-                                status={status}
-                                tasks={tasksInCell(
-                                  tasks,
-                                  placements,
-                                  lane.key,
-                                  `status:${status.id}`,
-                                  sort,
-                                )}
-                                statuses={statuses}
-                                laneKey={lane.key}
-                                laneLabel={lane.label}
-                                headerHidden
-                                selectedTaskKey={selectedTaskKey}
-                                mobileActive={status.id === selectedMobileStatus?.id}
-                                dragDisabled={moveDisabled}
-                                reorderDisabled={false}
-                                moveDisabled={moveDisabled}
-                                collapsed={collapsedColumns.collapsed.includes(
-                                  status.id,
-                                )}
-                                showAge={showAge}
-                                hint={null}
-                                hrefForTask={hrefForTask}
-                                onMove={moveFromMenu}
-                                onToggleCollapse={collapsedColumns.toggle}
-                                editing={editing}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </section>
-                    );
-                  })}
-                </div>
+              {!isBoardCanvas ? (
+                <ProjectStudio
+                  groups={studioGroups}
+                  statuses={statuses}
+                  selectedTaskKey={selectedTaskKey}
+                  hrefForTask={hrefForTask}
+                  moveDisabled={moveDisabled}
+                  onMove={moveFromMenu}
+                />
               ) : (
-                <div className="kanban-board" aria-label={`${project.name} board`}>
-                  {visibleStatuses.map((status) => (
-                    <KanbanColumn
-                      key={status.id}
-                      status={status}
-                      tasks={tasksInStatus(tasks, status.id, sort)}
-                      statuses={statuses}
-                      selectedTaskKey={selectedTaskKey}
-                      mobileActive={status.id === selectedMobileStatus?.id}
-                      dragDisabled={moveTask.isPending}
-                      reorderDisabled={sort !== "manual"}
-                      moveDisabled={moveTask.isPending}
-                      collapsed={collapsedColumns.collapsed.includes(status.id)}
-                      showAge={showAge}
-                      hint={status.category === "in_progress" ? doneHint : null}
-                      hrefForTask={hrefForTask}
-                      onMove={moveFromMenu}
-                      onToggleCollapse={collapsedColumns.toggle}
-                      editing={editing}
-                    />
-                  ))}
-                </div>
+                <>
+                  <label className="board-mobile-status">
+                    {/* A column, not a swimlane: on a phone the board shows one stage at a time. */}
+                    <span>Stage</span>
+                    <Select
+                      value={selectedMobileStatus?.id ?? ""}
+                      aria-label="Board stage"
+                      onChange={(event) => setMobileStatusId(event.target.value)}
+                    >
+                      {visibleStatuses.map((status) => (
+                        <option key={status.id} value={status.id}>
+                          {status.name} · {tasksInStatus(tasks, status.id, sort).length}
+                        </option>
+                      ))}
+                    </Select>
+                  </label>
+
+                  {swimlaned ? (
+                    <div
+                      className="board-swimlanes"
+                      aria-label={`${project.name} board`}
+                    >
+                      {/* The columns are named once, above the lanes, so a card's column and
+                    its lane each have exactly one heading. */}
+                      <div className="kanban-board kanban-board--headings">
+                        {visibleStatuses.map((status) => (
+                          <KanbanColumn
+                            key={status.id}
+                            status={status}
+                            tasks={tasksInColumn(
+                              tasks,
+                              placements,
+                              `status:${status.id}`,
+                            )}
+                            statuses={statuses}
+                            bodyHidden
+                            selectedTaskKey={selectedTaskKey}
+                            mobileActive={status.id === selectedMobileStatus?.id}
+                            dragDisabled
+                            reorderDisabled
+                            moveDisabled={moveDisabled}
+                            collapsed={collapsedColumns.collapsed.includes(status.id)}
+                            showAge={showAge}
+                            hint={status.category === "in_progress" ? doneHint : null}
+                            hrefForTask={hrefForTask}
+                            onMove={moveFromMenu}
+                            onToggleCollapse={collapsedColumns.toggle}
+                            editing={editing}
+                          />
+                        ))}
+                      </div>
+
+                      {lanes.map((lane) => {
+                        const laneCollapsed = collapsedLanes.collapsed.includes(
+                          lane.key,
+                        );
+                        return (
+                          <section
+                            key={lane.key}
+                            className="board-lane"
+                            data-collapsed={laneCollapsed || undefined}
+                            data-writable={lane.writable || undefined}
+                            aria-labelledby={`board-lane-${lane.key}`}
+                          >
+                            <header className="board-lane__header">
+                              <button
+                                type="button"
+                                className="board-lane__toggle"
+                                aria-expanded={!laneCollapsed}
+                                aria-label={`${laneCollapsed ? "Expand" : "Collapse"} ${lane.label}`}
+                                onClick={() => collapsedLanes.toggle(lane.key)}
+                              >
+                                <span aria-hidden="true">
+                                  {laneCollapsed ? "›" : "⌄"}
+                                </span>
+                              </button>
+                              <h2 id={`board-lane-${lane.key}`}>{lane.label}</h2>
+                              <span
+                                className="board-lane__count"
+                                aria-label={`${lane.count} cards`}
+                              >
+                                {lane.count}
+                              </span>
+                              {lane.writable ? null : (
+                                <span className="board-lane__hint">Read-only lane</span>
+                              )}
+                            </header>
+                            {laneCollapsed ? null : (
+                              <div className="kanban-board">
+                                {visibleStatuses.map((status) => (
+                                  <KanbanColumn
+                                    key={status.id}
+                                    status={status}
+                                    tasks={tasksInCell(
+                                      tasks,
+                                      placements,
+                                      lane.key,
+                                      `status:${status.id}`,
+                                      sort,
+                                    )}
+                                    statuses={statuses}
+                                    laneKey={lane.key}
+                                    laneLabel={lane.label}
+                                    headerHidden
+                                    selectedTaskKey={selectedTaskKey}
+                                    mobileActive={
+                                      status.id === selectedMobileStatus?.id
+                                    }
+                                    dragDisabled={moveDisabled}
+                                    reorderDisabled={false}
+                                    moveDisabled={moveDisabled}
+                                    collapsed={collapsedColumns.collapsed.includes(
+                                      status.id,
+                                    )}
+                                    showAge={showAge}
+                                    hint={null}
+                                    hrefForTask={hrefForTask}
+                                    onMove={moveFromMenu}
+                                    onToggleCollapse={collapsedColumns.toggle}
+                                    editing={editing}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </section>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="kanban-board" aria-label={`${project.name} board`}>
+                      {visibleStatuses.map((status) => (
+                        <KanbanColumn
+                          key={status.id}
+                          status={status}
+                          tasks={tasksInStatus(tasks, status.id, sort)}
+                          statuses={statuses}
+                          selectedTaskKey={selectedTaskKey}
+                          mobileActive={status.id === selectedMobileStatus?.id}
+                          dragDisabled={moveTask.isPending}
+                          reorderDisabled={sort !== "manual"}
+                          moveDisabled={moveTask.isPending}
+                          collapsed={collapsedColumns.collapsed.includes(status.id)}
+                          showAge={showAge}
+                          hint={status.category === "in_progress" ? doneHint : null}
+                          hrefForTask={hrefForTask}
+                          onMove={moveFromMenu}
+                          onToggleCollapse={collapsedColumns.toggle}
+                          editing={editing}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

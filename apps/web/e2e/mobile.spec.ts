@@ -79,6 +79,7 @@ test("every view fits the phone width and the main controls are thumb-sized", as
     "/upcoming",
     "/inbox",
     `/projects/${projectId}/board`,
+    `/projects/${projectId}/board?canvas=board`,
     `/projects/${projectId}/settings`,
     `/projects/${projectId}/flow`,
     "/projects",
@@ -141,7 +142,7 @@ test("the board runs one lane at a time and the task detail opens as a sheet", a
 }) => {
   await signUp(page);
   const projectId = await createProject(page, "Phone board");
-  await page.goto(`/projects/${projectId}/board`);
+  await page.goto(`/projects/${projectId}/board?canvas=board`);
   await expect(
     page.getByRole("heading", { level: 1, name: "Phone board" }),
   ).toBeVisible();

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { openSection } from "./disclosures";
+import { openProjectBoard, openSection } from "./disclosures";
 
 /**
  * Dependencies as relations with a reason (GAP-06, spec 8.4): a blocks relation added
@@ -35,7 +35,8 @@ async function addReadyTask(page: Page, title: string) {
   const capture = page.getByPlaceholder("Add to Ready and press Enter");
   // The quick-add stays open after a capture, so only open it when it is closed.
   if (!(await capture.isVisible())) {
-    await page.getByRole("button", { name: "+ Add to Ready" }).click();
+    await openProjectBoard(page);
+    await page.getByRole("button", { name: "+ Add a task" }).click();
   }
   await capture.fill(title);
   await capture.press("Enter");
@@ -49,6 +50,7 @@ test("a blocks relation marks the target until the source completes", async ({
 }) => {
   await signUp(page);
   await createProject(page);
+  await openProjectBoard(page);
   await addReadyTask(page, "Collect sources");
   await addReadyTask(page, "Make slides");
 
@@ -110,6 +112,7 @@ test("a flagged task keeps its stage, shows the reason, and warns before complet
 }) => {
   await signUp(page);
   await createProject(page);
+  await openProjectBoard(page);
   await addReadyTask(page, "Book venue");
 
   const ready = page.getByRole("region", { name: "Ready" });

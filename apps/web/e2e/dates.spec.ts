@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { openSection } from "./disclosures";
+import { openProjectBoard, openSection } from "./disclosures";
 
 /**
  * Start/defer dates and deadlines (GAP-16): a deferred task leaves Today, Upcoming, the
@@ -162,7 +162,8 @@ test("the board hides a deferred card until asked to show it", async ({ page }) 
   await page.getByLabel("Project name").fill("Deferral");
   await page.getByRole("button", { name: "Create project" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Deferral" })).toBeVisible();
-  await page.getByRole("button", { name: "+ Add to Ready" }).click();
+  await openProjectBoard(page);
+  await page.getByRole("button", { name: "+ Add a task" }).click();
   const field = page.getByPlaceholder("Add to Ready and press Enter");
   await field.fill("Later card");
   await field.press("Enter");
@@ -176,7 +177,7 @@ test("the board hides a deferred card until asked to show it", async ({ page }) 
   await panel.getByLabel("Defer until").fill(addDays(today, 7));
   await expect(ready.getByRole("link", { name: "Later card" })).toHaveCount(0);
 
-  const controls = page.getByRole("region", { name: "Board controls" });
+  const controls = page.getByRole("region", { name: "Project views and controls" });
   await controls.locator("summary").click();
   await controls.getByLabel("Deferred shown").selectOption("show");
   await expect(page).toHaveURL(/deferred=show/);

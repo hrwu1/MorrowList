@@ -49,7 +49,9 @@ export default defineConfig({
     // timeout and a test that walks many routes never fits its budget. CI builds before
     // it runs the suite, so drive the production server there; local runs keep the dev
     // server, whose rebuilds are what make iterating on a test bearable.
-    command: production ? `pnpm start --port ${PORT}` : `pnpm dev --port ${PORT}`,
+    command: production
+      ? `pnpm start --hostname 127.0.0.1 --port ${PORT}`
+      : `pnpm dev --hostname 127.0.0.1 --port ${PORT}`,
     url: `${baseURL}/api/v1/health`,
     // Never reuse a server already listening on this port: it may have been started
     // against DATABASE_URL, which would put the suite's rows back in development data.
@@ -68,6 +70,7 @@ export default defineConfig({
         .join(","),
       // The reminder worker polls fast here so a reminder due in a minute is seen in time.
       WORKER_POLL_SECONDS: "2",
+      WORKER_MODE: "embedded",
     },
   },
 });

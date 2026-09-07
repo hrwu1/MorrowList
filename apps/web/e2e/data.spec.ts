@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { openSection } from "./disclosures";
+import { openProjectBoard, openSection } from "./disclosures";
 
 /**
  * Export and import end to end (GAP-07, spec 30): download the archive and the task CSV,
@@ -158,6 +158,7 @@ test("a Trello board previews, then imports as a board with columns, tags and su
   await expect(
     page.getByRole("heading", { level: 1, name: "Website Relaunch" }),
   ).toBeVisible();
+  await openProjectBoard(page);
   // Lists became columns, in board order.
   await expect(page.getByRole("region", { name: "Backlog" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Doing" })).toBeVisible();
@@ -174,7 +175,7 @@ test("a Trello board previews, then imports as a board with columns, tags and su
   ).toBeVisible();
 
   // A card's checklist stays in the card's column rather than scattering.
-  await page.goto(`${new URL(page.url()).pathname}?subtasks=show`);
+  await page.goto(`${new URL(page.url()).pathname}?canvas=board&subtasks=show`);
   await expect(
     page
       .getByRole("region", { name: "Backlog" })

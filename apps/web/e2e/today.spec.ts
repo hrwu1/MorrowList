@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { openSection } from "./disclosures";
+import { openProjectBoard, openSection } from "./disclosures";
 
 /**
  * The daily loop (spec 9.2, 9.3): choose work for today, see it in Today, finish it
@@ -244,7 +244,8 @@ test("My Day can be toggled from a board card and the task detail", async ({
   await expect(
     page.getByRole("heading", { level: 1, name: "Daily Loop" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "+ Add to Ready" }).click();
+  await openProjectBoard(page);
+  await page.getByRole("button", { name: "+ Add a task" }).click();
   const field = page.getByPlaceholder("Add to Ready and press Enter");
   await field.fill("Card for the day");
   await field.press("Enter");

@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { openSection } from "./disclosures";
+import { openProjectBoard, openSection } from "./disclosures";
 
 const PASSWORD = "correct-horse-battery-staple";
 
@@ -104,6 +104,7 @@ test("quickly creates projects from desktop and mobile navigation", async ({
 test("creates a project and moves a board task with pointer drag", async ({ page }) => {
   await signUp(page);
   await createProject(page);
+  await openProjectBoard(page);
 
   for (const status of ["Backlog", "Ready", "In Progress", "Done"]) {
     await expect(page.getByRole("heading", { level: 2, name: status })).toBeVisible();
@@ -113,7 +114,7 @@ test("creates a project and moves a board task with pointer drag", async ({ page
     0,
   );
 
-  const controls = page.getByRole("region", { name: "Board controls" });
+  const controls = page.getByRole("region", { name: "Project views and controls" });
   await controls.locator("summary").click();
   await controls.getByLabel("Stages shown").selectOption("all");
   await expect(page.getByRole("heading", { level: 2, name: "Blocked" })).toBeVisible();
@@ -121,7 +122,9 @@ test("creates a project and moves a board task with pointer drag", async ({ page
     page.getByRole("heading", { level: 2, name: "In Review" }),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "+ Add to Ready" }).click();
+  await openProjectBoard(page);
+
+  await page.getByRole("button", { name: "+ Add a task" }).click();
   const capture = page.getByPlaceholder("Add to Ready and press Enter");
   await capture.fill("Draft research brief");
   await capture.press("Enter");
@@ -147,12 +150,13 @@ test("creates a project and moves a board task with pointer drag", async ({ page
 test("automatic sort disables drag but keeps the Move menu", async ({ page }) => {
   await signUp(page);
   await createProject(page);
-  await page.getByRole("button", { name: "+ Add to Ready" }).click();
+  await openProjectBoard(page);
+  await page.getByRole("button", { name: "+ Add a task" }).click();
   const capture = page.getByPlaceholder("Add to Ready and press Enter");
   await capture.fill("Review interview notes");
   await capture.press("Enter");
 
-  const controls = page.getByRole("region", { name: "Board controls" });
+  const controls = page.getByRole("region", { name: "Project views and controls" });
   await controls.locator("summary").click();
   await controls.getByLabel("Sort board").selectOption("priority");
   await expect(page).toHaveURL(/sort=priority/);
@@ -191,6 +195,7 @@ test("captures globally, sorts into a project, and keeps board history current",
 }) => {
   await signUp(page);
   await createProject(page);
+  await openProjectBoard(page);
 
   await page
     .getByRole("button", { name: "Capture a new Inbox task", exact: true })
@@ -243,6 +248,7 @@ test("captures globally, sorts into a project, and keeps board history current",
     .click();
 
   await page.getByRole("link", { name: "Research Launch", exact: true }).click();
+  await openProjectBoard(page, "Research Launch");
   await expect(
     page
       .getByRole("region", { name: "Ready" })
@@ -262,12 +268,13 @@ async function addSecondProject(page: Page) {
 
 /**
  * Waits for the named board before opening its capture input: the sidebar link that
- * precedes this is a soft navigation, and clicking "+ Add to Ready" while the previous
+ * precedes this is a soft navigation, and clicking "+ Add a task" while the previous
  * board is still on screen files the task under that project instead.
  */
 async function addReadyTask(page: Page, project: string, title: string) {
   await expect(page.getByRole("heading", { level: 1, name: project })).toBeVisible();
-  await page.getByRole("button", { name: "+ Add to Ready" }).click();
+  await openProjectBoard(page);
+  await page.getByRole("button", { name: "+ Add a task" }).click();
   const capture = page.getByPlaceholder("Add to Ready and press Enter");
   await capture.fill(title);
   await capture.press("Enter");
@@ -281,8 +288,10 @@ test("the Project field moves a task to another project or back to the Inbox", a
 }) => {
   await signUp(page);
   await createProject(page);
+  await openProjectBoard(page);
   await addSecondProject(page);
   await page.getByRole("link", { name: "Research Launch", exact: true }).click();
+  await openProjectBoard(page, "Research Launch");
   await addReadyTask(page, "Research Launch", "Write launch FAQ");
 
   const ready = page.getByRole("region", { name: "Ready" });
@@ -293,6 +302,7 @@ test("the Project field moves a task to another project or back to the Inbox", a
   await expect(panel.getByLabel("Project")).toHaveValue(/./);
 
   await page.getByRole("link", { name: "Design System", exact: true }).click();
+  await openProjectBoard(page, "Design System");
   await expect(
     page
       .getByRole("region", { name: "Ready" })
@@ -323,8 +333,10 @@ test("dragging a card or row onto a sidebar destination moves it there", async (
 }) => {
   await signUp(page);
   await createProject(page);
+  await openProjectBoard(page);
   await addSecondProject(page);
   await page.getByRole("link", { name: "Research Launch", exact: true }).click();
+  await openProjectBoard(page, "Research Launch");
   await addReadyTask(page, "Research Launch", "Sketch onboarding flow");
 
   const ready = page.getByRole("region", { name: "Ready" });
@@ -344,6 +356,7 @@ test("dragging a card or row onto a sidebar destination moves it there", async (
   await expect(page).not.toHaveURL(/task=/);
 
   await page.getByRole("link", { name: "Design System", exact: true }).click();
+  await openProjectBoard(page, "Design System");
   await expect(
     page
       .getByRole("region", { name: "Ready" })
@@ -376,6 +389,7 @@ test("dragging a card or row onto a sidebar destination moves it there", async (
   await expect(row).toHaveCount(0);
 
   await page.getByRole("link", { name: "Research Launch", exact: true }).click();
+  await openProjectBoard(page, "Research Launch");
   await expect(
     page
       .getByRole("region", { name: "Ready" })

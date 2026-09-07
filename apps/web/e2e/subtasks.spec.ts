@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { openSection } from "./disclosures";
+import { openProjectBoard, openSection } from "./disclosures";
 
 /**
  * Subtasks and checklists (spec 8.3): added from the detail, ticked off there, with
@@ -31,7 +31,8 @@ async function createProject(page: Page) {
 }
 
 async function addReadyTask(page: Page, title: string) {
-  await page.getByRole("button", { name: "+ Add to Ready" }).click();
+  await openProjectBoard(page);
+  await page.getByRole("button", { name: "+ Add a task" }).click();
   const capture = page.getByPlaceholder("Add to Ready and press Enter");
   await capture.fill(title);
   await capture.press("Enter");
@@ -45,6 +46,7 @@ test("subtasks are added from the detail, tracked on the card, and hidden on the
 }) => {
   await signUp(page);
   await createProject(page);
+  await openProjectBoard(page);
   await addReadyTask(page, "Plan launch");
 
   const ready = page.getByRole("region", { name: "Ready" });
@@ -95,7 +97,7 @@ test("subtasks are added from the detail, tracked on the card, and hidden on the
   ).toHaveAttribute("aria-pressed", "false");
 
   // The view toggle reveals the children as cards of their own.
-  const controls = page.getByRole("region", { name: "Board controls" });
+  const controls = page.getByRole("region", { name: "Project views and controls" });
   await controls.locator("summary").click();
   await controls.getByLabel("Subtasks shown").selectOption("show");
   await expect(page).toHaveURL(/subtasks=show/);
@@ -128,6 +130,7 @@ test("a subtask can be detached and a fourth nesting level is refused", async ({
 }) => {
   await signUp(page);
   await createProject(page);
+  await openProjectBoard(page);
   await addReadyTask(page, "Level one");
 
   const ready = page.getByRole("region", { name: "Ready" });
