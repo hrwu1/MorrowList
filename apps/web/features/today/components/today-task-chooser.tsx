@@ -37,7 +37,7 @@ export function TodayTaskChooser({
     >
       <div className="today-chooser__header">
         <div>
-          <h2>Make room for what matters</h2>
+          <h2 tabIndex={-1}>Make room for what matters</h2>
           <p>Choose from your Inbox and projects.</p>
         </div>
         <Button ref={doneButton} onClick={onClose}>

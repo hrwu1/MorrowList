@@ -1,0 +1,734 @@
+.studio-today {
+  --studio-focus-cream: #f6f5dd;
+  --studio-focus-soft: #c5d2ba;
+  --studio-focus-border: #6c806b;
+  --studio-focus-bg: #284734;
+  width: 100%;
+  max-width: none;
+}
+
+.studio-today__content {
+  min-width: 0;
+  gap: 1.5rem;
+}
+
+.studio-today-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 2.75rem;
+}
+
+.studio-today-header__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: var(--studio-muted, var(--text-secondary));
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+}
+
+.studio-today-header__eyebrow h1 {
+  margin: 0;
+  font: inherit;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--studio-ink, var(--text-primary));
+}
+
+.studio-today-header__eyebrow p {
+  margin: 0;
+}
+
+.studio-today-header__divider {
+  width: 1.3rem;
+  height: 1px;
+  background: var(--studio-line, var(--border-strong));
+}
+
+.studio-today-choose {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.studio-today-choose > span {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.studio-today-intro {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 0.65rem 0 0.7rem;
+}
+
+.studio-today-intro h2 {
+  font-family: var(--studio-serif, Georgia, serif);
+  font-size: clamp(2.8rem, 4.8vw, 4.8rem);
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.055em;
+  margin: 0;
+  color: var(--studio-ink, var(--text-primary));
+}
+
+.studio-today-intro h2 em {
+  font-weight: 400;
+  color: var(--accent-text);
+}
+
+.studio-today-intro > p {
+  margin: 0 0 0.45rem;
+  font-size: 0.87rem;
+  line-height: 1.7;
+  color: var(--studio-muted, var(--text-secondary));
+  flex-shrink: 0;
+}
+
+.studio-today-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(13rem, 0.85fr);
+  gap: 1.4rem;
+}
+
+.studio-focus-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  isolation: isolate;
+  /* Decorative rings must not create an internal scroll area when focus returns. */
+  overflow: clip;
+  min-width: 0;
+  min-height: 21.5rem;
+  padding: clamp(1.4rem, 2.7vw, 2.25rem);
+  border-radius: 1.1rem;
+  background: var(--studio-focus-bg);
+  color: var(--studio-focus-cream);
+}
+
+.studio-focus-card__topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.studio-focus-card__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.studio-focus-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #d5e9ac;
+  box-shadow: 0 0 0 4px rgb(213 233 172 / 9%);
+}
+
+.studio-focus-card__number {
+  font-family: var(--studio-serif, Georgia, serif);
+  font-size: 1.7rem;
+  color: var(--studio-focus-soft);
+  line-height: 1;
+}
+
+.studio-focus-card__task {
+  flex: 1;
+  margin-top: 1.8rem;
+  margin-bottom: 1.55rem;
+}
+
+.studio-focus-card__meta,
+.studio-focus-dialog__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin: 0 0 0.65rem;
+  font-size: 0.72rem;
+}
+
+.studio-focus-card__meta {
+  color: var(--studio-focus-soft);
+}
+
+.studio-focus-card__meta span + span,
+.studio-focus-dialog__meta span + span {
+  border-left: 1px solid currentColor;
+  padding-left: 0.7rem;
+}
+
+.studio-focus-card h3 {
+  margin: 0;
+  max-width: 26ch;
+  font-family: var(--studio-serif, Georgia, serif);
+  font-weight: 400;
+  font-size: clamp(1.8rem, 2.7vw, 2.7rem);
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
+  color: inherit;
+}
+
+.studio-focus-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem 1.25rem;
+  flex-wrap: wrap;
+}
+
+.studio-focus-start,
+.studio-focus-finish {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.8rem;
+  min-height: 2.9rem;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  padding: 0.7rem 1rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.studio-focus-start {
+  color: var(--studio-focus-bg);
+  background: var(--studio-focus-cream);
+}
+
+.studio-focus-start:hover {
+  background: #e7edcd;
+}
+
+.studio-focus-start:active,
+.studio-focus-finish:active {
+  transform: translateY(1px);
+}
+
+.studio-focus-card :focus-visible {
+  outline: 2px solid var(--studio-focus-cream);
+  outline-offset: 4px;
+}
+
+.studio-focus-details {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  color: var(--studio-focus-cream);
+  text-underline-offset: 0.25rem;
+  font-size: 0.78rem;
+}
+
+.studio-focus-details:hover {
+  color: white;
+}
+
+.studio-focus-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.2rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--studio-focus-border);
+  font-size: 0.73rem;
+}
+
+.studio-focus-picker label {
+  flex-shrink: 0;
+  color: var(--studio-focus-soft);
+}
+
+.studio-focus-picker select {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 0.4rem 0.25rem;
+  background: var(--studio-focus-bg);
+  color: var(--studio-focus-cream);
+  border: 0;
+  border-radius: 0.2rem;
+  font: inherit;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.studio-focus-rings {
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+  right: -5rem;
+  bottom: -7rem;
+  width: 22rem;
+  height: 22rem;
+  opacity: 0.23;
+}
+
+.studio-focus-rings span {
+  position: absolute;
+  inset: 0;
+  border: 1px solid #a3b392;
+  border-radius: 50%;
+}
+
+.studio-focus-rings span:nth-child(2) {
+  inset: 2.25rem;
+}
+.studio-focus-rings span:nth-child(3) {
+  inset: 4.5rem;
+}
+
+.studio-focus-card__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+  padding-top: 1.9rem;
+}
+
+.studio-focus-card__empty > p {
+  max-width: 28ch;
+  margin: 0 0 0.4rem;
+  color: var(--studio-focus-soft);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.studio-breathe {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0.5rem 1.35rem 0;
+  align-items: flex-start;
+  color: var(--studio-muted, var(--text-secondary));
+}
+
+.studio-breathe__illustration {
+  width: 8.4rem;
+  height: 5.75rem;
+  margin: 0 auto 0.7rem;
+  color: var(--accent-text);
+}
+
+.studio-breathe__illustration svg {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.studio-breathe__eyebrow {
+  margin: 0 0 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+
+.studio-breathe h3 {
+  margin: 0 0 0.8rem;
+  font-family: var(--studio-serif, Georgia, serif);
+  font-size: clamp(1.6rem, 2.2vw, 2.2rem);
+  line-height: 1.1;
+  font-weight: 400;
+  letter-spacing: -0.04em;
+  color: var(--studio-ink, var(--text-primary));
+}
+
+.studio-breathe > p:not(.studio-breathe__eyebrow) {
+  margin: 0;
+  line-height: 1.7;
+  font-size: 0.8rem;
+}
+
+.studio-breathe__footer {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: auto;
+  padding-top: 1.2rem;
+  padding-bottom: 0.2rem;
+  width: 100%;
+  border-top: 1px solid var(--studio-line, var(--border-subtle));
+  font-size: 0.7rem;
+  line-height: 1.6;
+}
+
+.studio-breathe__count {
+  font-family: var(--studio-serif, Georgia, serif);
+  font-size: 2.8rem;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--accent-text);
+}
+
+.studio-breathe__footer strong {
+  font-weight: 400;
+}
+
+.studio-today-list-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.4rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid var(--studio-line, var(--border-subtle));
+}
+
+.studio-today-list-heading__eyebrow {
+  margin: 0 0 0.4rem;
+  color: var(--studio-muted, var(--text-secondary));
+  font-size: 0.63rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.studio-today-list-heading h2 {
+  margin: 0;
+  font-family: var(--studio-serif, Georgia, serif);
+  font-size: 1.9rem;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  color: var(--studio-ink, var(--text-primary));
+}
+
+.studio-today-list-heading .saved-view-layout {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.studio-today .today-section__heading {
+  font-size: 0.77rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.studio-today .today-section__count {
+  background: transparent;
+  border: 1px solid var(--studio-line, var(--border-subtle));
+}
+
+.studio-focus-dialog {
+  box-sizing: border-box;
+  margin: auto;
+  width: min(50rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  border: 1px solid var(--studio-line, var(--border-subtle));
+  border-radius: 1rem;
+  padding: clamp(1.25rem, 4vw, 2.75rem);
+  overflow-y: auto;
+  background: var(--studio-paper, var(--surface-base));
+  color: var(--studio-ink, var(--text-primary));
+  box-shadow: 0 2rem 7rem rgb(13 27 18 / 22%);
+}
+
+.studio-focus-dialog::backdrop {
+  background: rgb(20 35 25 / 48%);
+  backdrop-filter: blur(7px);
+}
+
+.studio-focus-dialog__topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--studio-line, var(--border-subtle));
+  padding-bottom: 1rem;
+}
+
+.studio-focus-dialog__eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+  font-size: 0.67rem;
+  color: var(--studio-muted, var(--text-secondary));
+}
+
+.studio-focus-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 2.75rem;
+  padding: 0.5rem;
+  border: 0;
+  border-radius: 0.3rem;
+  background: transparent;
+  color: var(--studio-ink, var(--text-primary));
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.studio-focus-close:hover {
+  background: var(--studio-sage, var(--surface-sunken));
+}
+
+.studio-focus-close span {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.studio-focus-dialog__body {
+  padding: 2.3rem 0 0.8rem;
+}
+
+.studio-focus-dialog__meta {
+  color: var(--studio-muted, var(--text-secondary));
+  text-transform: capitalize;
+}
+
+.studio-focus-dialog__body > h2,
+.studio-focus-success h2 {
+  margin: 0.8rem 0;
+  font-family: var(--studio-serif, Georgia, serif);
+  font-size: clamp(2rem, 4.5vw, 3.5rem);
+  font-weight: 400;
+  line-height: 1.16;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+}
+
+.studio-focus-dialog__reassurance {
+  margin: 1rem 0 2rem;
+  font-size: 0.9rem;
+  color: var(--studio-muted, var(--text-secondary));
+}
+
+.studio-focus-dialog__load-state {
+  padding-block: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--studio-muted, var(--text-secondary));
+}
+
+.studio-focus-description {
+  border-top: 1px solid var(--studio-line, var(--border-subtle));
+  margin-bottom: 1.8rem;
+  padding-top: 1.2rem;
+  overflow-wrap: anywhere;
+}
+
+.studio-focus-dialog__warning {
+  padding: 0.85rem 1rem;
+  border-left: 3px solid var(--warning);
+  background: var(--surface-sunken);
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.studio-focus-dialog__subtasks {
+  font-size: 0.85rem;
+  color: var(--studio-muted, var(--text-secondary));
+  margin-bottom: 1.5rem;
+}
+
+.studio-focus-finish {
+  background: var(--studio-focus-bg);
+  color: var(--studio-focus-cream);
+  margin-top: 0.5rem;
+}
+
+.studio-focus-finish:hover:not(:disabled) {
+  background: #355e45;
+}
+
+.studio-focus-finish:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.studio-focus-dialog :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 4px;
+}
+
+.studio-focus-success {
+  text-align: center;
+  padding: 3rem 0 2rem;
+}
+
+.studio-focus-success__mark {
+  display: inline-grid;
+  place-items: center;
+  width: 4rem;
+  height: 4rem;
+  margin-bottom: 0.8rem;
+  border: 1px solid var(--studio-line, var(--border-subtle));
+  border-radius: 50%;
+  color: var(--accent-text);
+  background: var(--studio-sage, var(--success-subtle));
+  font-size: 1.7rem;
+}
+
+.studio-focus-success h2:focus {
+  outline: none;
+}
+
+.studio-focus-success p {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--studio-muted, var(--text-secondary));
+  overflow-wrap: anywhere;
+}
+
+.studio-focus-success strong {
+  color: var(--studio-ink, var(--text-primary));
+  font-weight: 500;
+}
+
+.studio-focus-success .studio-focus-finish {
+  margin-top: 1.6rem;
+}
+
+.studio-focus-undo {
+  display: block;
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  margin: 0.7rem auto 0;
+  border: 0;
+  border-radius: 0.3rem;
+  background: transparent;
+  color: var(--studio-muted, var(--text-secondary));
+  font: inherit;
+  font-size: 0.8rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
+  cursor: pointer;
+}
+
+.studio-focus-undo:hover {
+  background: var(--studio-sage, var(--surface-sunken));
+}
+
+@media (max-width: 74rem) {
+  .studio-today-intro > p {
+    display: none;
+  }
+  .studio-today-stage {
+    grid-template-columns: minmax(0, 1.45fr) minmax(11rem, 0.8fr);
+  }
+  .studio-breathe {
+    padding-inline: 0.6rem;
+  }
+  .studio-breathe__eyebrow {
+    font-size: 0.59rem;
+  }
+}
+
+@media (max-width: 58rem) {
+  .studio-today-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+  }
+  .studio-today-header__eyebrow {
+    font-size: 0.7rem;
+    gap: 0.6rem;
+  }
+  .studio-today-header__eyebrow h1 {
+    font-size: 0.7rem;
+  }
+  .studio-today-stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .studio-focus-card {
+    min-height: 20rem;
+  }
+  .studio-breathe {
+    display: none;
+  }
+  .studio-today-intro h2 {
+    font-size: clamp(2.8rem, 6vw, 4rem);
+  }
+}
+
+@media (max-width: 40rem) {
+  .studio-today__content {
+    gap: 1.15rem;
+  }
+  .studio-today-header {
+    gap: 0.8rem;
+  }
+  .studio-today-header__eyebrow p {
+    font-size: 0.7rem;
+  }
+  .studio-today-header .studio-today-choose {
+    font-size: 0.75rem;
+    min-height: 2.75rem;
+  }
+  .studio-today-intro {
+    padding: 0.5rem 0;
+  }
+  .studio-today-intro h2 {
+    font-size: 2.9rem;
+  }
+  .studio-focus-card {
+    padding: 1.35rem;
+    min-height: 20rem;
+    border-radius: 0.85rem;
+  }
+  .studio-focus-card__eyebrow {
+    font-size: 0.63rem;
+  }
+  .studio-focus-card__task {
+    margin-top: 1.45rem;
+  }
+  .studio-focus-card h3 {
+    font-size: 2rem;
+  }
+  .studio-focus-card__actions {
+    gap: 0.4rem 0.8rem;
+  }
+  .studio-focus-start {
+    gap: 1.1rem;
+  }
+  .studio-today-list-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-top: 0.7rem;
+  }
+  .studio-today-list-heading h2 {
+    font-size: 1.7rem;
+  }
+  .studio-today-list-heading__eyebrow {
+    font-size: 0.58rem;
+  }
+  .studio-focus-dialog__topline {
+    gap: 0.5rem;
+  }
+  .studio-focus-dialog__eyebrow {
+    font-size: 0.58rem;
+  }
+  .studio-focus-close {
+    font-size: 0.7rem;
+    gap: 0.5rem;
+  }
+  .studio-focus-dialog__body {
+    padding-top: 1.7rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-focus-start,
+  .studio-focus-finish {
+    transition: none;
+  }
+}
