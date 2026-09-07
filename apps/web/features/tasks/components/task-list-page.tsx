@@ -113,8 +113,10 @@ export function TaskListPage({
   const closePanel = useCallback(() => {
     const next = new URLSearchParams(searchParams.toString());
     next.delete("task");
-    navigate(next);
-  }, [navigate, searchParams]);
+    const query = next.toString();
+    // Closing the client-side panel should not wait for a server-rendered list either.
+    window.history.replaceState(null, "", query ? `${pathname}?${query}` : pathname);
+  }, [pathname, searchParams]);
 
   /**
    * Focus returns to the row that opened the panel (spec 14). It has to happen in an

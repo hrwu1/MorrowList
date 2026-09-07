@@ -113,6 +113,20 @@ export function TaskRow({ task, detailHref, selected, today }: TaskRowProps) {
             <Link
               className="task-row__title"
               href={detailHref}
+              prefetch={false}
+              onNavigate={(event) => {
+                const target = new URL(detailHref, window.location.href);
+                if (
+                  target.origin !== window.location.origin ||
+                  target.pathname !== window.location.pathname
+                ) {
+                  return;
+                }
+                // Panel selection is client URL state; the detail fetches its own task.
+                // Opening the panel does not need another server-rendered list.
+                event.preventDefault();
+                window.history.pushState(null, "", target.href);
+              }}
               // The list uses this to return focus here when the panel closes (spec 14).
               id={`task-link-${task.key}`}
             >

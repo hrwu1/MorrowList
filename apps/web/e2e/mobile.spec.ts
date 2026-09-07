@@ -162,15 +162,32 @@ test("the board runs one lane at a time and the task detail opens as a sheet", a
   );
   expect(await overflowsHorizontally(page)).toBe(false);
 
-  await page.goto("/inbox");
+  await page.goto("/inbox?sort=created");
   await capture(page, "Open me on a phone");
   const listTop = (await page.getByRole("list", { name: "Inbox tasks" }).boundingBox())!
     .y;
+  // The sheet is client state backed by the task API. Opening it must not depend on
+  // another server-rendered Inbox response, even if that request cannot complete.
+  let renderRequests = 0;
+  await page.route("**/inbox?**", async (route) => {
+    if (route.request().headers()["rsc"] === "1") {
+      renderRequests++;
+      await route.abort();
+    } else await route.continue();
+  });
   await page.getByRole("link", { name: "Open me on a phone" }).click();
 
   const panel = page.getByRole("complementary", { name: /Task details for/ });
   await expect(panel).toBeVisible();
   await expect(panel.getByLabel("Title")).toHaveValue("Open me on a phone");
+  await expect(page).toHaveURL(/\/inbox\?sort=created&task=MOBI-1$/);
+  await page.goBack();
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Open me on a phone" })).toBeFocused();
+  await expect(page).toHaveURL(/\/inbox\?sort=created$/);
+  await page.goForward();
+  await expect(panel).toBeVisible();
+  await expect(page).toHaveURL(/\/inbox\?sort=created&task=MOBI-1$/);
   const box = (await panel.boundingBox())!;
   const viewport = page.viewportSize()!;
   // A sheet: anchored to the bottom edge, full width, and the list still starts where it did.
@@ -182,4 +199,7 @@ test("the board runs one lane at a time and the task detail opens as a sheet", a
 
   await panel.getByRole("button", { name: "Close task details" }).click();
   await expect(panel).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Open me on a phone" })).toBeFocused();
+  await expect(page).toHaveURL(/\/inbox\?sort=created$/);
+  expect(renderRequests).toBe(0);
 });
