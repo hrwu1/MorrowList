@@ -1,3 +1,4 @@
+import { updateTaskRequestSchema } from "@morrowlist/contracts";
 import { fixedClock } from "@morrowlist/domain";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -97,6 +98,20 @@ describe("email capture", () => {
       "Unsupported",
     );
   });
+  it("stores long email bodies within the task description edit limit", async () => {
+    const result = await service.receive(
+      "normalized",
+      { ...email(await address()), text: "a".repeat(60_000) },
+      "long-email",
+    );
+    const descriptionMd = uow.data.tasks.get(result.taskId)!.descriptionMd!;
+    expect(descriptionMd).toHaveLength(50_000);
+    expect(descriptionMd).toContain(
+      "[Email body truncated to fit the task description.]",
+    );
+    expect(descriptionMd).toMatch(/\[2 attachment\(s\) omitted\.\]$/);
+    expect(updateTaskRequestSchema.safeParse({ descriptionMd }).success).toBe(true);
+  });
   it("stores only digests and rotates atomically without secret event content", async () => {
     const old = await address();
     expect(JSON.stringify([...uow.data.inboundAddresses.values()])).not.toContain(
@@ -142,6 +157,38 @@ describe("email capture", () => {
 });
 describe("provider normalization", () => {
   const recipient = "a".repeat(64) + "@inbox.example.com";
+  it.each([
+    ["attachment notes", { text: "a".repeat(50_000), attachmentCount: 1 }],
+    ["escaping expansion", { text: "<".repeat(20_000) }],
+    ["HTML bodies", { html: `<p>${"Body".repeat(20_000)}</p>` }],
+    ["Unicode boundaries", { text: "😀".repeat(30_000) }],
+  ] as const)("bounds sanitized descriptions and notices for %s", (_name, body) => {
+    const descriptionMd = emailDescription(
+      parseInboundEmail("normalized", {
+        messageId: "long-message",
+        recipient,
+        ...body,
+      }),
+    )!;
+    expect(descriptionMd.length).toBeLessThanOrEqual(50_000);
+    expect(descriptionMd).toContain(
+      "[Email body truncated to fit the task description.]",
+    );
+    expect(descriptionMd.isWellFormed()).toBe(true);
+    expect(updateTaskRequestSchema.safeParse({ descriptionMd }).success).toBe(true);
+  });
+  it("preserves a body exactly at the description limit without a truncation notice", () => {
+    const text = "a".repeat(50_000);
+    expect(
+      emailDescription(
+        parseInboundEmail("normalized", {
+          messageId: "exact-limit",
+          recipient,
+          text,
+        }),
+      ),
+    ).toBe(text);
+  });
   it("reads Postmark and strips HTML, scripts and quoted replies", () => {
     const message = parseInboundEmail("postmark", {
       MessageID: "pm-1",

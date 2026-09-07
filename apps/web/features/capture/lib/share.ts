@@ -30,12 +30,23 @@ export function sharedTaskRequest(shared: SharedCapture): CreateTaskRequest {
     descriptionMd: [shared.text, shared.url].filter(Boolean).join("\n\n") || null,
   };
 }
+/** Leave room for cookies and other headers below common HTTP request limits. */
+export const MAX_CAPTURE_LOGIN_PATH_LENGTH = 6000;
+export const CAPTURE_REDIRECT_TOO_LONG =
+  "This share is too long to preserve through sign-in. Copy the shared content below into a new task, or go back and share a shorter selection.";
+
 export function capturePath(shared: SharedCapture): string {
   const query = new URLSearchParams();
   if (shared.title) query.set("title", shared.title);
   if (shared.text) query.set("text", shared.text);
   if (shared.url) query.set("url", shared.url);
-  return `/capture?${query}`;
+  const path = `/capture?${query}`;
+  if (
+    `/sign-in?returnTo=${encodeURIComponent(path)}`.length >
+    MAX_CAPTURE_LOGIN_PATH_LENGTH
+  )
+    throw new RangeError(CAPTURE_REDIRECT_TOO_LONG);
+  return path;
 }
 /** Login return targets are restricted to the local capture page. */
 export function captureReturnTo(value: unknown): string {
