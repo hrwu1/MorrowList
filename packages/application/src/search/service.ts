@@ -117,7 +117,7 @@ export class SearchService {
         },
       );
 
-      // A task key such as ML-12 is an exact hit and leads the first page (spec 9.8).
+      // A task key such as ML-000012 is an exact hit and leads the first page (spec 9.8).
       const keyed = after ? null : await this.byKey(tx, workspace, parsed.text);
       const items = keyed
         ? [keyed, ...page.items.filter((task) => task.id !== keyed.id)]
@@ -168,7 +168,10 @@ export class SearchService {
     text: string,
   ): Promise<Task | null> {
     const key = parseTaskKey(text);
-    if (!key || key.prefix !== workspace.taskKeyPrefix.toUpperCase()) return null;
+    // The number is the identity; the prefix is display. Matching on the number alone
+    // keeps a key shared before a prefix rename resolving, and matches what
+    // `TaskService.resolveTask` and `ActivityService.resolveTask` already do.
+    if (!key) return null;
     const task = await tx.tasks.findByNumber(workspace.id, key.taskNumber);
     return task && task.deletedAt === null ? task : null;
   }

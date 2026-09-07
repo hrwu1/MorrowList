@@ -75,7 +75,7 @@ describe("bootstrapUser", () => {
     const result = await bootstrap({ displayName: "Morrow Team" });
 
     expect(result.workspace.name).toBe("Morrow Team's Workspace");
-    expect(result.workspace.taskKeyPrefix).toBe("MORR");
+    expect(result.workspace.taskKeyPrefix).toBe("MorrowTeamsWorkspace");
   });
 
   it("honours an explicit workspace name and prefix from onboarding", async () => {
@@ -116,6 +116,6 @@ describe("slugify and defaultPrefix", () => {
 
   it("falls back to ML when a name has no letters", () => {
     expect(defaultPrefix("123")).toBe("ML");
-    expect(defaultPrefix("MorrowList")).toBe("MORR");
+    expect(defaultPrefix("MorrowList")).toBe("MorrowList");
   });
 });

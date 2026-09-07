@@ -6,7 +6,7 @@ import { formatGroupDate, patchTaskInUpcoming, readHorizon } from "./upcoming-vi
 function task(overrides: Partial<TaskDto> = {}): TaskDto {
   return {
     id: "0198f0a0-0000-7000-8000-000000000001",
-    key: "ML-1",
+    key: "ML-000001",
     workspaceId: "0198f0a0-0000-7000-8000-000000000010",
     taskNumber: 1,
     projectId: null,
@@ -72,7 +72,7 @@ describe("patchTaskInUpcoming", () => {
       { date: "2026-09-04", tasks: [soon] },
       {
         date: "2026-09-10",
-        tasks: [task({ id: "2", key: "ML-2", dueDate: "2026-09-10" })],
+        tasks: [task({ id: "2", key: "ML-000002", dueDate: "2026-09-10" })],
       },
     ]);
 

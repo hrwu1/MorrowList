@@ -86,7 +86,7 @@ describe("NotificationService.deliverDue", () => {
         kind: "reminder",
         taskId: task.id,
         title: "Reminder: Call the bank",
-        body: "ML-1 is due 2026-09-03 at 12:00 (Europe/Berlin).",
+        body: "ML-000001 is due 2026-09-03 at 12:00 (Europe/Berlin).",
         readAt: null,
       }),
     ]);
@@ -97,7 +97,7 @@ describe("NotificationService.deliverDue", () => {
     expect(sent[0]).toMatchObject({
       aggregateId: task.id,
       actorKind: "system",
-      summary: "Sent reminder for ML-1",
+      summary: "Sent reminder",
       payload: {
         taskId: task.id,
         remindAt: FIRES_AT.toISOString(),
@@ -123,7 +123,7 @@ describe("NotificationService.deliverDue", () => {
       {
         to: "alex@example.com",
         subject: "Reminder: Call the bank",
-        text: expect.stringContaining("https://morrow.example/tasks/ML-1"),
+        text: expect.stringContaining("https://morrow.example/tasks/ML-000001"),
       },
     ]);
   });
@@ -198,7 +198,7 @@ describe("NotificationService.digest", () => {
       limit: 50,
     });
     expect(inbox.data.map((n) => n.title)).toEqual(["Today: 1 task", "Today: 1 task"]);
-    expect(inbox.data[1]?.body).toBe("Overdue (1)\n- ML-1 Overdue");
+    expect(inbox.data[1]?.body).toBe("Overdue (1)\n- ML-000001 Overdue");
     const events = unitOfWork.data.activity.filter(
       (e) => e.eventType === WORKSPACE_EVENTS.digestSent,
     );
@@ -241,7 +241,7 @@ describe("NotificationService.digest", () => {
       "Today: 2 tasks — MorrowList digest for 2026-09-03",
     );
     expect(emails.sent[0]?.text).toBe(
-      `Due today (1)\n- ML-2 Due at noon at 12:00\n\nMy Day (1)\n- ML-1 Chosen\n\nOpen Today: https://morrow.example/today\n`,
+      `Due today (1)\n- ML-000002 Due at noon at 12:00\n\nMy Day (1)\n- ML-000001 Chosen\n\nOpen Today: https://morrow.example/today\n`,
     );
     expect(chosen.dayPlans).toEqual(["2026-09-03"]);
   });

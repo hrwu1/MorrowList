@@ -23,7 +23,7 @@ const BASE = "http://api.test/api/v1";
 function taskFixture(overrides: Partial<TaskDto> = {}): TaskDto {
   return {
     id: "01996c1f-0000-7000-8000-000000000001",
-    key: "ML-142",
+    key: "ML-000142",
     workspaceId: "01996b00-0000-7000-8000-000000000002",
     taskNumber: 142,
     title: "Draft the brief",
@@ -206,11 +206,11 @@ describe("get_task", () => {
     respond = () => ({ data: taskFixture() });
     const client = await connect();
 
-    const { data } = await callTool(client, "get_task", { task: "ML-142" });
+    const { data } = await callTool(client, "get_task", { task: "ML-000142" });
 
-    expect(calls[0]?.url.pathname).toBe("/api/v1/tasks/ML-142");
+    expect(calls[0]?.url.pathname).toBe("/api/v1/tasks/ML-000142");
     expect(data).toMatchObject({
-      key: "ML-142",
+      key: "ML-000142",
       descriptionMd: "## Notes",
       version: 7,
       tags: ["Focus"],
@@ -220,7 +220,9 @@ describe("get_task", () => {
 
 describe("create_task", () => {
   it("POSTs the supplied fields and returns the new task", async () => {
-    respond = () => ({ data: taskFixture({ key: "ML-143", title: "Book the room" }) });
+    respond = () => ({
+      data: taskFixture({ key: "ML-000143", title: "Book the room" }),
+    });
     const client = await connect();
 
     const { data } = await callTool(client, "create_task", {
@@ -235,7 +237,7 @@ describe("create_task", () => {
       priority: "medium",
       dueDate: "2026-09-20",
     });
-    expect(data).toMatchObject({ key: "ML-143", title: "Book the room" });
+    expect(data).toMatchObject({ key: "ML-000143", title: "Book the room" });
   });
 
   it("refuses a malformed date without calling the API", async () => {
@@ -257,13 +259,13 @@ describe("update_task, move_task and complete_task", () => {
     const client = await connect();
 
     await callTool(client, "update_task", {
-      task: "ML-142",
+      task: "ML-000142",
       priority: "urgent",
       expectedVersion: 7,
     });
 
     expect(calls.map((call) => `${call.method} ${call.url.pathname}`)).toEqual([
-      "GET /api/v1/tasks/ML-142",
+      "GET /api/v1/tasks/ML-000142",
       "PATCH /api/v1/tasks/01996c1f-0000-7000-8000-000000000001",
     ]);
     // The key is resolved away; the command never carries it.
@@ -286,7 +288,7 @@ describe("update_task, move_task and complete_task", () => {
     const client = await connect();
 
     const { data } = await callTool(client, "move_task", {
-      task: "ML-142",
+      task: "ML-000142",
       projectId: "01996b10-0000-7000-8000-000000000003",
       statusId: "01996b20-0000-7000-8000-000000000004",
     });
@@ -302,7 +304,7 @@ describe("update_task, move_task and complete_task", () => {
     const client = await connect();
 
     const { data } = await callTool(client, "complete_task", {
-      task: "ML-142",
+      task: "ML-000142",
       acknowledgeBlocked: true,
     });
 
@@ -328,7 +330,7 @@ describe("search", () => {
     const { data } = await callTool(client, "search", { q: "is:open priority:high" });
 
     expect(calls[0]?.url.searchParams.get("q")).toBe("is:open priority:high");
-    expect(data).toMatchObject({ tasks: [{ key: "ML-142" }], projects: [] });
+    expect(data).toMatchObject({ tasks: [{ key: "ML-000142" }], projects: [] });
   });
 });
 
@@ -347,7 +349,7 @@ describe("failures", () => {
       );
     const client = await connect();
 
-    const result = await callTool(client, "get_task", { task: "ML-142" });
+    const result = await callTool(client, "get_task", { task: "ML-000142" });
 
     expect(result.isError).toBe(true);
     // The code is what an agent branches on; the sentence is what it reports.

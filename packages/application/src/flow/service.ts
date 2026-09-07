@@ -15,6 +15,7 @@ import {
   percentiles,
   startedAt,
   systemClock,
+  taskKey,
   throughputByWeek,
   toLocalDate,
   type Clock,
@@ -115,7 +116,7 @@ export class FlowService {
         return [
           {
             taskId: item.taskId,
-            key: `${workspace.taskKeyPrefix}-${task.taskNumber}`,
+            key: taskKey(workspace.taskKeyPrefix, task.taskNumber),
             title: task.title,
             statusId: item.statusId,
             statusName: statuses.get(item.statusId)?.name ?? "Unknown",

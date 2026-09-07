@@ -39,14 +39,14 @@ describe("parseCsv", () => {
   it("round-trips every value the archive can contain", () => {
     const rows = [
       ["key", "title", "description"],
-      ["ML-1", 'A "quoted", comma title', "line one\r\nline two"],
-      ["ML-2", "", "  "],
+      ["ML-000001", 'A "quoted", comma title', "line one\r\nline two"],
+      ["ML-000002", "", "  "],
     ];
 
     expect(parseCsv(formatCsv(rows))).toEqual([
       ["key", "title", "description"],
-      ["ML-1", 'A "quoted", comma title', "line one\r\nline two"],
-      ["ML-2", "", "  "],
+      ["ML-000001", 'A "quoted", comma title', "line one\r\nline two"],
+      ["ML-000002", "", "  "],
     ]);
   });
 });

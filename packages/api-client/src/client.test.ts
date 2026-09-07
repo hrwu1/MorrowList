@@ -60,12 +60,12 @@ describe("activity requests", () => {
     const { client, requests } = recordingClient(response);
 
     await expect(
-      client.listTaskActivity("ML-12", { limit: 20, cursor: "abc.def" }),
+      client.listTaskActivity("ML-000012", { limit: 20, cursor: "abc.def" }),
     ).resolves.toEqual(response);
 
     expect(requests[0]?.method).toBe("GET");
     expect(requests[0]?.url).toBe(
-      "https://example.test/api/v1/tasks/ML-12/activity?workspaceId=0198f0a0-0000-7000-8000-000000000003&limit=20&cursor=abc.def",
+      "https://example.test/api/v1/tasks/ML-000012/activity?workspaceId=0198f0a0-0000-7000-8000-000000000003&limit=20&cursor=abc.def",
     );
   });
 

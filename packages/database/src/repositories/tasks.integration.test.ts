@@ -84,7 +84,7 @@ describe("task persistence", () => {
       title: "Prepare research presentation",
     });
 
-    expect(task.key).toBe("ML-1");
+    expect(task.key).toBe("ML-000001");
     expect(task.projectId).toBeNull();
     expect(task.version).toBe(1);
 

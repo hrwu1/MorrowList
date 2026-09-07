@@ -21,7 +21,7 @@ import {
 function task(overrides: Partial<TaskDto> = {}): TaskDto {
   return {
     id: "01a04e0f-0000-7000-8000-000000000001",
-    key: "ML-1",
+    key: "ML-000001",
     workspaceId: "01a04e0f-0000-7000-8000-000000000002",
     taskNumber: 1,
     projectId: null,
@@ -78,8 +78,8 @@ describe("formatTaskTable", () => {
 
   it("aligns keys of differing width", () => {
     const lines = formatTaskTable([
-      task({ key: "ML-1" }),
-      task({ key: "ML-1234", title: "Second" }),
+      task({ key: "ML-000001" }),
+      task({ key: "ML-001234", title: "Second" }),
     ]).split("\n");
 
     expect(lines[0]?.indexOf("Prepare")).toBe(lines[1]?.indexOf("Second"));
@@ -152,13 +152,13 @@ describe("formatTodayView", () => {
         {
           id: "my_day",
           tasks: [
-            { task: task({ key: "ML-2", title: "Chosen" }), reasons: ["my_day"] },
+            { task: task({ key: "ML-000002", title: "Chosen" }), reasons: ["my_day"] },
           ],
         },
       ],
       review: {
         date: "2026-09-02",
-        tasks: [task({ key: "ML-3", title: "Left over" })],
+        tasks: [task({ key: "ML-000003", title: "Left over" })],
       },
     });
 
@@ -167,13 +167,13 @@ describe("formatTodayView", () => {
         "2026-09-03",
         "",
         "Overdue",
-        "[ ] ML-1    Overdue and chosen  (due 2026-09-01)  [My Day]",
+        "[ ] ML-000001    Overdue and chosen  (due 2026-09-01)  [My Day]",
         "",
         "My Day",
-        "[ ] ML-2    Chosen",
+        "[ ] ML-000002    Chosen",
         "",
         "Left over from 2026-09-02",
-        "[ ] ML-3    Left over",
+        "[ ] ML-000003    Left over",
       ].join("\n"),
     );
   });
@@ -198,15 +198,15 @@ describe("formatTaskDetail", () => {
     const output = formatTaskDetail(
       task({ subtaskProgress: { completed: 1, total: 2 } }),
       [
-        task({ key: "ML-2", title: "Collect sources", isCompleted: true }),
-        task({ key: "ML-3", title: "Make slides" }),
+        task({ key: "ML-000002", title: "Collect sources", isCompleted: true }),
+        task({ key: "ML-000003", title: "Make slides" }),
       ],
     );
 
     expect(output).toContain("subtasks    1/2 done");
     expect(output).toContain("Subtasks");
-    expect(output).toContain("[x] ML-2  ");
-    expect(output).toContain("[ ] ML-3  ");
+    expect(output).toContain("[x] ML-000002  ");
+    expect(output).toContain("[ ] ML-000003  ");
   });
 
   it("prints the blocked flag and relations from the task's point of view", () => {
@@ -222,7 +222,7 @@ describe("formatTaskDetail", () => {
             targetTaskId: "01a04e0f-0000-7000-8000-000000000001",
             task: {
               id: "01a04e0f-0000-7000-8000-000000000003",
-              key: "ML-3",
+              key: "ML-000003",
               title: "Collect sources",
               isCompleted: false,
             },
@@ -235,7 +235,7 @@ describe("formatTaskDetail", () => {
             targetTaskId: "01a04e0f-0000-7000-8000-000000000004",
             task: {
               id: "01a04e0f-0000-7000-8000-000000000004",
-              key: "ML-4",
+              key: "ML-000004",
               title: "Book venue",
               isCompleted: true,
             },
@@ -248,8 +248,8 @@ describe("formatTaskDetail", () => {
     expect(output).toContain(
       "  blocked     waiting on vendor (since 2026-09-03T09:00:00.000Z)",
     );
-    expect(output).toContain("  blocked by  [ ] ML-3  Collect sources");
-    expect(output).toContain("  related to  [x] ML-4  Book venue");
+    expect(output).toContain("  blocked by  [ ] ML-000003  Collect sources");
+    expect(output).toContain("  related to  [x] ML-000004  Book venue");
     expect(formatTaskTable([task({ isBlocked: true })])).toContain("[blocked]");
   });
 
@@ -378,7 +378,7 @@ describe("formatFlowSummary", () => {
       aging: [
         {
           taskId: "01a04e0f-0000-7000-8000-000000000001",
-          key: "ML-7",
+          key: "ML-000007",
           title: "Old one",
           statusId: "01a04e0f-0000-7000-8000-000000000004",
           statusName: "In Progress",
@@ -393,7 +393,7 @@ describe("formatFlowSummary", () => {
     expect(output).toContain("cycle time  p50 1.5d  p85 4d  p95 4d  (2 started tasks)");
     expect(output).toContain("2026-07-27  ## 2");
     expect(output).toContain("2026-08-03  0");
-    expect(output).toContain("ML-7       9d  In progress  Old one  [over p95]");
+    expect(output).toContain("ML-000007       9d  In progress  Old one  [over p95]");
   });
 });
 
@@ -408,7 +408,7 @@ describe("defer and deadline dates (GAP-16)", () => {
     });
 
     expect(formatTaskTable([dated])).toBe(
-      "[ ] ML-1    Prepare research presentation  (due 2026-09-03)  (deadline 2026-09-01)  (deferred until 2026-09-10)",
+      "[ ] ML-000001    Prepare research presentation  (due 2026-09-03)  (deadline 2026-09-01)  (deferred until 2026-09-10)",
     );
     const detail = formatTaskDetail(dated);
     expect(detail).toContain("  deadline    2026-09-01 17:00");

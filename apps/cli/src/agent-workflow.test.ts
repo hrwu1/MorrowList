@@ -36,7 +36,7 @@ let recorded: Recorded[];
 function stubApi(): Server {
   const task = {
     id: "01996c1f-0000-7000-8000-000000000001",
-    key: "ML-1",
+    key: "ML-000001",
     workspaceId: "01996b00-0000-7000-8000-000000000002",
     taskNumber: 1,
     title: "Draft the brief",

@@ -29,7 +29,7 @@ import {
 
 const BASE_TASK: TaskDto = {
   id: "0198f0a0-0000-7000-8000-000000000001",
-  key: "ML-1",
+  key: "ML-000001",
   workspaceId: "0198f0a0-0000-7000-8000-000000000010",
   taskNumber: 1,
   projectId: "0198f0a0-0000-7000-8000-000000000020",
@@ -273,10 +273,7 @@ describe("readBoardSubtasks", () => {
 });
 
 describe("swimlanes (GAP-19)", () => {
-  const lane = (
-    key: string,
-    overrides: Partial<BoardLaneDto> = {},
-  ): BoardLaneDto => ({
+  const lane = (key: string, overrides: Partial<BoardLaneDto> = {}): BoardLaneDto => ({
     key,
     label: key,
     value: key.split(":")[1] ?? null,
@@ -332,7 +329,9 @@ describe("swimlanes (GAP-19)", () => {
 
   it("reads the swimlane from the URL and ignores anything unknown", () => {
     expect(readBoardSwimlane(new URLSearchParams())).toBe("none");
-    expect(readBoardSwimlane(new URLSearchParams("swimlane=priority"))).toBe("priority");
+    expect(readBoardSwimlane(new URLSearchParams("swimlane=priority"))).toBe(
+      "priority",
+    );
     expect(readBoardSwimlane(new URLSearchParams("swimlane=colour"))).toBe("none");
   });
 
@@ -426,9 +425,7 @@ describe("swimlanes (GAP-19)", () => {
       ],
     }).steps;
 
-    expect(steps).toEqual([
-      { kind: "tag", addTagId: "tag-b", removeTagId: "tag-a" },
-    ]);
+    expect(steps).toEqual([{ kind: "tag", addTagId: "tag-b", removeTagId: "tag-a" }]);
   });
 
   it("refuses a drop into a read-only lane and says why", () => {

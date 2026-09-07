@@ -14,7 +14,7 @@ function notification(overrides: Partial<NotificationDto> = {}): NotificationDto
     kind: "reminder",
     taskId: "01a04e0f-0000-7000-8000-000000000003",
     title: "Reminder: Call the bank",
-    body: "ML-1 is due 2026-09-03 at 12:00 (UTC).",
+    body: "ML-000001 is due 2026-09-03 at 12:00 (UTC).",
     readAt: null,
     createdAt: "2026-09-03T09:30:00.000Z",
     ...overrides,

@@ -191,10 +191,10 @@ export function SearchBox({ onDismiss }: { readonly onDismiss: () => void }) {
           </p>
         ) : (
           <p className="search-dialog__note">
-            Words match titles, descriptions and tag names; a key such as ML-12 opens
-            the task. Operators: <code>due:overdue</code> <code>priority:high</code>{" "}
-            <code>tag:research</code> <code>is:blocked</code> <code>is:deferred</code>{" "}
-            <code>deadline:week</code> <code>in:inbox</code>.
+            Words match titles, descriptions and tag names; a key such as ML-000012
+            opens the task. Operators: <code>due:overdue</code>{" "}
+            <code>priority:high</code> <code>tag:research</code> <code>is:blocked</code>{" "}
+            <code>is:deferred</code> <code>deadline:week</code> <code>in:inbox</code>.
           </p>
         )}
         <p className="search-dialog__keys" aria-hidden="true">

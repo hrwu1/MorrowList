@@ -235,9 +235,9 @@ describe("ImportService.apply", () => {
   it("imports a CSV with its own columns, nesting rows under their parent", async () => {
     const csv = [
       "key,title,description,status,priority,dueDate,tags,parentKey,completed",
-      'ML-1,"Draft the brief","## Notes",Ready,high,2026-09-15,"research, ux",,',
-      "ML-2,Collect examples,,Ready,,,,ML-1,yes",
-      "ML-3,Ship it,,Done,,,,,",
+      'ML-000001,"Draft the brief","## Notes",Ready,high,2026-09-15,"research, ux",,',
+      "ML-000002,Collect examples,,Ready,,,,ML-000001,yes",
+      "ML-000003,Ship it,,Done,,,,,",
     ].join("\n");
 
     const result = await imports.apply(seeded.context, workspaceId(), "csv", {

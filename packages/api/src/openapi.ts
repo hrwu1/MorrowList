@@ -1215,7 +1215,7 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
               name: "idOrKey",
               in: "path",
               required: true,
-              description: "Task UUID or workspace key such as ML-142.",
+              description: "Task UUID or workspace key such as ML-000142.",
               schema: { type: "string" },
             },
             workspaceIdParam,
@@ -1237,7 +1237,7 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
               name: "idOrKey",
               in: "path",
               required: true,
-              description: "Task UUID or workspace key such as ML-142.",
+              description: "Task UUID or workspace key such as ML-000142.",
               schema: { type: "string" },
             },
             workspaceIdParam,
@@ -1579,7 +1579,7 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
         get: {
           summary: "Search tasks and projects",
           description:
-            "Free text is prefix-matched against titles, descriptions and tag names; a task key such as ML-12 is resolved first. `q` also accepts the operators due:, priority:, tag:, is:open|done|blocked and in:inbox, which override the same explicit filter. Match positions are returned as character offsets, never markup. Project name hits are listed for navigation on the first page.",
+            "Free text is prefix-matched against titles, descriptions and tag names; a task key such as ML-000012 is resolved first. `q` also accepts the operators due:, priority:, tag:, is:open|done|blocked and in:inbox, which override the same explicit filter. Match positions are returned as character offsets, never markup. Project name hits are listed for navigation on the first page.",
           parameters: [workspaceIdParam, ...queryParameters(searchQuerySchema)],
           responses: {
             "200": {

@@ -15,7 +15,7 @@ import {
 function task(overrides: Partial<TaskDto> = {}): TaskDto {
   return {
     id: "01a04e0f-2e8a-7000-ae0a-989d784c0287",
-    key: "ML-1",
+    key: "ML-000001",
     workspaceId: "01a04e0f-2e8a-7000-ae0a-989d784c0288",
     taskNumber: 1,
     projectId: null,
@@ -162,10 +162,10 @@ describe("writeTaskView", () => {
     const query = writeTaskView(
       { ...DEFAULT_VIEW, priority: "low" },
       DEFAULT_VIEW,
-      new URLSearchParams("task=ML-7"),
+      new URLSearchParams("task=ML-000007"),
     );
 
-    expect(new URLSearchParams(query).get("task")).toBe("ML-7");
+    expect(new URLSearchParams(query).get("task")).toBe("ML-000007");
     expect(new URLSearchParams(query).get("priority")).toBe("low");
   });
 });

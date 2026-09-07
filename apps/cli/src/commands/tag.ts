@@ -174,7 +174,7 @@ export function tagCommand(): Command {
     tag
       .command(name)
       .description(describe)
-      .argument("<idOrKey>", "task id or key, e.g. ML-142")
+      .argument("<idOrKey>", "task id or key, e.g. ML-000142")
       .argument("<tag>", "tag name or id")
       .option("--create-tags", "create the tag if it does not exist (add only)")
       .action(async (idOrKey: string, tagName: string, options, command: Command) => {

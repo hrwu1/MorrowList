@@ -129,9 +129,9 @@ describe("setTaskParentRequestSchema", () => {
         .expectedVersion,
     ).toBe(2);
     expect(setTaskParentRequestSchema.safeParse({}).success).toBe(false);
-    expect(setTaskParentRequestSchema.safeParse({ parentTaskId: "ML-1" }).success).toBe(
-      false,
-    );
+    expect(
+      setTaskParentRequestSchema.safeParse({ parentTaskId: "ML-000001" }).success,
+    ).toBe(false);
   });
 });
 

@@ -63,18 +63,37 @@ export interface Task {
   readonly deletedBy: ActorRef | null;
 }
 
-/** Human-readable key: workspace prefix plus monotonic number, e.g. `ML-142` (spec 8.1). */
+/** How wide the number renders. Beyond this it grows a digit rather than being capped. */
+const TASK_NUMBER_WIDTH = 6;
+
+/**
+ * Human-readable key: workspace prefix plus monotonic number, e.g. `MorrowList-000142`
+ * (spec 8.1). The number is zero-padded so keys line up in a list; the padding is purely
+ * presentational, and `parseTaskKey` reads padded and bare numbers alike.
+ */
 export function taskKey(prefix: string, taskNumber: number): string {
-  return `${prefix}-${taskNumber}`;
+  return `${prefix}-${String(taskNumber).padStart(TASK_NUMBER_WIDTH, "0")}`;
 }
 
-const TASK_KEY_PATTERN = /^([A-Z][A-Z0-9]{0,9})-(\d+)$/;
+/**
+ * The number alone, for text that refers to a task other than the one it hangs off. It
+ * carries no prefix, so it stays correct when a workspace renames its prefix.
+ */
+export function taskNumberRef(taskNumber: number): string {
+  return `#${String(taskNumber).padStart(TASK_NUMBER_WIDTH, "0")}`;
+}
 
-/** Parse a task key. Returns null when the input is not a key, e.g. when it is a UUID. */
+// Case-insensitive: prefixes are stored as typed, so a key may be typed in any case.
+const TASK_KEY_PATTERN = /^([A-Za-z][A-Za-z0-9]{0,23})-(\d+)$/;
+
+/**
+ * Parse a task key. Returns null when the input is not a key, e.g. when it is a UUID.
+ * The prefix comes back as it was written; callers that compare it should fold case.
+ */
 export function parseTaskKey(
   value: string,
 ): { prefix: string; taskNumber: number } | null {
-  const match = TASK_KEY_PATTERN.exec(value.trim().toUpperCase());
+  const match = TASK_KEY_PATTERN.exec(value.trim());
   if (!match) return null;
   const taskNumber = Number(match[2]);
   if (!Number.isSafeInteger(taskNumber) || taskNumber < 1) return null;

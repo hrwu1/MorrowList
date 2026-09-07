@@ -166,8 +166,8 @@ describe("completion of a repeating task", () => {
     expect(
       series.data.map((task) => [task.key, task.dueDate, task.isCompleted]),
     ).toEqual([
-      ["ML-1", "2026-08-29", true],
-      ["ML-2", "2026-09-05", false],
+      ["ML-000001", "2026-08-29", true],
+      ["ML-000002", "2026-09-05", false],
     ]);
     expect(series.data[1]?.tags.map((tag) => tag.name)).toEqual(["Focus"]);
     expect(series.data[1]?.recurrence).toEqual(weekly);

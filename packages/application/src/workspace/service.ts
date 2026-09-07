@@ -91,7 +91,7 @@ export class WorkspaceService {
         taskKeyPrefix:
           request.taskKeyPrefix === undefined
             ? previous.taskKeyPrefix
-            : request.taskKeyPrefix.trim().toUpperCase(),
+            : request.taskKeyPrefix.trim(),
         timezone:
           request.timezone === undefined
             ? previous.timezone

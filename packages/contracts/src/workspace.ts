@@ -52,8 +52,8 @@ export const updateWorkspaceRequestSchema = z
       .string()
       .trim()
       .regex(
-        /^[A-Za-z][A-Za-z0-9]{0,9}$/,
-        "must start with a letter, max 10 characters",
+        /^[A-Za-z][A-Za-z0-9]{0,23}$/,
+        "must start with a letter, max 24 characters",
       )
       .optional(),
     timezone: timezoneSchema.optional(),

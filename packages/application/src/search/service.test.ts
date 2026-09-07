@@ -75,22 +75,27 @@ describe("SearchService.search", () => {
     });
     await tasks.create(seeded.context, {
       workspaceId: seeded.workspace.id,
-      title: "Mentions ML-1 in the title",
+      title: "Mentions ML-000001 in the title",
     });
 
-    const { data } = await query("ml-1");
+    const { data } = await query("ml-000001");
     expect(data.tasks.map((hit) => hit.task.id)).toEqual([one.id, expect.any(String)]);
-    expect(data.tasks[1]?.task.title).toBe("Mentions ML-1 in the title");
+    expect(data.tasks[1]?.task.title).toBe("Mentions ML-000001 in the title");
   });
 
-  it("ignores a key from another workspace prefix", async () => {
-    await tasks.create(seeded.context, {
+  it("resolves a key by its number whatever prefix it carries", async () => {
+    const first = await tasks.create(seeded.context, {
       workspaceId: seeded.workspace.id,
       title: "First",
     });
 
-    const { data } = await query("XX-1");
-    expect(data.tasks).toEqual([]);
+    // The prefix is display only, so a key written before a rename still finds its task.
+    // The lookup stays inside the caller's workspace either way.
+    // A stale prefix, a lower-cased one, and the bare number all land on the same task.
+    for (const written of ["XX-000001", "ml-000001", "ML-1"]) {
+      const { data } = await query(written);
+      expect(data.tasks[0]?.task.id).toBe(first.id);
+    }
   });
 
   it("applies operators over explicit filters, resolving a tag by name", async () => {

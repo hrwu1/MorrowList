@@ -35,7 +35,7 @@ function entry(overrides: Partial<ActivityEntryDto>): ActivityEntryDto {
 
 /** The summary each command records, with the changes the read model derives for it. */
 const CATALOGUE: Record<string, Partial<ActivityEntryDto>> = {
-  [TASK_EVENTS.created]: { summary: "Created task ML-1" },
+  [TASK_EVENTS.created]: { summary: "Created task" },
   [TASK_EVENTS.updated]: {
     summary: "Updated task fields",
     changes: [
@@ -59,8 +59,8 @@ const CATALOGUE: Record<string, Partial<ActivityEntryDto>> = {
   [TASK_EVENTS.parentChanged]: { summary: "Made task a subtask" },
   [TASK_EVENTS.tagAdded]: { summary: "Added tag Focus" },
   [TASK_EVENTS.tagRemoved]: { summary: "Removed tag Focus" },
-  [TASK_EVENTS.relationAdded]: { summary: "Added relation: blocks ML-2" },
-  [TASK_EVENTS.relationRemoved]: { summary: "Removed relation: blocked by ML-1" },
+  [TASK_EVENTS.relationAdded]: { summary: "Added relation: blocks #000002" },
+  [TASK_EVENTS.relationRemoved]: { summary: "Removed relation: blocked by #000001" },
   [TASK_EVENTS.blocked]: { summary: "Marked task blocked: waiting on vendor" },
   [TASK_EVENTS.unblocked]: { summary: "Cleared the blocked flag" },
   [TASK_EVENTS.occurrenceSkipped]: {
@@ -70,7 +70,7 @@ const CATALOGUE: Record<string, Partial<ActivityEntryDto>> = {
   [TASK_EVENTS.reminderSent]: {
     actorKind: "system",
     actorDisplayName: "MorrowList",
-    summary: "Sent reminder for ML-1",
+    summary: "Sent reminder",
   },
   [TASK_EVENTS.reminderSnoozed]: { summary: "Snoozed reminder for 60 minutes" },
   [TASK_EVENTS.batchApplied]: { summary: "Bulk change: 12 tasks completed" },

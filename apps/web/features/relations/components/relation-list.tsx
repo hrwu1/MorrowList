@@ -154,7 +154,7 @@ export function RelationList({
             list={`${id}-options`}
             value={draft}
             autoComplete="off"
-            placeholder="Task key, e.g. ML-3"
+            placeholder="Task key, e.g. ML-000003"
             disabled={add.isPending}
             onChange={(event) => setDraft(event.target.value)}
           />

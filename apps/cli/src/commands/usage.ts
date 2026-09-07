@@ -29,9 +29,9 @@ const EXIT_MEANINGS: Record<number, string> = {
 const EXAMPLES = [
   `morrow task add "Draft the brief" --due 2026-09-15 --tag focus --json`,
   `morrow task list --where 'is:open due:today priority:high' --json`,
-  `morrow task show ML-142 --json`,
-  `morrow task update ML-142 -p urgent --expected-version 7 --json`,
-  `morrow task complete ML-142 --json`,
+  `morrow task show ML-000142 --json`,
+  `morrow task update ML-000142 -p urgent --expected-version 7 --json`,
+  `morrow task complete ML-000142 --json`,
   `morrow search "quarterly plan" --json`,
 ];
 
