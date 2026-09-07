@@ -12,7 +12,7 @@ import { PRIORITIES, isPriority, type Priority } from "../task/values.js";
  * `key:value` operators, no boolean algebra.
  *
  *   budget review                free text, each word prefix-matched
- *   ML-12                        a task key is resolved first
+ *   ML-000012                    a task key is resolved first
  *   due:overdue|today|future|none
  *   priority:none|low|medium|high|urgent
  *   tag:research  tag:"deep work"   tasks carrying the tag (quotes for spaces)

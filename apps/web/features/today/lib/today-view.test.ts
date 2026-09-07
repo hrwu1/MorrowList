@@ -6,7 +6,7 @@ import { countTodayTasks, patchTaskInToday } from "./today-view";
 function task(overrides: Partial<TaskDto> = {}): TaskDto {
   return {
     id: "0198f0a0-0000-7000-8000-000000000001",
-    key: "ML-1",
+    key: "ML-000001",
     workspaceId: "0198f0a0-0000-7000-8000-000000000010",
     taskNumber: 1,
     projectId: null,
@@ -80,7 +80,7 @@ describe("patchTaskInToday", () => {
 
   it("drops the My Day badge, and the row, when the selection is removed", () => {
     const overdueAndPlanned = task({ dueDate: "2026-09-01", dayPlans: [DATE] });
-    const planned = task({ id: "2", key: "ML-2", dayPlans: [DATE] });
+    const planned = task({ id: "2", key: "ML-000002", dayPlans: [DATE] });
     const cached = view({
       sections: [
         {
@@ -123,7 +123,7 @@ describe("patchTaskInToday", () => {
 
   it("leaves an unrelated task and the review untouched", () => {
     const listed = task({ dueDate: DATE });
-    const other = task({ id: "9", key: "ML-9" });
+    const other = task({ id: "9", key: "ML-000009" });
     const cached = view({
       sections: [
         { id: "overdue", tasks: [] },

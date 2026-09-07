@@ -289,7 +289,7 @@ export function taskCommand(): Command {
 
   task
     .command("show")
-    .description("Show one task by id or workspace key, e.g. ML-142")
+    .description("Show one task by id or workspace key, e.g. ML-000142")
     .argument("<idOrKey>")
     .action(async (idOrKey: string, _options, command: Command) => {
       const globals = globalsOf(command);

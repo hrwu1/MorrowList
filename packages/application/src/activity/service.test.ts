@@ -194,7 +194,7 @@ describe("ActivityService.listForTask", () => {
       data
         .filter((entry) => entry.eventType.startsWith("task.relation_"))
         .map((entry) => entry.summary),
-    ).toEqual(["Removed relation: blocks ML-2", "Added relation: blocks ML-2"]);
+    ).toEqual(["Removed relation: blocks #000002", "Added relation: blocks #000002"]);
     expect(
       data
         .filter((entry) => entry.eventType.endsWith("blocked"))
@@ -307,11 +307,11 @@ describe("ActivityService.listForTask", () => {
 
   it("reports an unknown task and an unreachable workspace as not found", async () => {
     await expect(
-      activity.listForTask(seeded.context, seeded.workspace.id, "ML-999", query()),
+      activity.listForTask(seeded.context, seeded.workspace.id, "ML-000999", query()),
     ).rejects.toMatchObject({ code: "TASK_NOT_FOUND" });
 
     await expect(
-      activity.listForTask(seeded.context, uuidv7(), "ML-1", query()),
+      activity.listForTask(seeded.context, uuidv7(), "ML-000001", query()),
     ).rejects.toMatchObject({ code: "WORKSPACE_NOT_FOUND" });
   });
 });

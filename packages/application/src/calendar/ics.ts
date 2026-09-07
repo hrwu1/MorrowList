@@ -1,4 +1,4 @@
-import { addDays, toInstant, type Task } from "@morrowlist/domain";
+import { addDays, taskKey, toInstant, type Task } from "@morrowlist/domain";
 
 import type { Workspace } from "../ports/index.js";
 
@@ -85,7 +85,7 @@ export function renderCalendar(
         `DTSTAMP:${utc(task.updatedAt)}`,
         `LAST-MODIFIED:${utc(task.updatedAt)}`,
         `SUMMARY:${text((entry.deadline ? "Deadline: " : "") + task.title)}`,
-        `URL:${new URL(`/tasks/${encodeURIComponent(workspace.taskKeyPrefix + "-" + task.taskNumber)}`, appUrl).href}`,
+        `URL:${new URL(`/tasks/${encodeURIComponent(taskKey(workspace.taskKeyPrefix, task.taskNumber))}`, appUrl).href}`,
       );
       if (task.descriptionMd) lines.push(`DESCRIPTION:${text(task.descriptionMd)}`);
       if (entry.time)

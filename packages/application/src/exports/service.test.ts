@@ -133,7 +133,7 @@ describe("ExportService.workspace", () => {
 
     const draft = exported.get(parent.id);
     expect(draft).toMatchObject({
-      key: "ML-1",
+      key: "ML-000001",
       dueDate: "2026-09-15",
       dueTime: "09:30",
       deferUntil: "2026-09-10",
@@ -263,20 +263,22 @@ describe("ExportService.tasksCsv", () => {
       "completed",
     ]);
     const draft = rows.find((row) => row[1] === "Draft the brief");
-    expect(draft?.[0]).toBe("ML-1");
+    expect(draft?.[0]).toBe("ML-000001");
     // The column's name, not its id: a person reads it and the importer matches on it.
     expect(draft?.[3]).toBe("Ready");
     expect(draft?.[5]).toBe("2026-09-15");
     expect(draft?.[8]).toBe("Research");
-    expect(rows.find((row) => row[1] === "Collect examples")?.[9]).toBe("ML-1");
+    expect(rows.find((row) => row[1] === "Collect examples")?.[9]).toBe("ML-000001");
 
     // The archive's own CSV is a valid import: the round trip closes.
     const plan = planFromCsv(csv, { projectName: "Round trip" });
     expect(plan.tasks.map((task) => task.title)).toContain("Draft the brief");
     expect(
       plan.tasks.find((task) => task.title === "Draft the brief")?.subtasks,
-    ).toEqual([{ title: "Collect examples", isCompleted: false, externalId: "ML-2" }]);
-    expect(parent.key).toBe("ML-1");
+    ).toEqual([
+      { title: "Collect examples", isCompleted: false, externalId: "ML-000002" },
+    ]);
+    expect(parent.key).toBe("ML-000001");
   });
 
   it("honours the list filter, so a person exports what they are looking at", async () => {

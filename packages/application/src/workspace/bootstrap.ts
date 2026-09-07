@@ -97,10 +97,12 @@ function defaultWorkspaceName(input: BootstrapUserInput): string {
   return `${label}'s Workspace`;
 }
 
-/** Task key prefix: up to four uppercase letters derived from the workspace name. */
+/** Task key prefix: the workspace name's letters, as written, up to the 24 allowed. */
 export function defaultPrefix(name: string): string {
-  const letters = name.toUpperCase().replace(/[^A-Z]/g, "");
-  return letters.slice(0, 4) || "ML";
+  // The prefix is displayed as written, so keep the name's own casing rather than
+  // shouting an abbreviation of it. Non-letters go because the key separator is `-`.
+  const letters = name.replace(/[^A-Za-z]/g, "");
+  return letters.slice(0, 24) || "ML";
 }
 
 export function slugify(value: string): string {

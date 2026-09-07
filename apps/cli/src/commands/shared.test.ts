@@ -42,16 +42,18 @@ describe("bulk guards (GAP-08)", () => {
     ({ key, title, id: key, version: 1 }) as unknown as TaskDto;
 
   it("lists a dry run and reports what a batch applied", () => {
-    const tasks = [task("ML-1", "Draft"), task("ML-2", "Review")];
+    const tasks = [task("ML-000001", "Draft"), task("ML-000002", "Review")];
     expect(formatBulkPlan("completed", tasks)).toBe(
-      ["Would completed 2 tasks:", "  ML-1  Draft", "  ML-2  Review"].join("\n"),
+      ["Would completed 2 tasks:", "  ML-000001  Draft", "  ML-000002  Review"].join(
+        "\n",
+      ),
     );
     expect(
       formatBulkResult("trashed", [
-        { op: "delete", taskId: "ML-1", data: tasks[0]! },
-        { op: "delete", taskId: "ML-2", data: tasks[1]! },
+        { op: "delete", taskId: "ML-000001", data: tasks[0]! },
+        { op: "delete", taskId: "ML-000002", data: tasks[1]! },
       ]),
-    ).toBe(["ML-1  trashed", "ML-2  trashed", "2 tasks trashed."].join("\n"));
+    ).toBe(["ML-000001  trashed", "ML-000002  trashed", "2 tasks trashed."].join("\n"));
   });
 
   it("refuses an unconfirmed, empty, or oversized selection", () => {
@@ -59,7 +61,7 @@ describe("bulk guards (GAP-08)", () => {
       throw new Error("exit");
     }) as never);
     const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
-    const one = [task("ML-1", "Draft")];
+    const one = [task("ML-000001", "Draft")];
 
     // Nothing matched: a bulk command that silently does nothing is worse than an error.
     expect(() => assertBulkConfirmed([], { where: "x" }, false)).toThrow("exit");

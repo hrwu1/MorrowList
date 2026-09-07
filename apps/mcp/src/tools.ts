@@ -125,9 +125,9 @@ export const TOOLS: readonly McpTool[] = [
     name: "get_task",
     title: "Get a task",
     description:
-      "One task in full, by key (ML-142) or id: description, dates, tags, relations, subtask progress, and the version needed for a safe update.",
+      "One task in full, by key (ML-000142) or id: description, dates, tags, relations, subtask progress, and the version needed for a safe update.",
     inputSchema: {
-      task: z.string().min(1).describe("Task key such as ML-142, or its uuid"),
+      task: z.string().min(1).describe("Task key such as ML-000142, or its uuid"),
     },
     annotations: { readOnlyHint: true },
     async run(client, args) {

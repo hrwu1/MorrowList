@@ -79,7 +79,7 @@ test("a task due in a minute reminds at its due time, and settings persist", asy
   // The task's history records the delivery as the system.
   await row.getByRole("link", { name: "Reminder: Call the bank" }).click();
   await expect(page.getByLabel("Title")).toHaveValue("Call the bank");
-  await expect(page.getByText("Sent reminder for")).toBeVisible();
+  await expect(page.getByText("Sent reminder")).toBeVisible();
 
   // Preferences live behind the inbox, not in the sidebar, which stays short enough for
   // a laptop viewport: turn email on and set a digest time; both survive a reload.

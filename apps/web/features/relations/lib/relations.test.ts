@@ -21,7 +21,7 @@ function relation(overrides: Partial<TaskRelationDto>): TaskRelationDto {
     type: "blocks",
     sourceTaskId: OTHER,
     targetTaskId: ME,
-    task: { id: OTHER, key: "ML-2", title: "Collect sources", isCompleted: false },
+    task: { id: OTHER, key: "ML-000002", title: "Collect sources", isCompleted: false },
     createdAt: "2026-09-03T09:00:00.000Z",
     ...overrides,
   };
@@ -30,7 +30,7 @@ function relation(overrides: Partial<TaskRelationDto>): TaskRelationDto {
 function task(overrides: Partial<TaskDto> = {}): TaskDto {
   return {
     id: ME,
-    key: "ML-1",
+    key: "ML-000001",
     workspaceId: "01a04e0f-0000-7000-8000-000000000009",
     taskNumber: 1,
     projectId: null,
@@ -74,22 +74,22 @@ const outgoing = relation({
   id: "01a04e0f-0000-7000-8000-000000000011",
   sourceTaskId: ME,
   targetTaskId: THIRD,
-  task: { id: THIRD, key: "ML-3", title: "Present", isCompleted: false },
+  task: { id: THIRD, key: "ML-000003", title: "Present", isCompleted: false },
 });
 const related = relation({
   id: "01a04e0f-0000-7000-8000-000000000012",
   type: "related_to",
   sourceTaskId: ME,
   targetTaskId: THIRD,
-  task: { id: THIRD, key: "ML-3", title: "Present", isCompleted: true },
+  task: { id: THIRD, key: "ML-000003", title: "Present", isCompleted: true },
 });
 
 describe("relation directions", () => {
   it("splits a task's relations by direction from its own point of view", () => {
     const subject = task({ relations: [incoming, outgoing, related] });
-    expect(blockedBy(subject).map((r) => r.task.key)).toEqual(["ML-2"]);
-    expect(blocks(subject).map((r) => r.task.key)).toEqual(["ML-3"]);
-    expect(relatedTo(subject).map((r) => r.task.key)).toEqual(["ML-3"]);
+    expect(blockedBy(subject).map((r) => r.task.key)).toEqual(["ML-000002"]);
+    expect(blocks(subject).map((r) => r.task.key)).toEqual(["ML-000003"]);
+    expect(relatedTo(subject).map((r) => r.task.key)).toEqual(["ML-000003"]);
   });
 
   it("counts only open predecessors as blockers", () => {
@@ -110,9 +110,9 @@ describe("blockedSummary", () => {
           relations: [incoming],
         }),
       ),
-    ).toBe("waiting on vendor · Waiting on ML-2 Collect sources");
+    ).toBe("waiting on vendor · Waiting on ML-000002 Collect sources");
     expect(blockedSummary(task({ isBlocked: true, relations: [incoming] }))).toBe(
-      "Waiting on ML-2 Collect sources",
+      "Waiting on ML-000002 Collect sources",
     );
   });
 });

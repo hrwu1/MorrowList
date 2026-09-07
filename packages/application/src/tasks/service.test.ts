@@ -55,7 +55,7 @@ describe("TaskService.create", () => {
     });
 
     expect(task.id).toMatch(/^[0-9a-f-]{36}$/);
-    expect(task.key).toBe("ML-1");
+    expect(task.key).toBe("ML-000001");
     expect(task.projectId).toBeNull();
     expect(task.statusId).toBeNull();
     expect(task.rank).toBeTruthy();
@@ -79,8 +79,8 @@ describe("TaskService.create", () => {
       title: "Second",
     });
 
-    expect(first.key).toBe("ML-1");
-    expect(second.key).toBe("ML-2");
+    expect(first.key).toBe("ML-000001");
+    expect(second.key).toBe("ML-000002");
   });
 
   it("appends new tasks to the end of the Inbox", async () => {
@@ -1065,7 +1065,7 @@ describe("TaskService.get", () => {
       title: "Findable",
     });
 
-    const byKey = await service.get(seeded.context, seeded.workspace.id, "ML-1");
+    const byKey = await service.get(seeded.context, seeded.workspace.id, "ML-000001");
     expect(byKey.id).toBe(created.id);
   });
 
@@ -1238,7 +1238,7 @@ describe("TaskService relations", () => {
         type: "blocks",
         sourceTaskId: a.id,
         targetTaskId: b.id,
-        task: { id: b.id, key: "ML-2", title: "Make slides", isCompleted: false },
+        task: { id: b.id, key: "ML-000002", title: "Make slides", isCompleted: false },
       }),
     ]);
     // A relation is not a task column: neither version moves (spec 8.2 invariant 12).
@@ -1247,15 +1247,15 @@ describe("TaskService relations", () => {
 
     const target = await service.get(seeded.context, workspaceId(), b.id);
     expect(target.isBlocked).toBe(true);
-    expect(target.relations[0]?.task.key).toBe("ML-1");
+    expect(target.relations[0]?.task.key).toBe("ML-000001");
     expect(target.version).toBe(1);
 
     const events = unitOfWork.data.activity.filter(
       (event) => event.eventType === "task.relation_added",
     );
     expect(events.map((event) => [event.aggregateId, event.summary])).toEqual([
-      [a.id, "Added relation: blocks ML-2"],
-      [b.id, "Added relation: blocked by ML-1"],
+      [a.id, "Added relation: blocks #000002"],
+      [b.id, "Added relation: blocked by #000001"],
     ]);
     expect(
       unitOfWork.data.outbox.filter((e) => e.eventType === "task.relation_added"),
@@ -1338,8 +1338,8 @@ describe("TaskService relations", () => {
         .filter((e) => e.eventType === "task.relation_removed")
         .map((e) => [e.aggregateId, e.summary]),
     ).toEqual([
-      [b.id, "Removed relation: blocked by ML-1"],
-      [a.id, "Removed relation: blocks ML-2"],
+      [b.id, "Removed relation: blocked by #000001"],
+      [a.id, "Removed relation: blocks #000002"],
     ]);
   });
 
@@ -1576,8 +1576,18 @@ describe("cross-project in-progress limit (GAP-20)", () => {
         count: 2,
         message: "2 tasks are in progress across your projects; the limit is 1.",
         tasks: [
-          { id: here.id, key: "ML-1", title: "Here", projectId: seeded.project.id },
-          { id: there.id, key: "ML-2", title: "There", projectId: second.project.id },
+          {
+            id: here.id,
+            key: "ML-000001",
+            title: "Here",
+            projectId: seeded.project.id,
+          },
+          {
+            id: there.id,
+            key: "ML-000002",
+            title: "There",
+            projectId: second.project.id,
+          },
         ],
       },
     ]);
@@ -1812,7 +1822,7 @@ describe("TaskService recurrence", () => {
       seeded.context,
       listQuery({ seriesId: first.id, sort: "dueDate" }),
     );
-    expect(series.data.map((task) => task.key)).toEqual([first.key, "ML-2"]);
+    expect(series.data.map((task) => task.key)).toEqual([first.key, "ML-000002"]);
     const next = series.data[1]!;
     expect(next).toMatchObject({
       title: "Weekly review",
@@ -1838,7 +1848,7 @@ describe("TaskService recurrence", () => {
       seriesId: first.id,
       spawnedFrom: first.id,
     });
-    expect(recorded[1]?.summary).toBe("Completed task; next occurrence is ML-2");
+    expect(recorded[1]?.summary).toBe("Completed task; next occurrence is #000002");
     expect(unitOfWork.data.outbox.slice(-2).map((event) => event.eventType)).toEqual([
       "task.created",
       "task.completed",

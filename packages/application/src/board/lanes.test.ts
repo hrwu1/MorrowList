@@ -12,7 +12,7 @@ const WORKSPACE = "0198f0a0-0000-7000-8000-0000000000ff";
 
 const BASE: TaskDto = {
   id: "0198f0a0-0000-7000-8000-000000000001",
-  key: "ML-1",
+  key: "ML-000001",
   workspaceId: WORKSPACE,
   taskNumber: 1,
   projectId: null,
@@ -64,7 +64,10 @@ const tag = (id: string, name: string, colorToken = "blue") => ({
   updatedAt: BASE.updatedAt,
 });
 
-const context = (projects: readonly Project[] = [], parents: [string, string][] = []) => ({
+const context = (
+  projects: readonly Project[] = [],
+  parents: [string, string][] = [],
+) => ({
   projects,
   parentTitles: new Map(parents),
   today: TODAY,
@@ -178,10 +181,13 @@ describe("buildLanes", () => {
     const { lanes, laneKeys } = buildLanes(
       "parent",
       cards,
-      context([], [
-        ["parent-a", "Adopt the plan"],
-        ["parent-b", "Zip the archive"],
-      ]),
+      context(
+        [],
+        [
+          ["parent-a", "Adopt the plan"],
+          ["parent-b", "Zip the archive"],
+        ],
+      ),
     );
 
     expect(lanes.map((lane) => lane.label)).toEqual([

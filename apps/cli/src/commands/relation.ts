@@ -8,7 +8,7 @@ import { fail, globalsOf, idempotency, usageFailure, withClient } from "./shared
 
 /**
  * `morrow relation …` (CLI-006, spec 8.4, 21.3). Relations read the way people say them:
- * `morrow relation add ML-141 blocks ML-142`. Tasks are addressed by key or id.
+ * `morrow relation add ML-000141 blocks ML-000142`. Tasks are addressed by key or id.
  */
 
 const TYPE_WORDS: Record<string, RelationType> = {
@@ -62,7 +62,9 @@ export function relationCommand(): Command {
 
   relation
     .command("add")
-    .description("Relate two tasks, e.g. `morrow relation add ML-141 blocks ML-142`")
+    .description(
+      "Relate two tasks, e.g. `morrow relation add ML-000141 blocks ML-000142`",
+    )
     .argument("<source>", "task id or key")
     .argument("<type>", "blocks | related-to")
     .argument("<target>", "task id or key")

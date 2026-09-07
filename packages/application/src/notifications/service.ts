@@ -427,7 +427,9 @@ export class NotificationService {
       aggregateType: "task",
       aggregateId: task.id,
       eventType: TASK_EVENTS.reminderSent,
-      summary: `Sent reminder for ${key}`,
+      // Like `task.created`, this entry hangs off the task itself, so naming its key
+      // would only add something that goes stale when the prefix is renamed.
+      summary: "Sent reminder",
       payload: {
         taskId: task.id,
         remindAt: reminder.remindAt.toISOString(),

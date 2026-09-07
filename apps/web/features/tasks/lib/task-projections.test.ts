@@ -38,7 +38,7 @@ function status(overrides: Partial<WorkflowStatusDto> = {}): WorkflowStatusDto {
 function task(overrides: Partial<TaskDto> = {}): TaskDto {
   return {
     id: "0198f0a0-0000-7000-8000-000000000001",
-    key: "ML-1",
+    key: "ML-000001",
     workspaceId: "0198f0a0-0000-7000-8000-000000000010",
     taskNumber: 1,
     projectId: PROJECT_ID,

@@ -9,8 +9,8 @@ import type { TaskDto } from "@morrowlist/contracts";
  * That is deliberate: it means the board's roving focus and the list's focus return are
  * reused exactly as they are, and neither view had to change for this feature.
  *
- * When nothing is focused, the open detail is the subject instead: `/tasks/ML-12`, or a
- * `?task=ML-12` panel over a list or a board.
+ * When nothing is focused, the open detail is the subject instead: `/tasks/ML-000012`, or a
+ * `?task=ML-000012` panel over a list or a board.
  */
 
 const LIST_LINK = /^task-link-(.+)$/;

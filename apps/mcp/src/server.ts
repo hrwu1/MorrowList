@@ -33,7 +33,7 @@ export function createMorrowMcpServer(options: McpServerOptions): McpServer {
     { name: SERVER_NAME, version: SERVER_VERSION },
     {
       instructions:
-        "MorrowList task management. Task keys look like ML-142 and are stable; ids are uuids. Read with list_tasks or search before writing, and pass the version you read back as expectedVersion so a concurrent edit fails loudly.",
+        "MorrowList task management. Task keys look like ML-000142 and are stable; ids are uuids. Read with list_tasks or search before writing, and pass the version you read back as expectedVersion so a concurrent edit fails loudly.",
     },
   );
 

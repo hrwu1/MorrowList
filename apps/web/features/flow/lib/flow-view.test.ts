@@ -91,7 +91,7 @@ describe("cumulativeFlowAreas", () => {
 describe("agingChart", () => {
   const item = (overrides: Partial<AgingItemDto>): AgingItemDto => ({
     taskId: "01a04e0f-0000-7000-8000-000000000001",
-    key: "ML-1",
+    key: "ML-000001",
     title: "Item",
     statusId: "01a04e0f-0000-7000-8000-000000000002",
     statusName: "In Progress",
@@ -105,7 +105,7 @@ describe("agingChart", () => {
     const chart = agingChart(
       [
         item({ ageDays: 3 }),
-        item({ ageDays: 3, key: "ML-2" }),
+        item({ ageDays: 3, key: "ML-000002" }),
         item({ category: "review", ageDays: 12 }),
       ],
       { p50: 2, p85: 6, p95: 10 },

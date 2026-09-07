@@ -3,7 +3,6 @@ import {
   boardPlacement,
   createTask,
   rankBetween,
-  taskKey,
   type Clock,
   type CreateTaskInput,
   type Tag,
@@ -81,17 +80,18 @@ export async function insertNewTask(options: InsertTaskOptions): Promise<Task> {
   const placement = boardPlacement(task);
   if (placement) await openInterval(tx, task, placement, fields.project?.status);
 
-  const key = taskKey(workspace.taskKeyPrefix, task.taskNumber);
+  // The summary carries no key: the entry hangs off this task's own aggregate, and a
+  // rendered key would go stale the moment the workspace renamed its prefix.
   await recordEvent(tx, context, clock, {
     workspaceId: task.workspaceId,
     aggregateType: "task",
     aggregateId: task.id,
     eventType: TASK_EVENTS.created,
     summary: origin?.spawnedFrom
-      ? `Created task ${key} as the next occurrence of a repeating task`
+      ? "Created task as the next occurrence of a repeating task"
       : origin?.importedFrom
-        ? `Created task ${key} from a ${origin.importedFrom.source} import`
-        : `Created task ${key}`,
+        ? `Created task from a ${origin.importedFrom.source} import`
+        : "Created task",
     payload: {
       taskId: task.id,
       taskNumber: task.taskNumber,

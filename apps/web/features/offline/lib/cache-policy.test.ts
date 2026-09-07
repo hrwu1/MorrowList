@@ -74,12 +74,12 @@ describe("cache policy", () => {
     // Saved views are owner-scoped, which the user-and-workspace partition already is.
     expect(policy("/api/v1/views/saved")).toBe("partition");
     expect(policy("/api/v1/tasks?inbox=true")).toBe("partition");
-    expect(policy("/api/v1/tasks/ML-1")).toBe("partition");
+    expect(policy("/api/v1/tasks/ML-000001")).toBe("partition");
     expect(policy("/api/v1/projects/p1/board")).toBe("partition");
     expect(policy("/api/v1/projects/p1/flow")).toBe("partition");
     expect(policy("/api/v1/projects/p1/activity")).toBe("partition");
     expect(policy("/api/v1/projects/p1/statuses")).toBe("partition");
-    expect(policy("/api/v1/tasks/ML-1/activity")).toBe("partition");
+    expect(policy("/api/v1/tasks/ML-000001/activity")).toBe("partition");
     expect(policy("/api/v1/tags")).toBe("partition");
     expect(policy("/inbox", "navigate")).toBe("partition");
     expect(policy("/projects/p1/board", "navigate")).toBe("partition");

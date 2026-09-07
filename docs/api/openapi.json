@@ -13566,7 +13566,7 @@
           },
           "taskKeyPrefix": {
             "type": "string",
-            "pattern": "^[A-Za-z][A-Za-z0-9]{0,9}$"
+            "pattern": "^[A-Za-z][A-Za-z0-9]{0,23}$"
           },
           "timezone": {
             "type": "string",
@@ -23275,7 +23275,7 @@
             "name": "idOrKey",
             "in": "path",
             "required": true,
-            "description": "Task UUID or workspace key such as ML-142.",
+            "description": "Task UUID or workspace key such as ML-000142.",
             "schema": {
               "type": "string"
             }
@@ -23364,7 +23364,7 @@
             "name": "idOrKey",
             "in": "path",
             "required": true,
-            "description": "Task UUID or workspace key such as ML-142.",
+            "description": "Task UUID or workspace key such as ML-000142.",
             "schema": {
               "type": "string"
             }
@@ -25094,7 +25094,7 @@
     "/search": {
       "get": {
         "summary": "Search tasks and projects",
-        "description": "Free text is prefix-matched against titles, descriptions and tag names; a task key such as ML-12 is resolved first. `q` also accepts the operators due:, priority:, tag:, is:open|done|blocked and in:inbox, which override the same explicit filter. Match positions are returned as character offsets, never markup. Project name hits are listed for navigation on the first page.",
+        "description": "Free text is prefix-matched against titles, descriptions and tag names; a task key such as ML-000012 is resolved first. `q` also accepts the operators due:, priority:, tag:, is:open|done|blocked and in:inbox, which override the same explicit filter. Match positions are returned as character offsets, never markup. Project name hits are listed for navigation on the first page.",
         "parameters": [
           {
             "name": "workspaceId",

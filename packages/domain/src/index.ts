@@ -54,6 +54,7 @@ export {
   isPastDeadline,
   parseTaskKey,
   taskKey,
+  taskNumberRef,
   type DateWarning,
   type Task,
 } from "./task/task.js";

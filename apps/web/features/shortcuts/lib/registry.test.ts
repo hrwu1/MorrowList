@@ -144,7 +144,7 @@ describe("surfaceOf", () => {
     expect(surfaceOf("/today")).toBe("list");
     expect(surfaceOf("/views/01a04e0f-2e8a-7000-ae0a-989d784c0287")).toBe("list");
     expect(surfaceOf("/projects/p1/board")).toBe("board");
-    expect(surfaceOf("/tasks/ML-12")).toBe("detail");
+    expect(surfaceOf("/tasks/ML-000012")).toBe("detail");
     expect(surfaceOf("/settings/workspace")).toBe("other");
     expect(surfaceOf("/projects")).toBe("other");
   });
@@ -277,7 +277,7 @@ describe("running a command", () => {
   function task(overrides: Partial<TaskDto> = {}): TaskDto {
     return {
       id: "01a04e0f-2e8a-7000-ae0a-989d784c0287",
-      key: "ML-1",
+      key: "ML-000001",
       workspaceId: "01a04e0f-2e8a-7000-ae0a-989d784c0288",
       taskNumber: 1,
       projectId: null,
@@ -293,7 +293,7 @@ describe("running a command", () => {
       deadlineTime: null,
       dateWarnings: [],
       reminderOffsetMinutes: null,
-    fields: {},
+      fields: {},
       parentTaskId: null,
       recurrence: null,
       seriesId: null,

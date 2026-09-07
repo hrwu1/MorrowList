@@ -40,7 +40,7 @@ export function todayCommand(): Command {
     today
       .command(name)
       .description(describe)
-      .argument("<idOrKey>", "task id or workspace key, e.g. ML-142")
+      .argument("<idOrKey>", "task id or workspace key, e.g. ML-000142")
       .option("--date <date>", "a day other than today, as YYYY-MM-DD")
       .action(async (idOrKey: string, options, command: Command) => {
         const globals = globalsOf(command);

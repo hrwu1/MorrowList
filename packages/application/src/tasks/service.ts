@@ -47,6 +47,7 @@ import {
   spawnNextOccurrence,
   systemClock,
   taskKey,
+  taskNumberRef,
   toLocalDate,
   toPlainDate,
   updateTaskFields,
@@ -268,7 +269,7 @@ export class TaskService {
     });
   }
 
-  /** Fetch one task by UUID or by workspace task key such as `ML-142` (spec 20.3). */
+  /** Fetch one task by UUID or by workspace task key such as `ML-000142` (spec 20.3). */
   async get(
     context: ActorContext,
     workspaceId: string,
@@ -600,9 +601,9 @@ export class TaskService {
     let spawned: Task | null = null;
     return {
       eventType: TASK_EVENTS.completed,
-      summarize: (_next, _previous, workspace) =>
+      summarize: (_next, _previous, _workspace) =>
         spawned
-          ? `Completed task; next occurrence is ${taskKey(workspace.taskKeyPrefix, spawned.taskNumber)}`
+          ? `Completed task; next occurrence is ${taskNumberRef(spawned.taskNumber)}`
           : "Completed task",
       apply: async (task, tx, workspace) => {
         if (
@@ -1186,7 +1187,7 @@ export class TaskService {
       [task, other],
       [other, task],
     ] as const) {
-      const counterpartKey = `${workspace.taskKeyPrefix}-${counterpart.taskNumber}`;
+      const counterpartKey = taskNumberRef(counterpart.taskNumber);
       await recordEvent(tx, context, this.clock, {
         workspaceId: workspace.id,
         aggregateType: "task",
@@ -1679,7 +1680,7 @@ function describeBatch(operations: readonly BatchOperation[]): string {
 
 /**
  * Say which entry of a batch failed. The batch is already rolling back; the caller's
- * problem is working out what to fix, and "operation 37 on ML-142" is the answer.
+ * problem is working out what to fix, and "operation 37 on ML-000142" is the answer.
  */
 function batchFailure(
   error: unknown,

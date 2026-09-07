@@ -114,7 +114,7 @@ export function SearchPage() {
       {q.length === 0 ? (
         <EmptyState
           title="Type something to search"
-          description="Try a word from a title, a task key such as ML-12, or a tag name."
+          description="Try a word from a title, a task key such as ML-000012, or a tag name."
         />
       ) : results.isPending ? (
         <div className="task-list__status">

@@ -10,7 +10,7 @@ describe("planFromCsv", () => {
     const plan = planFromCsv(
       [
         HEADER,
-        'ML-1,"Draft the brief","## Notes",Ready,high,2026-09-15,"research, ux",,',
+        'ML-000001,"Draft the brief","## Notes",Ready,high,2026-09-15,"research, ux",,',
       ].join("\n"),
     );
 
@@ -26,7 +26,7 @@ describe("planFromCsv", () => {
         statusExternalId: "ready",
         isCompleted: false,
         isArchived: false,
-        externalId: "ML-1",
+        externalId: "ML-000001",
         subtasks: [],
       },
     ]);
@@ -54,28 +54,28 @@ describe("planFromCsv", () => {
     const plan = planFromCsv(
       [
         HEADER,
-        "ML-1,Parent,,Ready,,,,,",
-        "ML-2,By key,,Ready,,,,ML-1,yes",
-        "ML-3,By title,,Ready,,,,Parent,",
+        "ML-000001,Parent,,Ready,,,,,",
+        "ML-000002,By key,,Ready,,,,ML-000001,yes",
+        "ML-000003,By title,,Ready,,,,Parent,",
       ].join("\n"),
     );
 
     expect(plan.tasks).toHaveLength(1);
     expect(plan.tasks[0]?.subtasks).toEqual([
-      { title: "By key", isCompleted: true, externalId: "ML-2" },
-      { title: "By title", isCompleted: false, externalId: "ML-3" },
+      { title: "By key", isCompleted: true, externalId: "ML-000002" },
+      { title: "By title", isCompleted: false, externalId: "ML-000003" },
     ]);
   });
 
   it("keeps a row whose parent is unknown, and says why", () => {
-    const plan = planFromCsv([HEADER, "ML-9,Orphan,,,,,,ML-404,"].join("\n"));
+    const plan = planFromCsv([HEADER, "ML-000009,Orphan,,,,,,ML-000404,"].join("\n"));
 
     expect(plan.tasks.map((task) => task.title)).toEqual(["Orphan"]);
     expect(plan.issues).toEqual([
       {
         row: 2,
         title: "Orphan",
-        reason: 'No row matches parent "ML-404"; imported as a top-level task.',
+        reason: 'No row matches parent "ML-000404"; imported as a top-level task.',
       },
     ]);
   });
@@ -84,9 +84,9 @@ describe("planFromCsv", () => {
     const plan = planFromCsv(
       [
         HEADER,
-        "ML-1,Parent,,,,,,,",
-        "ML-2,Child,,,,,,ML-1,",
-        "ML-3,Grandchild,,,,,,ML-2,",
+        "ML-000001,Parent,,,,,,,",
+        "ML-000002,Child,,,,,,ML-000001,",
+        "ML-000003,Grandchild,,,,,,ML-000002,",
       ].join("\n"),
     );
 

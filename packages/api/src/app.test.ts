@@ -326,7 +326,7 @@ describe("task endpoints", () => {
     expect(response.status).toBe(201);
     const body = await response.json();
     expect(body.data).toMatchObject({
-      key: "ML-1",
+      key: "ML-000001",
       title: "Prepare research presentation",
       projectId: null,
       statusId: null,
@@ -352,7 +352,7 @@ describe("task endpoints", () => {
   it("fetches a task by its workspace key", async () => {
     await jsonRequest("/api/v1/tasks", "POST", { title: "Findable" });
 
-    const response = await request("/api/v1/tasks/ML-1");
+    const response = await request("/api/v1/tasks/ML-000001");
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
@@ -410,8 +410,8 @@ describe("task endpoints", () => {
     expect(
       series.data.map((t: { key: string; dueDate: string }) => [t.key, t.dueDate]),
     ).toEqual([
-      ["ML-1", "2026-09-05"],
-      ["ML-2", "2026-09-12"],
+      ["ML-000001", "2026-09-05"],
+      ["ML-000002", "2026-09-12"],
     ]);
 
     // Completed: nothing to skip. Both rejections are validation failures.
@@ -514,11 +514,11 @@ describe("task endpoints", () => {
     const addedBody = await added.json();
     expect(addedBody.data.relations[0]).toMatchObject({
       type: "blocks",
-      task: { key: "ML-2", title: "Make slides" },
+      task: { key: "ML-000002", title: "Make slides" },
     });
 
     const blocked = await (await request(`/api/v1/tasks?isBlocked=true`)).json();
-    expect(blocked.data.map((t: { key: string }) => t.key)).toEqual(["ML-2"]);
+    expect(blocked.data.map((t: { key: string }) => t.key)).toEqual(["ML-000002"]);
 
     const refused = await jsonRequest(
       `/api/v1/tasks/${target.data.id}/complete`,
@@ -766,7 +766,7 @@ describe("activity endpoints", () => {
       expectedVersion: 1,
     });
 
-    const response = await request("/api/v1/tasks/ML-1/activity?limit=1");
+    const response = await request("/api/v1/tasks/ML-000001/activity?limit=1");
 
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -781,7 +781,7 @@ describe("activity endpoints", () => {
     expect(body.page.hasMore).toBe(true);
 
     const rest = await request(
-      `/api/v1/tasks/ML-1/activity?cursor=${encodeURIComponent(body.page.nextCursor)}`,
+      `/api/v1/tasks/ML-000001/activity?cursor=${encodeURIComponent(body.page.nextCursor)}`,
     );
     const restBody = await rest.json();
     expect(
@@ -791,17 +791,17 @@ describe("activity endpoints", () => {
   });
 
   it("rejects a tampered cursor and reports an unknown task", async () => {
-    const forged = await request("/api/v1/tasks/ML-1/activity?cursor=abc.def");
+    const forged = await request("/api/v1/tasks/ML-000001/activity?cursor=abc.def");
     expect(forged.status).toBe(404);
 
     await jsonRequest("/api/v1/tasks", "POST", { title: "Exists" });
-    const tampered = await request("/api/v1/tasks/ML-1/activity?cursor=abc.def");
+    const tampered = await request("/api/v1/tasks/ML-000001/activity?cursor=abc.def");
     expect(tampered.status).toBe(422);
     await expect(tampered.json()).resolves.toMatchObject({
       error: { code: "VALIDATION_FAILED" },
     });
 
-    const missing = await request("/api/v1/tasks/ML-9/activity");
+    const missing = await request("/api/v1/tasks/ML-000009/activity");
     expect(missing.status).toBe(404);
   });
 
@@ -1472,10 +1472,10 @@ describe("search endpoint", () => {
     await jsonRequest("/api/v1/tasks", "POST", { title: "First", priority: "high" });
     await jsonRequest("/api/v1/tasks", "POST", { title: "Second" });
 
-    const byKey = await (await request("/api/v1/search?q=ML-2")).json();
+    const byKey = await (await request("/api/v1/search?q=ML-000002")).json();
     expect(
       byKey.data.tasks.map((hit: { task: { key: string } }) => hit.task.key),
-    ).toEqual(["ML-2"]);
+    ).toEqual(["ML-000002"]);
 
     const byOperator = await (await request("/api/v1/search?q=priority%3Ahigh")).json();
     expect(
