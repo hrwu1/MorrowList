@@ -64,7 +64,10 @@ import type {
   WorkspaceRepository,
   WorkspaceRole,
 } from "../ports/index.js";
+import type { Rule, RuleRun } from "../ports/rules.js";
 import { BLOCKS_WALK_DEPTH, BOARD_TASK_LIMIT, UPCOMING_LIMIT } from "../ports/tasks.js";
+
+import { ruleRepository } from "./rules.js";
 
 /**
  * In-memory adapters for the application ports.
@@ -79,6 +82,8 @@ export interface InMemoryData {
   inboundAddresses: Map<string, InboundAddress>;
   inboundReceipts: Map<string, string>;
   tasks: Map<string, Task>;
+  rules: Map<string, Rule>;
+  ruleRuns: Map<string, RuleRun>;
   counters: Map<string, number>;
   /** Keyed by `${taskId}:${planDate}`, mirroring the composite primary key. */
   dayPlans: Map<string, DayPlan>;
@@ -115,6 +120,8 @@ export function emptyData(): InMemoryData {
     inboundAddresses: new Map(),
     inboundReceipts: new Map(),
     tasks: new Map(),
+    rules: new Map(),
+    ruleRuns: new Map(),
     counters: new Map(),
     dayPlans: new Map(),
     projects: new Map(),
@@ -1416,6 +1423,8 @@ export function createInMemoryUnitOfWork(
     inboundAddresses: new Map(source.inboundAddresses),
     inboundReceipts: new Map(source.inboundReceipts),
     tasks: new Map(source.tasks),
+    rules: new Map(source.rules),
+    ruleRuns: new Map(source.ruleRuns),
     counters: new Map(source.counters),
     dayPlans: new Map(source.dayPlans),
     projects: new Map(source.projects),
@@ -1444,6 +1453,8 @@ export function createInMemoryUnitOfWork(
     target.inboundAddresses = source.inboundAddresses;
     target.inboundReceipts = source.inboundReceipts;
     target.tasks = source.tasks;
+    target.rules = source.rules;
+    target.ruleRuns = source.ruleRuns;
     target.counters = source.counters;
     target.dayPlans = source.dayPlans;
     target.projects = source.projects;
@@ -1481,6 +1492,7 @@ export function createInMemoryUnitOfWork(
       const tx: TransactionContext = {
         inboundAddresses: inboundAddressRepository(working),
         tasks: taskRepository(working),
+        rules: ruleRepository(working),
         taskCounters: counterRepository(working),
         dayPlans: dayPlanRepository(working),
         projects: projectRepository(working),

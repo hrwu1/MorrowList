@@ -12,3 +12,4 @@ export * from "./saved-view.js";
 export * from "./webhook.js";
 
 export * from "./calendar.js";
+export * from "./rule.js";

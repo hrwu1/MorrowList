@@ -20,6 +20,7 @@ import {
   createProjectRepository,
   createWorkflowStatusRepository,
 } from "./repositories/projects.js";
+import { createRuleRepository } from "./repositories/rules.js";
 import { createSavedViewRepository } from "./repositories/saved-views.js";
 import { createTagRepository } from "./repositories/tags.js";
 import {
@@ -44,6 +45,7 @@ export function buildTransactionContext(db: Database): TransactionContext {
     calendarFeedTokens: createCalendarFeedTokenRepository(db),
     inboundAddresses: createInboundAddressRepository(db),
     tasks: createTaskRepository(db),
+    rules: createRuleRepository(db),
     taskCounters: createTaskCounterRepository(db),
     dayPlans: createDayPlanRepository(db),
     projects: createProjectRepository(db),

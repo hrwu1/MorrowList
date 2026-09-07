@@ -12,6 +12,8 @@ import { paginated, paginationQuerySchema, uuidSchema } from "./common.js";
 
 /** `*` subscribes to everything, including event types added after the subscription. */
 export const WEBHOOK_EVENT_WILDCARD = "*";
+/** Reserved filter: receives only explicit automation deliveries, never normal fanout. */
+export const RULE_ONLY_WEBHOOK_EVENT = "rule.only";
 
 const eventTypeSchema = z
   .string()
@@ -20,6 +22,15 @@ const eventTypeSchema = z
   .regex(
     /^(\*|[a-z_]+\.(\*|[a-z_]+))$/,
     "must be an event type such as task.completed, a prefix such as task.*, or *",
+  );
+
+const eventTypesSchema = z
+  .array(eventTypeSchema)
+  .min(1)
+  .max(50)
+  .refine(
+    (types) => !types.includes(RULE_ONLY_WEBHOOK_EVENT) || types.length === 1,
+    "Rules-only delivery cannot be mixed with automatic event filters",
   );
 
 /** Only `https` in production; `http` is allowed so a local receiver can be tested. */
@@ -60,14 +71,14 @@ export const createdWebhookSubscriptionSchema = webhookSubscriptionSchema.extend
 
 export const createWebhookRequestSchema = z.object({
   url: webhookUrlSchema,
-  eventTypes: z.array(eventTypeSchema).min(1).max(50).default([WEBHOOK_EVENT_WILDCARD]),
+  eventTypes: eventTypesSchema.default([WEBHOOK_EVENT_WILDCARD]),
   description: z.string().max(200).nullable().optional(),
 });
 
 export const updateWebhookRequestSchema = z
   .object({
     url: webhookUrlSchema.optional(),
-    eventTypes: z.array(eventTypeSchema).min(1).max(50).optional(),
+    eventTypes: eventTypesSchema.optional(),
     description: z.string().max(200).nullable().optional(),
     active: z.boolean().optional(),
   })

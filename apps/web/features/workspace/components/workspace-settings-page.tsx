@@ -146,6 +146,7 @@ export function WorkspaceSettingsPage() {
         </p>
         <p className="workspace-settings__link">
           <Link href="/settings/webhooks">Webhooks</Link>
+          <Link href="/settings/rules">Automation rules</Link>
         </p>
       </section>
 

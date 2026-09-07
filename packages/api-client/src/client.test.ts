@@ -364,3 +364,31 @@ describe("capture address requests", () => {
     expect(requests[1]?.method).toBe("POST");
   });
 });
+
+describe("rule requests", () => {
+  it("uses workspace-scoped CRUD, preview and log endpoints", async () => {
+    const { client, requests } = recordingClient({ data: { id: TASK_ID } });
+    const definition = {
+      name: "Plan today",
+      trigger: { type: "due.today" as const },
+      actions: [{ type: "add_to_day" as const }],
+      conditions: [],
+      enabled: true,
+    };
+    await expect(client.createRule(definition)).resolves.toEqual({ id: TASK_ID });
+    await client.updateRule(TASK_ID, { enabled: false });
+    await client.testRule(TASK_ID, PROJECT_ID);
+    await client.listRuleRuns(TASK_ID);
+    expect(requests.map((request) => request.method)).toEqual([
+      "POST",
+      "PATCH",
+      "POST",
+      "GET",
+    ]);
+    expect(
+      requests.every((request) => new URL(request.url).searchParams.has("workspaceId")),
+    ).toBe(true);
+    expect(new URL(requests[2]!.url).pathname).toBe(`/api/v1/rules/${TASK_ID}/test`);
+    expect(await requests[2]!.json()).toEqual({ taskId: PROJECT_ID });
+  });
+});

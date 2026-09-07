@@ -65,3 +65,4 @@ export type {
 } from "./events.js";
 
 export * from "./calendar.js";
+export * from "./rules.js";

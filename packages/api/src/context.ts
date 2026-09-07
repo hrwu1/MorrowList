@@ -2,6 +2,7 @@ import type {
   CalendarFeedService,
   InboundEmailService,
   ActivityService,
+  RuleService,
   ActorContext,
   FieldService,
   ExportService,
@@ -35,6 +36,7 @@ export interface ApiDependencies {
   readonly projectService: ProjectService;
   readonly workflowService: WorkflowService;
   readonly taskService: TaskService;
+  readonly ruleService: RuleService;
   readonly activityService: ActivityService;
   readonly flowService: FlowService;
   readonly exportService: ExportService;

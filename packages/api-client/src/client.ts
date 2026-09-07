@@ -4,6 +4,11 @@ import type {
   CalendarFeedDto,
   CalendarFeedStatus,
   InboundAddressDto,
+  CreateRuleRequest,
+  UpdateRuleRequest,
+  RuleDto,
+  RuleRunDto,
+  RuleTestResult,
   ActivityListResponse,
   ActivityQuery,
   AddTaskRelationRequest,
@@ -1023,6 +1028,75 @@ export class ApiClient {
       undefined,
       options,
     );
+  }
+
+  async listRules(options: RequestOptions = {}): Promise<{ data: RuleDto[] }> {
+    return this.send(
+      "GET",
+      `/rules${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+  }
+  async createRule(
+    body: CreateRuleRequest,
+    options: RequestOptions = {},
+  ): Promise<RuleDto> {
+    return (
+      await this.send<{ data: RuleDto }>(
+        "POST",
+        `/rules${this.queryString({}, options)}`,
+        body,
+        options,
+      )
+    ).data;
+  }
+  async updateRule(
+    id: string,
+    body: UpdateRuleRequest,
+    options: RequestOptions = {},
+  ): Promise<RuleDto> {
+    return (
+      await this.send<{ data: RuleDto }>(
+        "PATCH",
+        `/rules/${encodeURIComponent(id)}${this.queryString({}, options)}`,
+        body,
+        options,
+      )
+    ).data;
+  }
+  async deleteRule(id: string, options: RequestOptions = {}): Promise<void> {
+    return this.send(
+      "DELETE",
+      `/rules/${encodeURIComponent(id)}${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+  }
+  async listRuleRuns(
+    id: string,
+    options: RequestOptions = {},
+  ): Promise<{ data: RuleRunDto[] }> {
+    return this.send(
+      "GET",
+      `/rules/${encodeURIComponent(id)}/runs${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+  }
+  async testRule(
+    id: string,
+    taskId: string,
+    options: RequestOptions = {},
+  ): Promise<RuleTestResult> {
+    return (
+      await this.send<{ data: RuleTestResult }>(
+        "POST",
+        `/rules/${encodeURIComponent(id)}/test${this.queryString({}, options)}`,
+        { taskId },
+        options,
+      )
+    ).data;
   }
 
   /** Webhook endpoints (GAP-18). The secret comes back from `createWebhook` only. */

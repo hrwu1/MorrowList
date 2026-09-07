@@ -54,11 +54,13 @@ const webhookDispatcher = new application.WebhookDispatcher({
   sender: application.createFetchWebhookSender(),
   logger,
 });
+const ruleEngine = new application.RuleEngine({ unitOfWork });
 const worker = application.startNotificationWorker({
   service,
   logger,
   pollIntervalMs: env.WORKER_POLL_SECONDS * 1000,
   webhookDispatcher,
+  ruleEngine,
 });
 
 // Keep the process alive between ticks; the worker's own timer is unref'd on purpose.

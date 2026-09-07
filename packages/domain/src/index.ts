@@ -315,3 +315,5 @@ export {
   planFromTrelloJson,
   type TrelloImportOptions,
 } from "./import/trello.js";
+
+export * from "./rules/evaluate.js";

@@ -1,5 +1,6 @@
 import type { Logger } from "@morrowlist/observability";
 
+import type { RuleEngine } from "../rules/engine.js";
 import type { WebhookDispatcher } from "../webhooks/dispatcher.js";
 
 import type { NotificationService } from "./service.js";
@@ -21,6 +22,7 @@ export interface NotificationWorkerOptions {
   readonly pollIntervalMs: number;
   readonly now?: () => Date;
   /** Webhook delivery (GAP-18). Omitted, the tick does reminders and digests only. */
+  readonly ruleEngine?: RuleEngine | undefined;
   readonly webhookDispatcher?: WebhookDispatcher | undefined;
 }
 
@@ -50,25 +52,33 @@ export function startNotificationWorker(
   async function runTick(): Promise<WorkerTickResult> {
     const at = now();
     const result = { reminders: 0, digests: 0, webhooks: 0 };
+    const failed = (component: string, error: unknown) =>
+      logger.error("notification worker tick failed", {
+        component,
+        error: error instanceof Error ? error.message : String(error),
+      });
     try {
       result.reminders = await service.deliverDue(at);
       result.digests = await service.digest(at);
-      if (result.reminders > 0 || result.digests > 0) {
+      if (result.reminders > 0 || result.digests > 0)
         logger.info("notifications delivered", {
           reminders: result.reminders,
           digests: result.digests,
         });
-      }
-      // Webhook delivery is separate work on the same tick: a failing endpoint must not
-      // hold up a reminder, and a failing reminder must not stop a delivery.
-      if (options.webhookDispatcher) {
-        result.webhooks = (await options.webhookDispatcher.tick(at)).delivered;
-      }
     } catch (error) {
-      // One bad tick must not stop the loop; the next tick claims what is still pending.
-      logger.error("notification worker tick failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      failed("notifications", error);
+    }
+    // Independent consumers share a timer, but one failing job must not starve another.
+    try {
+      if (options.ruleEngine) await options.ruleEngine.tick(at);
+    } catch (error) {
+      failed("rules", error);
+    }
+    try {
+      if (options.webhookDispatcher)
+        result.webhooks = (await options.webhookDispatcher.tick(at)).delivered;
+    } catch (error) {
+      failed("webhooks", error);
     }
     return result;
   }

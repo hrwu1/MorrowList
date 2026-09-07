@@ -1,3 +1,4 @@
+import { RULE_ONLY_WEBHOOK_EVENT } from "@morrowlist/contracts";
 import type { WebhookDeliveryDto, WebhookSubscriptionDto } from "@morrowlist/contracts";
 
 /**
@@ -10,6 +11,7 @@ import type { WebhookDeliveryDto, WebhookSubscriptionDto } from "@morrowlist/con
 /** The event groups the form offers. `*` is deliberately first: it is the useful default. */
 export const EVENT_PRESETS = [
   { value: "*", label: "Everything" },
+  { value: RULE_ONLY_WEBHOOK_EVENT, label: "Only when called by a rule" },
   { value: "task.*", label: "All task events" },
   { value: "task.created,task.updated,task.completed", label: "Task lifecycle" },
   { value: "project.*,workflow_status.*", label: "Projects and columns" },
@@ -43,6 +45,11 @@ export function deliveryDetail(delivery: WebhookDeliveryDto): string {
 }
 
 export function describeEndpoint(webhook: WebhookSubscriptionDto): string {
+  if (
+    webhook.eventTypes.length === 1 &&
+    webhook.eventTypes[0] === RULE_ONLY_WEBHOOK_EVENT
+  )
+    return `${webhook.active ? "Active" : "Paused"} · Only when called by a rule`;
   const events =
     webhook.eventTypes.length === 1 && webhook.eventTypes[0] === "*"
       ? "every event"

@@ -15,6 +15,8 @@ import {
   SearchService,
   TagService,
   TaskService,
+  RuleService,
+  RuleEngine,
   ViewService,
   WebhookDispatcher,
   WebhookService,
@@ -117,6 +119,8 @@ export function getContainer(): Container {
     logger,
   });
   // One sender for the synchronous test delivery and the dispatcher alike (GAP-18).
+  const ruleService = new RuleService({ unitOfWork });
+  const ruleEngine = new RuleEngine({ unitOfWork });
   const webhookSender = createFetchWebhookSender();
   const webhookService = new WebhookService({
     unitOfWork,
@@ -158,6 +162,7 @@ export function getContainer(): Container {
     savedViewService: new SavedViewService({ unitOfWork }),
     notificationService,
     webhookService,
+    ruleService,
     logger,
     checkHealth: () => checkDatabaseHealth(database),
   };
@@ -171,6 +176,7 @@ export function getContainer(): Container {
           logger: logger.child({ component: "notification-worker" }),
           pollIntervalMs: env.WORKER_POLL_SECONDS * 1000,
           webhookDispatcher,
+          ruleEngine,
         })
       : null;
 

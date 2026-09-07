@@ -55,6 +55,7 @@ export async function recordEvent(
     actor: { kind: context.actorKind, id: context.actorId },
     payload: input.payload,
     correlationId: context.requestId,
+    causationId: context.causationId,
     occurredAt,
     // Available immediately; a future dispatcher may delay individual events.
     availableAt: occurredAt,

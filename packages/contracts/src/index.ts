@@ -17,3 +17,4 @@ export * from "./flow.js";
 export * from "./export.js";
 
 export * from "./calendar.js";
+export * from "./rule.js";
