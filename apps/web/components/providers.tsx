@@ -10,8 +10,8 @@ import { UndoProvider } from "@/features/tasks/components/undo-toast";
 /**
  * Server-state configuration (spec 23.1, 24.3).
  *
- * Real-time push is deferred for the MVP, so consistency comes from refetching on focus
- * and reconnect rather than from a socket. Requests are attempted even when the browser
+ * Real-time push is deferred for the MVP, so consistency comes from refetching on focus,
+ * reconnect, and the authenticated shell's active-view refresh. Requests are attempted even when the browser
  * reports itself offline (spec 25.1): the service worker answers a read from its cache,
  * and a write fails fast through the transport guard instead of waiting in a queue.
  */

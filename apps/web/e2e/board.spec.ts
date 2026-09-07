@@ -16,6 +16,8 @@ async function signUp(page: Page) {
 
 /** dnd-kit activates after a few pointer moves, so a drag is a stepped mouse path. */
 async function dragWithPointer(source: Locator, target: Locator, page: Page) {
+  // Wait for route/layout settlement before taking coordinates for raw pointer events.
+  await source.hover();
   const from = await source.boundingBox();
   const to = await target.boundingBox();
   expect(from).not.toBeNull();

@@ -64,8 +64,25 @@ export async function refreshActiveTaskProjections(client: QueryClient): Promise
 export function useBackgroundTaskSync(): void {
   const queryClient = useQueryClient();
   useEffect(() => {
+    let pointerDown = false;
+    const beginPointer = () => {
+      pointerDown = true;
+    };
+    const endPointer = () => {
+      pointerDown = false;
+    };
+    window.addEventListener("pointerdown", beginPointer, true);
+    window.addEventListener("pointerup", endPointer, true);
+    window.addEventListener("pointercancel", endPointer, true);
+    window.addEventListener("blur", endPointer);
     const timer = window.setInterval(() => {
-      if (!navigator.onLine || document.visibilityState !== "visible") return;
+      if (
+        pointerDown ||
+        !navigator.onLine ||
+        document.visibilityState !== "visible" ||
+        document.querySelector('[data-dragging="true"]')
+      )
+        return;
       const focused = document.activeElement;
       if (
         focused?.matches(
@@ -76,6 +93,12 @@ export function useBackgroundTaskSync(): void {
       }
       void refreshActiveTaskProjections(queryClient);
     }, REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("pointerdown", beginPointer, true);
+      window.removeEventListener("pointerup", endPointer, true);
+      window.removeEventListener("pointercancel", endPointer, true);
+      window.removeEventListener("blur", endPointer);
+    };
   }, [queryClient]);
 }
