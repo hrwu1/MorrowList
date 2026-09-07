@@ -1,0 +1,171 @@
+.calendar-page {
+  max-width: none;
+}
+.calendar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.calendar-controls h2 {
+  margin: 0 auto 0 0.5rem;
+  font-size: 1.15rem;
+}
+.calendar-layout {
+  display: flex;
+  gap: 0.25rem;
+}
+.calendar-layout [aria-pressed="true"] {
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+}
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.calendar-weekday {
+  padding: 0.5rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.calendar-day {
+  min-width: 0;
+  min-height: 9rem;
+  padding: 0.25rem;
+  border-top: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+}
+.calendar-day[data-outside] {
+  background: var(--surface-sunken);
+}
+.calendar-day[data-selected],
+.calendar-day[data-over] {
+  background: var(--accent-subtle);
+}
+.calendar-day__date {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.4rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: transparent;
+  cursor: pointer;
+}
+.calendar-day__date[aria-current="date"] {
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 0.3rem;
+}
+.calendar-day__count {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+.calendar-chips {
+  display: grid;
+  gap: 0.25rem;
+}
+.calendar-chip {
+  display: flex;
+  min-width: 0;
+  background: var(--surface-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+.calendar-chip[data-dragging] {
+  opacity: 0.5;
+}
+.calendar-chip a {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  padding: 0.2rem;
+  text-decoration: none;
+}
+.calendar-chip a span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.calendar-chip__marker {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+.calendar-chip__drag {
+  min-width: 24px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: grab;
+  touch-action: none;
+}
+.calendar-more {
+  min-height: 30px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: var(--accent-text);
+  cursor: pointer;
+}
+.calendar-hint {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+.calendar-day-list {
+  min-width: 0;
+}
+.calendar-feed-url {
+  width: 100%;
+  min-width: 0;
+  padding: 0.75rem;
+}
+@media (max-width: 700px) {
+  .calendar-day {
+    min-height: 48px;
+    padding: 0;
+  }
+  .calendar-chips {
+    display: none;
+  }
+  .calendar-weekday {
+    font-size: 0.75rem;
+    padding: 0.25rem 0;
+  }
+  .calendar-day__date {
+    padding: 0.25rem;
+  }
+  .calendar-day__count {
+    font-size: 0.7rem;
+  }
+  .calendar-controls h2 {
+    order: -1;
+    flex-basis: 100%;
+    margin: 0 0 0.25rem;
+  }
+}
+
+/* Use the day list when the detail panel leaves too little room for readable chips. */
+.calendar-page > .stack {
+  container-type: inline-size;
+  container-name: calendar-content;
+}
+@container calendar-content (max-width: 600px) {
+  .calendar-chips {
+    display: none;
+  }
+  .calendar-day {
+    min-height: 48px;
+  }
+}
