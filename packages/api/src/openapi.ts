@@ -1,4 +1,12 @@
 import {
+  createRuleRequestSchema,
+  listRuleRunsQuerySchema,
+  updateRuleRequestSchema,
+  ruleResponseSchema,
+  ruleListResponseSchema,
+  ruleRunsResponseSchema,
+  testRuleRequestSchema,
+  testRuleResponseSchema,
   activityListResponseSchema,
   activityQuerySchema,
   addTaskRelationRequestSchema,
@@ -162,6 +170,13 @@ const registry = {
   WorkspaceExport: workspaceExportSchema,
   ImportRequest: importRequestSchema,
   ImportResult: importResultSchema,
+  CreateRuleRequest: createRuleRequestSchema,
+  UpdateRuleRequest: updateRuleRequestSchema,
+  Rule: ruleResponseSchema,
+  RuleList: ruleListResponseSchema,
+  RuleRuns: ruleRunsResponseSchema,
+  TestRuleRequest: testRuleRequestSchema,
+  TestRuleResponse: testRuleResponseSchema,
 } as const;
 
 function ref(name: keyof typeof registry) {
@@ -510,6 +525,85 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
               ...jsonContent(ref("Notification")),
             },
             "404": { description: "Not found", ...jsonContent(ref("ErrorResponse")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/rules": {
+        get: {
+          summary: "List automation rules",
+          parameters: [workspaceIdParam],
+          responses: {
+            "200": { description: "Workspace rules", ...jsonContent(ref("RuleList")) },
+            ...commonErrors,
+          },
+        },
+        post: {
+          summary: "Create an automation rule",
+          description:
+            "Requires workspace:write and tasks:write. Fixed typed triggers, AND conditions and actions. No historical replay; rule descendants never trigger any rule.",
+          parameters: [workspaceIdParam],
+          requestBody: { required: true, ...jsonContent(ref("CreateRuleRequest")) },
+          responses: {
+            "201": { description: "Created rule", ...jsonContent(ref("Rule")) },
+            ...commonErrors,
+          },
+        },
+      },
+      "/rules/{id}": {
+        patch: {
+          summary: "Edit, enable or disable an automation rule",
+          description:
+            "Changes reset eligibility to this instant. Existing daily receipts remain deduplicated.",
+          parameters: [workspaceIdParam, taskIdParam],
+          requestBody: { required: true, ...jsonContent(ref("UpdateRuleRequest")) },
+          responses: {
+            "200": { description: "Updated rule", ...jsonContent(ref("Rule")) },
+            ...notFound,
+            ...commonErrors,
+          },
+        },
+        delete: {
+          summary: "Delete an automation rule and its runs",
+          parameters: [workspaceIdParam, taskIdParam],
+          responses: {
+            "204": { description: "Deleted" },
+            ...notFound,
+            ...commonErrors,
+          },
+        },
+      },
+      "/rules/{id}/runs": {
+        get: {
+          summary: "List the latest automation runs",
+          parameters: [
+            workspaceIdParam,
+            taskIdParam,
+            ...queryParameters(listRuleRunsQuerySchema),
+          ],
+          responses: {
+            "200": {
+              description: "Latest bounded run log",
+              ...jsonContent(ref("RuleRuns")),
+            },
+            ...notFound,
+            ...commonErrors,
+          },
+        },
+      },
+      "/rules/{id}/test": {
+        post: {
+          summary: "Preview a rule against a task",
+          description:
+            "Simulates the configured trigger against current task values without mutations or deliveries.",
+          parameters: [workspaceIdParam, taskIdParam],
+          requestBody: { required: true, ...jsonContent(ref("TestRuleRequest")) },
+          responses: {
+            "200": {
+              description: "Dry-run match and actions",
+              ...jsonContent(ref("TestRuleResponse")),
+            },
+            ...notFound,
             ...commonErrors,
           },
         },

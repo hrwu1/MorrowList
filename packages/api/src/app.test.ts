@@ -10,6 +10,7 @@ import {
   SearchService,
   TagService,
   TaskService,
+  RuleService,
   ViewService,
   WebhookService,
   WorkflowService,
@@ -120,6 +121,7 @@ beforeEach(async () => {
       userDirectory: { findById: async () => currentUser },
       appUrl: "http://localhost:3200",
     }),
+    ruleService: new RuleService({ unitOfWork, clock: fixedClock(NOW) }),
     webhookService: new WebhookService({
       unitOfWork,
       clock: fixedClock(NOW),
@@ -1901,5 +1903,49 @@ describe("export and import endpoints (GAP-07)", () => {
       body: JSON.stringify({ content: "title\nFrom a big file" }),
     });
     expect(importedBody.status).toBe(201);
+  });
+});
+
+describe("automation rule routes", () => {
+  it("validates typed rules and supports create/update/test/run/delete", async () => {
+    const createdResponse = await jsonRequest("/api/v1/rules", "POST", {
+      name: "Urgency",
+      trigger: { type: "task.created" },
+      conditions: [{ type: "priority_is", priority: "none" }],
+      actions: [{ type: "set_priority", priority: "urgent" }],
+      enabled: false,
+    });
+    expect(createdResponse.status).toBe(201);
+    const { data: rule } = await createdResponse.json();
+    const changed = await jsonRequest(`/api/v1/rules/${rule.id}`, "PATCH", {
+      name: "Renamed",
+    });
+    expect((await changed.json()).data).toMatchObject({
+      enabled: false,
+      conditions: [{ type: "priority_is", priority: "none" }],
+    });
+    expect((await request("/api/v1/rules")).status).toBe(200);
+    expect((await request(`/api/v1/rules/${rule.id}/runs`)).status).toBe(200);
+    const taskResponse = await jsonRequest("/api/v1/tasks", "POST", {
+      title: "Preview",
+    });
+    const { data: task } = await taskResponse.json();
+    expect(
+      (await jsonRequest(`/api/v1/rules/${rule.id}/test`, "POST", { taskId: task.id }))
+        .status,
+    ).toBe(200);
+    expect(
+      (
+        await jsonRequest("/api/v1/rules", "POST", {
+          name: "Unsafe",
+          trigger: { type: "task.created" },
+          actions: [{ type: "execute", script: "x" }],
+        })
+      ).status,
+    ).toBe(422);
+    expect(
+      (await request(`/api/v1/rules/${rule.id}`, { method: "DELETE" })).status,
+    ).toBe(204);
+    expect((await request(`/api/v1/rules/${rule.id}/runs`)).status).toBe(404);
   });
 });

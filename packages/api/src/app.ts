@@ -12,6 +12,7 @@ import { importRoutes } from "./routes/imports.js";
 import { meRoutes } from "./routes/me.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { projectRoutes } from "./routes/projects.js";
+import { ruleRoutes } from "./routes/rules.js";
 import { searchRoutes } from "./routes/search.js";
 import { statusRoutes } from "./routes/statuses.js";
 import { tagRoutes } from "./routes/tags.js";
@@ -68,6 +69,8 @@ export function createApiApp(deps: ApiDependencies) {
   app.use("/fields", authenticate(deps.auth, listWorkspaceIds));
   app.use("/fields/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/statuses/*", authenticate(deps.auth, listWorkspaceIds));
+  app.use("/rules", authenticate(deps.auth, listWorkspaceIds));
+  app.use("/rules/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/webhooks", authenticate(deps.auth, listWorkspaceIds));
   app.use("/webhooks/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/workspaces/*", authenticate(deps.auth, listWorkspaceIds));
@@ -86,6 +89,7 @@ export function createApiApp(deps: ApiDependencies) {
   app.route("/", taskRoutes(deps));
   app.route("/", viewRoutes(deps));
   app.route("/", webhookRoutes(deps));
+  app.route("/", ruleRoutes(deps));
   app.route("/", workspaceRoutes(deps));
 
   app.notFound((c) => {

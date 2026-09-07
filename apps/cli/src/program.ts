@@ -6,6 +6,7 @@ import { fieldCommand } from "./commands/field.js";
 import { notificationsCommand } from "./commands/notifications.js";
 import { projectCommand } from "./commands/project.js";
 import { relationCommand } from "./commands/relation.js";
+import { ruleCommand } from "./commands/rule.js";
 import { searchCommand } from "./commands/search.js";
 import { statusCommand } from "./commands/status.js";
 import { tagCommand } from "./commands/tag.js";
@@ -56,6 +57,7 @@ export function createProgram(): Command {
   program.addCommand(exportCommand());
   program.addCommand(importCommand());
   program.addCommand(webhookCommand());
+  program.addCommand(ruleCommand());
   program.addCommand(usageCommand());
 
   return program;
