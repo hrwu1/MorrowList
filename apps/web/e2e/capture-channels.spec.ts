@@ -44,6 +44,11 @@ test("settings rotates email addresses, bookmarklet captures, and shortcut opens
     /javascript:.*encodeURIComponent/,
   );
   await page.goto("/inbox");
+  // Navigation can finish before the shortcut listener hydrates. This row is loaded
+  // by the client, so its appearance establishes readiness for keyboard interaction.
+  await expect(
+    page.getByRole("link", { name: "Email from browser test", exact: true }),
+  ).toBeVisible();
   const popupPromise = page.waitForEvent("popup");
   await page.keyboard.press("Control+Shift+Space");
   const popup = await popupPromise;
