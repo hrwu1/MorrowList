@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { openSection } from "./disclosures";
+
 /**
  * Search and saved views end to end (GAP-02, spec 9.8): find a task by key, by a word
  * in its description, and by a tag; save the Inbox filters as a view; reload and open
@@ -167,6 +169,7 @@ test("a filter set saves as a personal view that survives a reload and reorders"
   await capture(page, "Calm thing");
   await page.getByRole("link", { name: "Urgent thing" }).click();
   const panel = page.getByRole("complementary", { name: /Task details for/ });
+  await openSection(panel, "Scheduling & priority");
   await panel.getByLabel("Priority").selectOption("urgent");
   await expect(panel.getByText("Saved")).toBeVisible();
   await panel.getByRole("button", { name: "Close task details" }).click();

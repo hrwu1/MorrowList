@@ -2,6 +2,8 @@ import { readFile } from "node:fs/promises";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { openSection } from "./disclosures";
+
 /**
  * Export and import end to end (GAP-07, spec 30): download the archive and the task CSV,
  * then bring a Trello board in — dry run first, board afterwards.
@@ -89,6 +91,7 @@ test("the archive and the task CSV download from Settings › Data", async ({ pa
   await signUp(page);
   await captureInboxTask(page, "Draft the brief");
 
+  await openSection(page, "Settings");
   await page.getByRole("link", { name: "Export and import" }).first().click();
   await expect(page.getByRole("heading", { level: 1, name: "Data" })).toBeVisible();
 
@@ -119,6 +122,7 @@ test("a Trello board previews, then imports as a board with columns, tags and su
   page,
 }) => {
   await signUp(page);
+  await openSection(page, "Settings");
   await page.getByRole("link", { name: "Export and import" }).first().click();
   await expect(page.getByRole("heading", { level: 1, name: "Data" })).toBeVisible();
 

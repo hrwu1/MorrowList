@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { openSection } from "./disclosures";
+
 const PASSWORD = "correct-horse-battery-staple";
 
 async function signUp(page: Page) {
@@ -13,6 +15,7 @@ async function signUp(page: Page) {
 }
 
 async function createProject(page: Page, name: string) {
+  await openSection(page, "Settings");
   await page.getByRole("link", { name: "Manage projects" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
   await page.getByLabel("Project name").fill(name);
@@ -47,6 +50,7 @@ test("warns across projects when the in-progress limit is exceeded, never blocki
   await signUp(page);
 
   // The limit belongs to the workspace, so it lives in the workspace settings.
+  await openSection(page, "Settings");
   await page.getByRole("link", { name: "Workspace settings", exact: true }).click();
   await expect(
     page.getByRole("heading", { level: 1, name: "Workspace" }),

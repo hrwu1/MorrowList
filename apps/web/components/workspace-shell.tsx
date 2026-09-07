@@ -192,16 +192,6 @@ export function WorkspaceShell({
             {/* Beside the brand rather than in the nav, so the sidebar's drop targets
                 keep their positions for keyboard drags. */}
             <span className="workspace-topline__tools">
-              <button
-                type="button"
-                className="workspace-search"
-                aria-label="Search tasks and projects"
-                title="Search (/)"
-                onClick={openSearch}
-              >
-                <Icon name="search" />
-                <kbd aria-hidden="true">/</kbd>
-              </button>
               {/* A keyboard-first product has to say so somewhere a mouse can reach
                   (spec 14). Beside the brand rather than in the nav: another nav row
                   would push the sidebar past a laptop viewport. */}
@@ -235,6 +225,18 @@ export function WorkspaceShell({
               </Link>
             </span>
           </div>
+
+          <button
+            type="button"
+            className="workspace-search"
+            aria-label="Search tasks and projects"
+            title="Search (/)"
+            onClick={openSearch}
+          >
+            <Icon name="search" />
+            <span>Search</span>
+            <kbd aria-hidden="true">/</kbd>
+          </button>
 
           <button
             type="button"
@@ -329,38 +331,51 @@ export function WorkspaceShell({
           </nav>
 
           <div className="workspace-sidebar__utilities">
-            <Link
-              className="workspace-nav__link workspace-nav__link--quiet"
-              href="/projects"
-              aria-current={pathname === "/projects" ? "page" : undefined}
+            <details
+              className="workspace-settings"
+              key={`settings-${pathname}`}
+              open={pathname.startsWith("/settings") || pathname === "/projects"}
             >
-              <Icon name="settings" />
-              <span>Manage projects</span>
-            </Link>
-            <Link
-              className="workspace-nav__link workspace-nav__link--quiet"
-              href="/settings/tags"
-              aria-current={pathname === "/settings/tags" ? "page" : undefined}
-            >
-              <Icon name="tag" />
-              <span>Manage tags</span>
-            </Link>
-            <Link
-              className="workspace-nav__link workspace-nav__link--quiet"
-              href="/settings/data"
-              aria-current={pathname === "/settings/data" ? "page" : undefined}
-            >
-              <Icon name="settings" />
-              <span>Export and import</span>
-            </Link>
-            <Link
-              className="workspace-nav__link workspace-nav__link--quiet"
-              href="/settings/workspace"
-              aria-current={pathname === "/settings/workspace" ? "page" : undefined}
-            >
-              <Icon name="settings" />
-              <span>Workspace settings</span>
-            </Link>
+              <summary>
+                <Icon name="settings" />
+                <span>Settings</span>
+                <Icon name="chevron-up" />
+              </summary>
+              <div className="workspace-settings__links">
+                <Link
+                  className="workspace-nav__link workspace-nav__link--quiet"
+                  href="/projects"
+                  aria-current={pathname === "/projects" ? "page" : undefined}
+                >
+                  <Icon name="settings" />
+                  <span>Manage projects</span>
+                </Link>
+                <Link
+                  className="workspace-nav__link workspace-nav__link--quiet"
+                  href="/settings/tags"
+                  aria-current={pathname === "/settings/tags" ? "page" : undefined}
+                >
+                  <Icon name="tag" />
+                  <span>Manage tags</span>
+                </Link>
+                <Link
+                  className="workspace-nav__link workspace-nav__link--quiet"
+                  href="/settings/data"
+                  aria-current={pathname === "/settings/data" ? "page" : undefined}
+                >
+                  <Icon name="settings" />
+                  <span>Export and import</span>
+                </Link>
+                <Link
+                  className="workspace-nav__link workspace-nav__link--quiet"
+                  href="/settings/workspace"
+                  aria-current={pathname === "/settings/workspace" ? "page" : undefined}
+                >
+                  <Icon name="settings" />
+                  <span>Workspace settings</span>
+                </Link>
+              </div>
+            </details>
 
             <details className="workspace-account" key={`account-${pathname}`}>
               <summary>

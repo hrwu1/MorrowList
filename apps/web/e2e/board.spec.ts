@@ -1,5 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { openSection } from "./disclosures";
+
 const PASSWORD = "correct-horse-battery-staple";
 
 async function signUp(page: Page) {
@@ -23,10 +25,18 @@ async function dragWithPointer(source: Locator, target: Locator, page: Page) {
   await page.mouse.down();
   await page.mouse.move(from.x + from.width / 2 + 12, from.y + from.height / 2 + 12);
   await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });
+  // React publishes the highlighted destination after the pointer event. Drop only
+  // once that visible feedback confirms the sidebar has accepted this position.
+  if (
+    await target.evaluate((element) => element.closest(".workspace-sidebar") !== null)
+  ) {
+    await expect(target).toHaveAttribute("data-drop-target", "true");
+  }
   await page.mouse.up();
 }
 
 async function createProject(page: Page) {
+  await openSection(page, "Settings");
   await page.getByRole("link", { name: "Manage projects" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
   await page.getByLabel("Project name").fill("Research Launch");
@@ -119,20 +129,7 @@ test("creates a project and moves a board task with pointer drag", async ({ page
   await expect(ready.getByRole("link", { name: "Draft research brief" })).toBeVisible();
 
   const handle = ready.getByRole("button", { name: /Drag Draft research brief/ });
-  const start = await handle.boundingBox();
-  const destination = await inProgress.boundingBox();
-  expect(start).not.toBeNull();
-  expect(destination).not.toBeNull();
-  if (!start || !destination) return;
-
-  await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(
-    destination.x + destination.width / 2,
-    destination.y + destination.height / 2,
-    { steps: 12 },
-  );
-  await page.mouse.up();
+  await dragWithPointer(handle, inProgress, page);
 
   await expect(
     inProgress.getByRole("link", { name: "Draft research brief" }),

@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { openSection } from "./disclosures";
+
 /**
  * Reminders end to end (GAP-13): a task due in a minute gets a reminder at its due time,
  * the worker embedded in the server delivers it, the bell and the inbox show it, and the
@@ -40,7 +42,9 @@ test("a task due in a minute reminds at its due time, and settings persist", asy
 
   // Due 60–120 seconds from now, on the minute; "At the due time" fires at that minute.
   const due = utcDateAndTime(new Date(Date.now() + 120_000));
+  await openSection(panel, "Scheduling & priority");
   await panel.getByLabel("Planned", { exact: true }).fill(due.date);
+  await openSection(panel, "Scheduling & priority");
   await panel.getByLabel("Planned time").fill(due.time);
   const reminder = panel.getByLabel("Reminder");
   await expect(reminder).toBeVisible();

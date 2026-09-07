@@ -101,6 +101,52 @@ export function KanbanCard({
         listeners?.onPointerDown?.(event);
       }}
     >
+      <Link
+        className="board-card__title"
+        href={detailHref}
+        id={`board-task-link-${task.key}`}
+      >
+        {task.title}
+      </Link>
+
+      <div className="board-card__meta">
+        <span className="task-row__key">{task.key}</span>
+        <PriorityBadge priority={task.priority} />
+        <DueBadge
+          dueDate={task.dueDate}
+          dueTime={task.dueTime}
+          isCompleted={task.isCompleted}
+        />
+        <RepeatBadge recurrence={task.recurrence} />
+        <DeadlineBadge
+          deadline={task.deadline}
+          deadlineTime={task.deadlineTime}
+          isCompleted={task.isCompleted}
+        />
+        <DeferBadge deferUntil={task.deferUntil} />
+        <MyDayBadge dayPlans={task.dayPlans} />
+        <BlockedBadge task={task} />
+        <SubtaskProgressBadge progress={task.subtaskProgress} />
+        {days !== null && days >= 1 ? (
+          <span
+            className="board-card__age"
+            data-age={band ?? undefined}
+            title={`In this column for ${days} ${days === 1 ? "day" : "days"}`}
+            aria-label={`In this column for ${days} ${days === 1 ? "day" : "days"}`}
+          >
+            {days}d
+          </span>
+        ) : null}
+      </div>
+
+      {task.tags.length > 0 ? (
+        <div className="board-card__tags">
+          <TagChips tags={task.tags} />
+        </div>
+      ) : null}
+
+      <FieldChips values={task.fields} />
+
       <div className="board-card__controls">
         <SelectionCheckbox task={task} />
         <label>
@@ -156,52 +202,6 @@ export function KanbanCard({
           <span aria-hidden="true">⠿</span>
         </button>
       </div>
-
-      <Link
-        className="board-card__title"
-        href={detailHref}
-        id={`board-task-link-${task.key}`}
-      >
-        {task.title}
-      </Link>
-
-      <div className="board-card__meta">
-        <span className="task-row__key">{task.key}</span>
-        <PriorityBadge priority={task.priority} />
-        <DueBadge
-          dueDate={task.dueDate}
-          dueTime={task.dueTime}
-          isCompleted={task.isCompleted}
-        />
-        <RepeatBadge recurrence={task.recurrence} />
-        <DeadlineBadge
-          deadline={task.deadline}
-          deadlineTime={task.deadlineTime}
-          isCompleted={task.isCompleted}
-        />
-        <DeferBadge deferUntil={task.deferUntil} />
-        <MyDayBadge dayPlans={task.dayPlans} />
-        <BlockedBadge task={task} />
-        <SubtaskProgressBadge progress={task.subtaskProgress} />
-        {days !== null && days >= 1 ? (
-          <span
-            className="board-card__age"
-            data-age={band ?? undefined}
-            title={`In this column for ${days} ${days === 1 ? "day" : "days"}`}
-            aria-label={`In this column for ${days} ${days === 1 ? "day" : "days"}`}
-          >
-            {days}d
-          </span>
-        ) : null}
-      </div>
-
-      {task.tags.length > 0 ? (
-        <div className="board-card__tags">
-          <TagChips tags={task.tags} />
-        </div>
-      ) : null}
-
-      <FieldChips values={task.fields} />
     </li>
   );
 }

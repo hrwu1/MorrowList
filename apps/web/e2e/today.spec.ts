@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { openSection } from "./disclosures";
+
 /**
  * The daily loop (spec 9.2, 9.3): choose work for today, see it in Today, finish it
  * there; give work a date and find it in Upcoming; and review yesterday's leftovers
@@ -235,6 +237,7 @@ test("My Day can be toggled from a board card and the task detail", async ({
   page,
 }) => {
   await signUp(page);
+  await openSection(page, "Settings");
   await page.getByRole("link", { name: "Manage projects" }).click();
   await page.getByLabel("Project name").fill("Daily Loop");
   await page.getByRole("button", { name: "Create project" }).click();

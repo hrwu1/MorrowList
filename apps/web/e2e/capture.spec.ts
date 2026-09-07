@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { openSection } from "./disclosures";
+
 /**
  * Natural-language quick add end to end (GAP-15, ADR pending-natural-language-capture):
  * type one line, see chips saying what was read, create the tag it named, take a chip
@@ -41,6 +43,7 @@ test("quick add reads a typed line, shows what it read, and builds the task from
   const tomorrow = addDays(await workspaceToday(page), 1);
 
   // A project for `#Launch` to resolve to.
+  await openSection(page, "Settings");
   await page.getByRole("link", { name: "Manage projects" }).click();
   await page.getByLabel("Project name").fill("Launch");
   await page.getByRole("button", { name: "Create project" }).click();
@@ -106,6 +109,7 @@ test("a backslash keeps one word, and the settings toggle turns reading off", as
   ).toBeVisible();
 
   // The toggle: this device stops reading anything out of the line.
+  await openSection(page, "Settings");
   await page.getByRole("link", { name: "Workspace settings", exact: true }).click();
   const toggle = page.getByLabel(
     "Read dates, priority, projects and tags out of what I type",

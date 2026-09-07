@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { openSection } from "./disclosures";
+
 /**
  * Recurring tasks (GAP-12): give a task a weekly rule, complete it, find the next
  * occurrence a week later in Upcoming, skip one, and change the rule on the new
@@ -54,7 +56,9 @@ test("a weekly task spawns its next occurrence on completion, can be skipped, an
 
   // A due date and a weekly preset anchored at it.
   const detail = panel(page);
+  await openSection(detail, "Scheduling & priority");
   await detail.getByLabel("Planned", { exact: true }).fill(today);
+  await openSection(detail, "Scheduling & priority");
   await detail.getByLabel("Repeat", { exact: true }).selectOption("weekly");
   await expect(detail.getByText(/^Every week on \w{3}\. Completing/)).toBeVisible();
   await expect(
@@ -63,6 +67,7 @@ test("a weekly task spawns its next occurrence on completion, can be skipped, an
   await expect(detail.getByText("Saved", { exact: true })).toBeVisible();
 
   // The custom form starts from the chosen rule and saves each change as a whole rule.
+  await openSection(detail, "Scheduling & priority");
   await detail.getByLabel("Repeat", { exact: true }).selectOption("custom");
   await detail.getByLabel("Every").fill("2");
   await expect(detail.getByText(/^Every 2 weeks on \w{3}\. Completing/)).toBeVisible();
@@ -71,6 +76,7 @@ test("a weekly task spawns its next occurrence on completion, can be skipped, an
     detail.getByText(/^Every 2 weeks on \w{3}, 5 occurrences left\. Completing/),
   ).toBeVisible();
   await page.screenshot({ path: "test-results/recurrence-editor.png", fullPage: true });
+  await openSection(detail, "Scheduling & priority");
   await detail.getByLabel("Repeat", { exact: true }).selectOption("weekly");
   await expect(detail.getByText(/^Every week on \w{3}\. Completing/)).toBeVisible();
   await expect(detail.getByText("Saved", { exact: true })).toBeVisible();
@@ -117,6 +123,7 @@ test("a weekly task spawns its next occurrence on completion, can be skipped, an
   await expect(upcomingLink).toContainText("1");
 
   // A new rule on this occurrence shapes the next one; the completed RECU-1 is untouched.
+  await openSection(next, "Scheduling & priority");
   await next.getByLabel("Repeat", { exact: true }).selectOption("daily");
   await expect(next.getByText(/^Every day\. Completing/)).toBeVisible();
   await expect(next.getByText("Saved", { exact: true })).toBeVisible();

@@ -1,5 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { openSection } from "./disclosures";
+
 /**
  * Tags end to end (GAP-03, spec 12.1): create a tag from the task detail, see it on the
  * card, filter a list by it, rename it in settings, and see the chip follow.
@@ -18,6 +20,7 @@ async function signUp(page: Page) {
 }
 
 async function createProject(page: Page) {
+  await openSection(page, "Settings");
   await page.getByRole("link", { name: "Manage projects" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
   await page.getByLabel("Project name").fill("Research Launch");
@@ -127,6 +130,7 @@ test("tags travel from the detail to the card, the filter, and settings", async 
   await page.screenshot({ path: "test-results/tags-inbox-filter.png", fullPage: true });
 
   // Settings: a case-insensitive duplicate is refused; a rename reaches every chip.
+  await openSection(page, "Settings");
   await page.getByRole("link", { name: "Manage tags" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Tags" })).toBeVisible();
   const createForm = page.getByRole("form", { name: "Create a tag" });

@@ -411,6 +411,14 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   }
 
   const project = board.data.data.project;
+  const adjustedViewCount = [
+    sort !== "manual",
+    stageView === "all",
+    swimlaned,
+    showSubtasks,
+    !showAge,
+    showDeferred,
+  ].filter(Boolean).length;
 
   return (
     <SelectionProvider order={selectionOrder}>
@@ -461,45 +469,9 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
           <details className="view-disclosure board-toolbar__view">
             <summary className="view-disclosure__summary">
               <span className="view-disclosure__summary-label">View</span>
-              <span className="view-disclosure__chips">
-                <span
-                  className="view-disclosure__chip"
-                  data-active={sort !== "manual" || undefined}
-                >
-                  {SORT_LABELS[sort]}
-                </span>
-                <span
-                  className="view-disclosure__chip"
-                  data-active={stageView === "all" || undefined}
-                >
-                  {stageView === "all"
-                    ? "All stages"
-                    : `${visibleStatuses.length} of ${statuses.length} stages`}
-                </span>
-                <span
-                  className="view-disclosure__chip"
-                  data-active={swimlaned || undefined}
-                >
-                  {swimlaned ? `Lanes: ${SWIMLANE_LABELS[swimlaneBy]}` : "No swimlanes"}
-                </span>
-                <span
-                  className="view-disclosure__chip"
-                  data-active={showSubtasks || undefined}
-                >
-                  {showSubtasks ? "Subtasks shown" : "Subtasks hidden"}
-                </span>
-                <span
-                  className="view-disclosure__chip"
-                  data-active={!showAge || undefined}
-                >
-                  {showAge ? "Card age shown" : "Card age hidden"}
-                </span>
-                <span
-                  className="view-disclosure__chip"
-                  data-active={showDeferred || undefined}
-                >
-                  {showDeferred ? "Deferred shown" : "Deferred hidden"}
-                </span>
+              <span className="view-disclosure__count">
+                {sort !== "manual" ? `${SORT_LABELS[sort]} · ` : ""}
+                {adjustedViewCount > 0 ? `${adjustedViewCount} adjusted` : ""}
               </span>
             </summary>
             <div className="view-disclosure__panel board-toolbar__view-panel">

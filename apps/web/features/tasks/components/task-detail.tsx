@@ -521,212 +521,6 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
         />
       </Field>
 
-      <Field
-        label="Project"
-        htmlFor={fieldId("project")}
-        hint="A moved task starts in the project's default stage."
-      >
-        <Select
-          id={fieldId("project")}
-          value={task.projectId ?? ""}
-          disabled={!editable || projects.isPending || move.isPending}
-          onChange={(event) =>
-            changeProject(event.target.value === "" ? null : event.target.value)
-          }
-        >
-          <option value="">Inbox</option>
-          {currentProjectKnown ? null : (
-            <option value={task.projectId ?? ""}>Current project</option>
-          )}
-          {projectItems.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </Select>
-      </Field>
-
-      <div className="task-detail__row">
-        <Field label="Priority" htmlFor={fieldId("priority")}>
-          <PrioritySelect
-            id={fieldId("priority")}
-            value={draft.priority}
-            disabled={!editable}
-            onChange={(priority) => edit({ priority }, { priority }, true)}
-          />
-        </Field>
-
-        <Field
-          label="Planned"
-          htmlFor={fieldId("due-date")}
-          hint="The day you plan to do it."
-        >
-          <DueDateInput
-            id={fieldId("due-date")}
-            value={draft.dueDate}
-            disabled={!editable}
-            onChange={(dueDate) =>
-              // Clearing the date clears the time with it (spec 8.2 invariant 3).
-              edit(
-                { dueDate, dueTime: dueDate === null ? null : draft.dueTime },
-                dueDate === null ? { dueDate: null, dueTime: null } : { dueDate },
-                true,
-              )
-            }
-          />
-        </Field>
-
-        <Field
-          label="Planned time"
-          htmlFor={fieldId("due-time")}
-          hint={draft.dueDate ? undefined : "Set a planned day first."}
-        >
-          <DueTimeInput
-            id={fieldId("due-time")}
-            value={draft.dueTime}
-            hasDueDate={draft.dueDate !== null}
-            disabled={!editable}
-            onChange={(dueTime) => edit({ dueTime }, { dueTime }, true)}
-          />
-        </Field>
-      </div>
-
-      <Field
-        label="Repeat"
-        htmlFor={fieldId("repeat")}
-        hint={
-          draft.recurrence
-            ? `${describeRecurrence(draft.recurrence)}. Completing this task creates the next occurrence.`
-            : undefined
-        }
-      >
-        <RecurrenceEditor
-          id={fieldId("repeat")}
-          value={draft.recurrence}
-          anchor={draft.dueDate ?? localToday()}
-          disabled={!editable || task.isCompleted}
-          onChange={(recurrence) => edit({ recurrence }, { recurrence }, true)}
-        />
-      </Field>
-      <div className="task-detail__row">
-        <Field
-          label="Defer until"
-          htmlFor={fieldId("defer-until")}
-          hint="Hidden from Today, Upcoming, the Inbox and the board until then."
-        >
-          <DueDateInput
-            id={fieldId("defer-until")}
-            value={draft.deferUntil}
-            disabled={!editable}
-            onChange={(deferUntil) => edit({ deferUntil }, { deferUntil }, true)}
-          />
-        </Field>
-
-        <Field
-          label="Deadline"
-          htmlFor={fieldId("deadline")}
-          hint="The hard limit, separate from the planned day."
-        >
-          <DueDateInput
-            id={fieldId("deadline")}
-            value={draft.deadline}
-            disabled={!editable}
-            onChange={(deadline) =>
-              edit(
-                {
-                  deadline,
-                  deadlineTime: deadline === null ? null : draft.deadlineTime,
-                },
-                deadline === null
-                  ? { deadline: null, deadlineTime: null }
-                  : { deadline },
-                true,
-              )
-            }
-          />
-        </Field>
-
-        <Field
-          label="Deadline time"
-          htmlFor={fieldId("deadline-time")}
-          hint={draft.deadline ? undefined : "Set a deadline first."}
-        >
-          <DueTimeInput
-            id={fieldId("deadline-time")}
-            value={draft.deadlineTime}
-            hasDueDate={draft.deadline !== null}
-            disabled={!editable}
-            onChange={(deadlineTime) => edit({ deadlineTime }, { deadlineTime }, true)}
-          />
-        </Field>
-      </div>
-
-      {task.dateWarnings.length > 0 ? (
-        <Alert tone="info" title="These dates are in an unusual order">
-          <ul className="task-detail__warnings">
-            {task.dateWarnings.map((warning) => (
-              <li key={warning}>{DATE_WARNING_LABELS[warning]}</li>
-            ))}
-          </ul>
-        </Alert>
-      ) : null}
-
-      {draft.dueTime ? (
-        <Field
-          label="Reminder"
-          htmlFor={fieldId("reminder")}
-          hint={
-            task.reminderOffsetMinutes === null && draft.dueTime && !task.dueTime
-              ? "A new due time gets your default reminder once it is saved."
-              : undefined
-          }
-        >
-          <ReminderSelect
-            id={fieldId("reminder")}
-            value={draft.reminderOffsetMinutes}
-            disabled={!editable || task.dueTime === null}
-            onChange={(reminderOffsetMinutes) =>
-              edit({ reminderOffsetMinutes }, { reminderOffsetMinutes }, true)
-            }
-          />
-        </Field>
-      ) : null}
-
-      <TagPicker task={task} disabled={!editable} />
-
-      <TaskFieldValues task={task} disabled={!editable} />
-
-      <BlockedFlag task={task} disabled={!editable} />
-
-      <RelationList task={task} disabled={!editable} />
-
-      {task.seriesId && series.data && series.data.data.length > 1 ? (
-        <section className="task-detail__series" aria-labelledby={fieldId("series")}>
-          <h3 className="task-detail__section-title" id={fieldId("series")}>
-            Other occurrences
-          </h3>
-          <ul className="task-detail__series-list" aria-label="Other occurrences">
-            {series.data.data
-              .filter((occurrence) => occurrence.id !== task.id)
-              .map((occurrence) => (
-                <li key={occurrence.id} data-done={occurrence.isCompleted || undefined}>
-                  <Link href={`/tasks/${encodeURIComponent(occurrence.key)}`}>
-                    {occurrence.key}
-                  </Link>{" "}
-                  <DueBadge
-                    dueDate={occurrence.dueDate}
-                    dueTime={occurrence.dueTime}
-                    isCompleted={occurrence.isCompleted}
-                  />
-                  {occurrence.isCompleted ? (
-                    <span className="task-detail__hint">Completed</span>
-                  ) : null}
-                </li>
-              ))}
-          </ul>
-        </section>
-      ) : null}
-
       <details className="task-detail__disclosure">
         <summary className="task-detail__disclosure-summary">
           <span>Description</span>
@@ -783,6 +577,242 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
       </details>
 
       {editable ? <SubtaskList parent={task} /> : null}
+
+      <Field
+        label="Project"
+        htmlFor={fieldId("project")}
+        hint="A moved task starts in the project's default stage."
+      >
+        <Select
+          id={fieldId("project")}
+          value={task.projectId ?? ""}
+          disabled={!editable || projects.isPending || move.isPending}
+          onChange={(event) =>
+            changeProject(event.target.value === "" ? null : event.target.value)
+          }
+        >
+          <option value="">Inbox</option>
+          {currentProjectKnown ? null : (
+            <option value={task.projectId ?? ""}>Current project</option>
+          )}
+          {projectItems.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name}
+            </option>
+          ))}
+        </Select>
+      </Field>
+
+      <details className="task-detail__disclosure">
+        <summary className="task-detail__disclosure-summary">
+          <span>Scheduling & priority</span>
+          <span className="task-detail__hint">
+            {[
+              draft.priority !== "none" ? draft.priority : null,
+              draft.dueDate ? `Planned ${draft.dueDate}` : null,
+              draft.deadline ? `Deadline ${draft.deadline}` : null,
+              draft.deferUntil ? `Deferred until ${draft.deferUntil}` : null,
+              draft.recurrence ? describeRecurrence(draft.recurrence) : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || "Set dates, priority or repeat"}
+          </span>
+        </summary>
+        <div className="task-detail__disclosure-body stack">
+          <div className="task-detail__row">
+            <Field label="Priority" htmlFor={fieldId("priority")}>
+              <PrioritySelect
+                id={fieldId("priority")}
+                value={draft.priority}
+                disabled={!editable}
+                onChange={(priority) => edit({ priority }, { priority }, true)}
+              />
+            </Field>
+
+            <Field
+              label="Planned"
+              htmlFor={fieldId("due-date")}
+              hint="The day you plan to do it."
+            >
+              <DueDateInput
+                id={fieldId("due-date")}
+                value={draft.dueDate}
+                disabled={!editable}
+                onChange={(dueDate) =>
+                  // Clearing the date clears the time with it (spec 8.2 invariant 3).
+                  edit(
+                    { dueDate, dueTime: dueDate === null ? null : draft.dueTime },
+                    dueDate === null ? { dueDate: null, dueTime: null } : { dueDate },
+                    true,
+                  )
+                }
+              />
+            </Field>
+
+            <Field
+              label="Planned time"
+              htmlFor={fieldId("due-time")}
+              hint={draft.dueDate ? undefined : "Set a planned day first."}
+            >
+              <DueTimeInput
+                id={fieldId("due-time")}
+                value={draft.dueTime}
+                hasDueDate={draft.dueDate !== null}
+                disabled={!editable}
+                onChange={(dueTime) => edit({ dueTime }, { dueTime }, true)}
+              />
+            </Field>
+          </div>
+
+          <Field
+            label="Repeat"
+            htmlFor={fieldId("repeat")}
+            hint={
+              draft.recurrence
+                ? `${describeRecurrence(draft.recurrence)}. Completing this task creates the next occurrence.`
+                : undefined
+            }
+          >
+            <RecurrenceEditor
+              id={fieldId("repeat")}
+              value={draft.recurrence}
+              anchor={draft.dueDate ?? localToday()}
+              disabled={!editable || task.isCompleted}
+              onChange={(recurrence) => edit({ recurrence }, { recurrence }, true)}
+            />
+          </Field>
+          <div className="task-detail__row">
+            <Field
+              label="Defer until"
+              htmlFor={fieldId("defer-until")}
+              hint="Hidden from Today, Upcoming, the Inbox and the board until then."
+            >
+              <DueDateInput
+                id={fieldId("defer-until")}
+                value={draft.deferUntil}
+                disabled={!editable}
+                onChange={(deferUntil) => edit({ deferUntil }, { deferUntil }, true)}
+              />
+            </Field>
+
+            <Field
+              label="Deadline"
+              htmlFor={fieldId("deadline")}
+              hint="The hard limit, separate from the planned day."
+            >
+              <DueDateInput
+                id={fieldId("deadline")}
+                value={draft.deadline}
+                disabled={!editable}
+                onChange={(deadline) =>
+                  edit(
+                    {
+                      deadline,
+                      deadlineTime: deadline === null ? null : draft.deadlineTime,
+                    },
+                    deadline === null
+                      ? { deadline: null, deadlineTime: null }
+                      : { deadline },
+                    true,
+                  )
+                }
+              />
+            </Field>
+
+            <Field
+              label="Deadline time"
+              htmlFor={fieldId("deadline-time")}
+              hint={draft.deadline ? undefined : "Set a deadline first."}
+            >
+              <DueTimeInput
+                id={fieldId("deadline-time")}
+                value={draft.deadlineTime}
+                hasDueDate={draft.deadline !== null}
+                disabled={!editable}
+                onChange={(deadlineTime) =>
+                  edit({ deadlineTime }, { deadlineTime }, true)
+                }
+              />
+            </Field>
+          </div>
+
+          {task.dateWarnings.length > 0 ? (
+            <Alert tone="info" title="These dates are in an unusual order">
+              <ul className="task-detail__warnings">
+                {task.dateWarnings.map((warning) => (
+                  <li key={warning}>{DATE_WARNING_LABELS[warning]}</li>
+                ))}
+              </ul>
+            </Alert>
+          ) : null}
+
+          {draft.dueTime ? (
+            <Field
+              label="Reminder"
+              htmlFor={fieldId("reminder")}
+              hint={
+                task.reminderOffsetMinutes === null && draft.dueTime && !task.dueTime
+                  ? "A new due time gets your default reminder once it is saved."
+                  : undefined
+              }
+            >
+              <ReminderSelect
+                id={fieldId("reminder")}
+                value={draft.reminderOffsetMinutes}
+                disabled={!editable || task.dueTime === null}
+                onChange={(reminderOffsetMinutes) =>
+                  edit({ reminderOffsetMinutes }, { reminderOffsetMinutes }, true)
+                }
+              />
+            </Field>
+          ) : null}
+        </div>
+      </details>
+
+      <TagPicker task={task} disabled={!editable} />
+
+      <TaskFieldValues task={task} disabled={!editable} />
+
+      <details className="task-detail__disclosure">
+        <summary className="task-detail__disclosure-summary">
+          <span>Relationships</span>
+          <span className="task-detail__hint">
+            {task.isBlocked ? blockedSummary(task) : "Blocking and related tasks"}
+          </span>
+        </summary>
+        <div className="task-detail__disclosure-body stack">
+          <BlockedFlag task={task} disabled={!editable} />
+
+          <RelationList task={task} disabled={!editable} />
+        </div>
+      </details>
+
+      {task.seriesId && series.data && series.data.data.length > 1 ? (
+        <section className="task-detail__series" aria-labelledby={fieldId("series")}>
+          <h3 className="task-detail__section-title" id={fieldId("series")}>
+            Other occurrences
+          </h3>
+          <ul className="task-detail__series-list" aria-label="Other occurrences">
+            {series.data.data
+              .filter((occurrence) => occurrence.id !== task.id)
+              .map((occurrence) => (
+                <li key={occurrence.id} data-done={occurrence.isCompleted || undefined}>
+                  <Link href={`/tasks/${encodeURIComponent(occurrence.key)}`}>
+                    {occurrence.key}
+                  </Link>{" "}
+                  <DueBadge
+                    dueDate={occurrence.dueDate}
+                    dueTime={occurrence.dueTime}
+                    isCompleted={occurrence.isCompleted}
+                  />
+                  {occurrence.isCompleted ? (
+                    <span className="task-detail__hint">Completed</span>
+                  ) : null}
+                </li>
+              ))}
+          </ul>
+        </section>
+      ) : null}
 
       <details
         className="task-detail__disclosure"

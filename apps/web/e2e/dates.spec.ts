@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { openSection } from "./disclosures";
+
 /**
  * Start/defer dates and deadlines (GAP-16): a deferred task leaves Today, Upcoming, the
  * Inbox and the board until its date and comes back on its own; a deadline is its own
@@ -135,8 +137,10 @@ test("a deadline is its own marker, loud only when close, and warns about odd or
   // The detail edits the deadline time and shows the soft order warning.
   await page.getByRole("link", { name: "Ship the release" }).click();
   const panel = page.getByRole("complementary", { name: /Task details for/ });
+  await openSection(panel, "Scheduling & priority");
   await panel.getByLabel("Deadline time").fill("17:00");
   await expect(soon).toHaveText(`Deadline ${addDays(today, 1)} at 17:00`);
+  await openSection(panel, "Scheduling & priority");
   await panel.getByLabel("Planned", { exact: true }).fill(addDays(today, 3));
   await expect(panel.getByText("These dates are in an unusual order")).toBeVisible();
   await expect(panel.getByText("The planned day is after the deadline.")).toBeVisible();
@@ -145,6 +149,7 @@ test("a deadline is its own marker, loud only when close, and warns about odd or
     fullPage: true,
   });
 
+  await openSection(panel, "Scheduling & priority");
   await panel.getByLabel("Deadline", { exact: true }).fill("");
   await expect(soon).toHaveCount(0);
   await expect(panel.getByText("These dates are in an unusual order")).toHaveCount(0);
@@ -152,6 +157,7 @@ test("a deadline is its own marker, loud only when close, and warns about odd or
 
 test("the board hides a deferred card until asked to show it", async ({ page }) => {
   await signUp(page);
+  await openSection(page, "Settings");
   await page.getByRole("link", { name: "Manage projects" }).click();
   await page.getByLabel("Project name").fill("Deferral");
   await page.getByRole("button", { name: "Create project" }).click();
@@ -166,6 +172,7 @@ test("the board hides a deferred card until asked to show it", async ({ page }) 
 
   await ready.getByRole("link", { name: "Later card" }).click();
   const panel = page.getByRole("complementary", { name: /Task details for/ });
+  await openSection(panel, "Scheduling & priority");
   await panel.getByLabel("Defer until").fill(addDays(today, 7));
   await expect(ready.getByRole("link", { name: "Later card" })).toHaveCount(0);
 

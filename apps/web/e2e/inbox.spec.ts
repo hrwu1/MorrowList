@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { openSection } from "./disclosures";
+
 /**
  * The capture-to-completion journey (US-001, US-006). This is the path that must never
  * break: if a user cannot capture a thought and later tick it off, nothing else matters.
@@ -108,7 +110,9 @@ test("edits priority, due date, and description, and they survive a reload", asy
   const panel = page.getByRole("complementary", { name: /Task details for/ });
   await expect(panel).toBeVisible();
 
+  await openSection(panel, "Scheduling & priority");
   await panel.getByLabel("Priority").selectOption("urgent");
+  await openSection(panel, "Scheduling & priority");
   await panel.getByLabel("Planned", { exact: true }).fill("2026-09-15");
   await panel.locator("summary").filter({ hasText: "Description" }).click();
   await panel

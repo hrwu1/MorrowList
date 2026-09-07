@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { openSection } from "./disclosures";
+
 /**
  * Typed custom fields end to end (GAP-24): define a select field in settings, set it on a
  * task from the detail, see it on the card, filter a list by it, and watch the cap of ten
@@ -40,6 +42,7 @@ test("a select field is defined, set on a task, shown on the row, and filtered b
   await signUp(page);
 
   // Define the field in settings, reached from the workspace's own settings page.
+  await openSection(page, "Settings");
   await page.getByRole("link", { name: "Workspace settings", exact: true }).click();
   await page.getByRole("link", { name: "Manage fields" }).click();
   await expect(
@@ -95,6 +98,7 @@ test("a select field is defined, set on a task, shown on the row, and filtered b
 
 test("the eleventh field is refused with a clear error", async ({ page }) => {
   await signUp(page);
+  await openSection(page, "Settings");
   await page.getByRole("link", { name: "Workspace settings", exact: true }).click();
   await page.getByRole("link", { name: "Manage fields" }).click();
   await expect(

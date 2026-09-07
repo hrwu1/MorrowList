@@ -3,6 +3,8 @@ import { createServer, type Server } from "node:http";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { openSection } from "./disclosures";
+
 /**
  * Webhooks end to end (GAP-18).
  *
@@ -81,6 +83,7 @@ function verify(secret: string, delivery: Delivery): boolean {
 /** Webhooks sit behind Workspace settings, not in the sidebar. */
 async function openWebhookSettings(page: Page) {
   // The WIP counter links here too, so this picks the labelled utilities entry.
+  await openSection(page, "Settings");
   await page.getByRole("link", { name: "Workspace settings", exact: true }).click();
   await expect(
     page.getByRole("heading", { level: 1, name: "Workspace" }),

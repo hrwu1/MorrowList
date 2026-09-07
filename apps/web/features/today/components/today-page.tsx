@@ -3,12 +3,13 @@
 import { Alert, Button, EmptyState, Spinner } from "@morrowlist/ui";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useTodayView } from "../hooks/use-today";
 import { TODAY_SECTION_LABELS, formatDateHeading } from "../lib/today-view";
 
 import { ReviewBanner } from "./review-banner";
+import { TodayTaskChooser } from "./today-task-chooser";
 
 import { ViewBoardPage } from "@/features/board/components/view-board-page";
 import { TaskPanel } from "@/features/tasks/components/task-panel";
@@ -21,6 +22,8 @@ import { TaskRow } from "@/features/tasks/components/task-row";
  */
 export function TodayPage() {
   const router = useRouter();
+  const [choosing, setChoosing] = useState(false);
+  const chooseButton = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const requestedDate = searchParams.get("date") ?? undefined;
@@ -67,18 +70,42 @@ export function TodayPage() {
   return (
     <div className="list-page">
       <div className="stack">
-        <header className="page-header">
-          <h1>{isPastDay ? "Plan" : "Today"}</h1>
-          <p className="page-header__subtitle">
-            {view ? formatDateHeading(view.date) : isPastDay ? requestedDate : " "}
-            {isPastDay ? (
-              <>
-                {" · "}
-                <Link href="/today">Back to today</Link>
-              </>
-            ) : null}
-          </p>
+        <header className="page-header today-header">
+          <div>
+            <h1>{isPastDay ? "Plan" : "Today"}</h1>
+            <p className="page-header__subtitle">
+              {view ? formatDateHeading(view.date) : isPastDay ? requestedDate : " "}
+              {isPastDay ? (
+                <>
+                  {" · "}
+                  <Link href="/today">Back to today</Link>
+                </>
+              ) : null}
+            </p>
+          </div>
+          {!isPastDay ? (
+            <Button
+              ref={chooseButton}
+              aria-expanded={choosing}
+              aria-controls="today-task-chooser"
+              onClick={() => setChoosing((open) => !open)}
+            >
+              Choose tasks for today
+            </Button>
+          ) : null}
         </header>
+
+        {choosing && view && !isPastDay ? (
+          <div id="today-task-chooser">
+            <TodayTaskChooser
+              date={view.date}
+              onClose={() => {
+                setChoosing(false);
+                chooseButton.current?.focus();
+              }}
+            />
+          </div>
+        ) : null}
 
         <fieldset className="saved-view-layout" aria-label="Today layout">
           <legend className="ml-visually-hidden">Layout</legend>
@@ -122,16 +149,20 @@ export function TodayPage() {
             <Button onClick={() => void refetch()}>Try again</Button>
           </Alert>
         ) : total === 0 ? (
-          <EmptyState
-            title={
-              isPastDay ? "Nothing was planned for this day" : "Nothing needs you today"
-            }
-            description={
-              isPastDay
-                ? "No task was overdue, due, or chosen for this date."
-                : "Nothing is overdue or due, and you have not chosen anything yet. Add a task to My Day from any list, card, or task to plan the day on purpose."
-            }
-          />
+          choosing ? null : (
+            <EmptyState
+              title={
+                isPastDay
+                  ? "Nothing was planned for this day"
+                  : "Nothing needs you today"
+              }
+              description={
+                isPastDay
+                  ? "No task was overdue, due, or chosen for this date."
+                  : "Start with a few tasks that deserve your attention. Choose from your Inbox and projects above."
+              }
+            />
+          )
         ) : (
           sections.map((section) => (
             <section

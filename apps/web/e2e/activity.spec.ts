@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { openSection } from "./disclosures";
+
 /**
  * Activity history (GAP-09, ACT-001): a move and a title edit show up in the task's
  * history with the right summaries, the project sees the same events, and a long
@@ -19,6 +21,7 @@ async function signUp(page: Page) {
 }
 
 async function createProject(page: Page, name: string) {
+  await openSection(page, "Settings");
   await page.getByRole("link", { name: "Manage projects" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
   await page.getByLabel("Project name").fill(name);
@@ -71,6 +74,7 @@ test("a move and a title edit appear in the task's and the project's activity", 
   await panel.screenshot({ path: "test-results/activity-panel.png" });
 
   // The next edit refreshes the open list without a reload.
+  await openSection(panel, "Scheduling & priority");
   await panel.getByLabel("Priority").selectOption("high");
   await expect(items).toHaveCount(4);
   await expect(items.nth(0)).toContainText("Priority: none → high");

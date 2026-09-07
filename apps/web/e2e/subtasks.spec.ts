@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { openSection } from "./disclosures";
+
 /**
  * Subtasks and checklists (spec 8.3): added from the detail, ticked off there, with
  * progress on the parent's card while the board keeps the children out of the lanes.
@@ -18,6 +20,7 @@ async function signUp(page: Page) {
 }
 
 async function createProject(page: Page) {
+  await openSection(page, "Settings");
   await page.getByRole("link", { name: "Manage projects" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
   await page.getByLabel("Project name").fill("Research Launch");

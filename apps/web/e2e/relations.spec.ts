@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { openSection } from "./disclosures";
+
 /**
  * Dependencies as relations with a reason (GAP-06, spec 8.4): a blocks relation added
  * from the detail shows on the target's card and clears when the source completes; a
@@ -19,6 +21,7 @@ async function signUp(page: Page) {
 }
 
 async function createProject(page: Page) {
+  await openSection(page, "Settings");
   await page.getByRole("link", { name: "Manage projects" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Projects" })).toBeVisible();
   await page.getByLabel("Project name").fill("Research Launch");
@@ -58,6 +61,8 @@ test("a blocks relation marks the target until the source completes", async ({
   await slides.getByRole("link", { name: "Make slides" }).click();
   const panel = page.getByRole("complementary", { name: /Task details for/ });
 
+  await openSection(panel, "Relationships");
+
   // "Blocked by" is the default kind; the other task is named by key.
   await expect(panel.getByLabel("Relation type")).toHaveValue("blocked_by");
   const key = panel.getByLabel("Related task key");
@@ -78,6 +83,10 @@ test("a blocks relation marks the target until the source completes", async ({
 
   // A reverse relation would be a cycle and is refused with the server's message.
   await sources.getByRole("link", { name: "Collect sources" }).click();
+  await expect(panel.getByLabel("Title", { exact: true })).toHaveValue(
+    "Collect sources",
+  );
+  await openSection(panel, "Relationships");
   await expect(
     panel.getByRole("list", { name: "Blocks" }).getByRole("link", {
       name: "Make slides",
@@ -108,6 +117,7 @@ test("a flagged task keeps its stage, shows the reason, and warns before complet
   await card.getByRole("link", { name: "Book venue" }).click();
   const panel = page.getByRole("complementary", { name: /Task details for/ });
 
+  await openSection(panel, "Relationships");
   await panel.getByRole("button", { name: "Mark blocked" }).click();
   const reason = panel.getByLabel("Why is this task blocked?");
   await reason.fill("waiting on vendor");
@@ -152,6 +162,7 @@ test("a flagged task keeps its stage, shows the reason, and warns before complet
       .getByRole("region", { name: "Ready" })
       .getByRole("link", { name: "Book venue" }),
   ).toBeVisible();
+  await openSection(panel, "Relationships");
   await panel.getByRole("button", { name: "Clear blocked" }).click();
   await expect(panel.getByText("Not flagged.")).toBeVisible();
   await page.screenshot({ path: "test-results/relations-cleared.png" });
