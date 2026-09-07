@@ -1,3 +1,4 @@
+import type { CalendarFeedTokenRepository } from "./calendar.js";
 import type { DayPlanRepository } from "./day-plans.js";
 import type { ActivityRepository, OutboxRepository } from "./events.js";
 import type { FieldDefinitionRepository } from "./fields.js";
@@ -24,6 +25,7 @@ import type { WorkspaceRepository } from "./workspace.js";
  * activity row, and its outbox row cannot be committed separately.
  */
 export interface TransactionContext {
+  readonly calendarFeedTokens: CalendarFeedTokenRepository;
   readonly tasks: TaskRepository;
   readonly taskCounters: TaskCounterRepository;
   readonly dayPlans: DayPlanRepository;

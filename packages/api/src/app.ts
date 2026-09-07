@@ -5,6 +5,7 @@ import { ApiError, toErrorBody } from "./errors.js";
 import { authenticate } from "./middleware/authenticate.js";
 import { requestContext } from "./middleware/request-context.js";
 import { bodyLimit } from "./middleware/validate.js";
+import { calendarRoutes } from "./routes/calendar.js";
 import { exportRoutes } from "./routes/exports.js";
 import { fieldRoutes } from "./routes/fields.js";
 import { healthRoutes } from "./routes/health.js";
@@ -74,6 +75,7 @@ export function createApiApp(deps: ApiDependencies) {
   app.use("/exports/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/imports/*", authenticate(deps.auth, listWorkspaceIds));
 
+  app.route("/", calendarRoutes(deps));
   app.route("/", exportRoutes(deps));
   app.route("/", importRoutes(deps));
   app.route("/", meRoutes(deps));

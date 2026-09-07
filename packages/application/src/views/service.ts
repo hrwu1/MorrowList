@@ -1,4 +1,6 @@
 import type {
+  CalendarViewQuery,
+  CalendarViewResponse,
   BoardPlacementDto,
   BoardViewQuery,
   BoardViewResponse,
@@ -66,6 +68,38 @@ export class ViewService {
   constructor(options: ViewServiceOptions) {
     this.unitOfWork = options.unitOfWork;
     this.clock = options.clock ?? systemClock;
+  }
+
+  async calendar(
+    context: ActorContext,
+    request: CalendarViewQuery & WorkspaceViewRequest,
+  ): Promise<CalendarViewResponse> {
+    assertWorkspaceAccess(context, request.workspaceId);
+    assertScope(context, SCOPES.tasksRead);
+    const from = toPlainDate(request.from, "from");
+    const to = toPlainDate(request.to, "to");
+    if (from > to || Date.parse(to) - Date.parse(from) > 366 * 86400000) {
+      throw new ValidationError("Choose an ordered range of at most 367 days.");
+    }
+    return this.unitOfWork.execute(async (tx) => {
+      const workspace = await this.requireWorkspace(tx, request.workspaceId);
+      const page = await tx.tasks.listCalendar({ workspaceId: workspace.id, from, to });
+      const tasks = await loadTaskDtos(
+        tx,
+        workspace,
+        page.items,
+        toLocalDate(this.clock.now(), workspace.timezone),
+      );
+      return {
+        data: {
+          from,
+          to,
+          timezone: workspace.timezone,
+          tasks,
+          truncated: page.truncated,
+        },
+      };
+    });
   }
 
   async today(

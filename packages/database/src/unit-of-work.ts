@@ -1,6 +1,7 @@
 import type { TransactionContext, UnitOfWork } from "@morrowlist/application";
 
 import type { Database, DatabaseHandle } from "./client.js";
+import { createCalendarFeedTokenRepository } from "./repositories/calendar.js";
 import { createDayPlanRepository } from "./repositories/day-plans.js";
 import {
   createActivityRepository,
@@ -39,6 +40,7 @@ import { createWorkspaceRepository } from "./repositories/workspaces.js";
  */
 export function buildTransactionContext(db: Database): TransactionContext {
   return {
+    calendarFeedTokens: createCalendarFeedTokenRepository(db),
     tasks: createTaskRepository(db),
     taskCounters: createTaskCounterRepository(db),
     dayPlans: createDayPlanRepository(db),

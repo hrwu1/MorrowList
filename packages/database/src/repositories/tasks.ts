@@ -424,6 +424,41 @@ export function createTaskRepository(db: Database): TaskRepository {
       return { items: rows.slice(0, limit).map(toTask), hasMore, truncated: hasMore };
     },
 
+    async listCalendar(query): Promise<BoardTaskPage> {
+      const limit = Math.max(1, Math.min(query.limit ?? 2000, 10000));
+      const rows = await db
+        .select()
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.workspaceId, query.workspaceId),
+            isNull(tasks.deletedAt),
+            isNull(tasks.completedAt),
+            or(
+              and(
+                isNotNull(tasks.dueDate),
+                query.from ? gte(tasks.dueDate, query.from) : undefined,
+                query.to ? lte(tasks.dueDate, query.to) : undefined,
+              ),
+              and(
+                isNotNull(tasks.deadline),
+                query.from ? gte(tasks.deadline, query.from) : undefined,
+                query.to ? lte(tasks.deadline, query.to) : undefined,
+              ),
+              and(
+                isNotNull(tasks.deferUntil),
+                query.from ? gte(tasks.deferUntil, query.from) : undefined,
+                query.to ? lte(tasks.deferUntil, query.to) : undefined,
+              ),
+            ),
+          ),
+        )
+        .orderBy(asc(tasks.dueDate), asc(tasks.rank), asc(tasks.id))
+        .limit(limit + 1);
+      const hasMore = rows.length > limit;
+      return { items: rows.slice(0, limit).map(toTask), hasMore, truncated: hasMore };
+    },
+
     async listUpcoming(query): Promise<BoardTaskPage> {
       const limit = Math.max(
         1,

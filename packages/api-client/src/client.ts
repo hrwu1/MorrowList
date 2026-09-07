@@ -1,4 +1,8 @@
 import type {
+  CalendarViewQuery,
+  CalendarViewResponse,
+  CalendarFeedDto,
+  CalendarFeedStatus,
   ActivityListResponse,
   ActivityQuery,
   AddTaskRelationRequest,
@@ -659,6 +663,49 @@ export class ApiClient {
     return this.send<TodayViewResponse>(
       "GET",
       `/views/today${this.queryString(query, options)}`,
+      undefined,
+      options,
+    );
+  }
+
+  async getCalendarView(
+    query: CalendarViewQuery,
+    options: RequestOptions = {},
+  ): Promise<CalendarViewResponse> {
+    return this.send<CalendarViewResponse>(
+      "GET",
+      `/views/calendar${this.queryString(query, options)}`,
+      undefined,
+      options,
+    );
+  }
+
+  async getCalendarFeedStatus(
+    options: RequestOptions = {},
+  ): Promise<CalendarFeedStatus> {
+    const result = await this.send<{ data: CalendarFeedStatus }>(
+      "GET",
+      `/me/calendar-feed${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+    return result.data;
+  }
+
+  async createCalendarFeed(options: RequestOptions = {}): Promise<CalendarFeedDto> {
+    const result = await this.send<{ data: CalendarFeedDto }>(
+      "POST",
+      `/me/calendar-feed${this.queryString({}, options)}`,
+      undefined,
+      options,
+    );
+    return result.data;
+  }
+
+  async revokeCalendarFeed(options: RequestOptions = {}): Promise<void> {
+    await this.send<void>(
+      "DELETE",
+      `/me/calendar-feed${this.queryString({}, options)}`,
       undefined,
       options,
     );

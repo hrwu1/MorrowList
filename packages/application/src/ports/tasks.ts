@@ -145,7 +145,15 @@ export interface RankScope {
   readonly statusId: string | null;
 }
 
+export interface CalendarTaskQuery {
+  readonly workspaceId: string;
+  readonly from: PlainDate | null;
+  readonly to: PlainDate | null;
+  readonly limit?: number;
+}
+
 export interface TaskRepository {
+  listCalendar(query: CalendarTaskQuery): Promise<BoardTaskPage>;
   findById(workspaceId: string, taskId: string): Promise<Task | null>;
   findByNumber(workspaceId: string, taskNumber: number): Promise<Task | null>;
   list(filter: TaskFilter, cursor: Cursor): Promise<Page<Task>>;
