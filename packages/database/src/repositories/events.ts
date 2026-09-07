@@ -182,7 +182,7 @@ export function createOutboxRepository(db: Database): OutboxRepository {
 
 type OutboxRow = typeof outboxEvents.$inferSelect;
 
-function toOutboxEvent(row: OutboxRow) {
+export function toOutboxEvent(row: OutboxRow) {
   return {
     id: row.id,
     workspaceId: row.workspaceId,

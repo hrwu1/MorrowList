@@ -9,6 +9,7 @@ import type {
   ReminderRepository,
 } from "./notifications.js";
 import type { ProjectRepository, WorkflowStatusRepository } from "./projects.js";
+import type { RuleRepository } from "./rules.js";
 import type { SavedViewRepository } from "./saved-views.js";
 import type { TagRepository } from "./tags.js";
 import type { TaskCounterRepository, TaskRepository } from "./tasks.js";
@@ -25,6 +26,7 @@ import type { WorkspaceRepository } from "./workspace.js";
  */
 export interface TransactionContext {
   readonly tasks: TaskRepository;
+  readonly rules: RuleRepository;
   readonly taskCounters: TaskCounterRepository;
   readonly dayPlans: DayPlanRepository;
   readonly projects: ProjectRepository;

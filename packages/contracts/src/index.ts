@@ -14,3 +14,5 @@ export * from "./workspace.js";
 export * from "./events.js";
 export * from "./flow.js";
 export * from "./export.js";
+
+export * from "./rule.js";

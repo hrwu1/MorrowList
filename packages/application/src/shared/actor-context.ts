@@ -12,6 +12,8 @@ export interface ActorContext {
   readonly workspaceIds: readonly string[];
   readonly scopes: ReadonlySet<string>;
   readonly requestId: string;
+  /** Existing outbox envelope link; automation descendants are not eligible for rules. */
+  readonly causationId?: string;
 }
 
 export function actorRef(context: ActorContext): ActorRef {

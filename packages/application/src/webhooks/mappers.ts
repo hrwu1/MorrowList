@@ -1,3 +1,4 @@
+import { RULE_ONLY_WEBHOOK_EVENT } from "@morrowlist/contracts";
 import type { WebhookDeliveryDto, WebhookSubscriptionDto } from "@morrowlist/contracts";
 
 import type { WebhookDelivery, WebhookSubscription } from "../ports/index.js";
@@ -44,6 +45,7 @@ export function matchesEventType(
   eventTypes: readonly string[],
   eventType: string,
 ): boolean {
+  if (eventTypes.includes(RULE_ONLY_WEBHOOK_EVENT)) return false;
   return eventTypes.some((pattern) => {
     if (pattern === "*" || pattern === eventType) return true;
     if (!pattern.endsWith(".*")) return false;

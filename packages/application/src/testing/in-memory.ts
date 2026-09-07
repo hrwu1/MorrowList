@@ -60,7 +60,10 @@ import type {
   WorkspaceRepository,
   WorkspaceRole,
 } from "../ports/index.js";
+import type { Rule, RuleRun } from "../ports/rules.js";
 import { BLOCKS_WALK_DEPTH, BOARD_TASK_LIMIT, UPCOMING_LIMIT } from "../ports/tasks.js";
+
+import { ruleRepository } from "./rules.js";
 
 /**
  * In-memory adapters for the application ports.
@@ -72,6 +75,8 @@ import { BLOCKS_WALK_DEPTH, BOARD_TASK_LIMIT, UPCOMING_LIMIT } from "../ports/ta
 
 export interface InMemoryData {
   tasks: Map<string, Task>;
+  rules: Map<string, Rule>;
+  ruleRuns: Map<string, RuleRun>;
   counters: Map<string, number>;
   /** Keyed by `${taskId}:${planDate}`, mirroring the composite primary key. */
   dayPlans: Map<string, DayPlan>;
@@ -106,6 +111,8 @@ export type InMemoryInterval = StatusIntervalInput & { readonly leftAt: Date | n
 export function emptyData(): InMemoryData {
   return {
     tasks: new Map(),
+    rules: new Map(),
+    ruleRuns: new Map(),
     counters: new Map(),
     dayPlans: new Map(),
     projects: new Map(),
@@ -1377,6 +1384,8 @@ export function createInMemoryUnitOfWork(
 
   const snapshot = (source: InMemoryData): InMemoryData => ({
     tasks: new Map(source.tasks),
+    rules: new Map(source.rules),
+    ruleRuns: new Map(source.ruleRuns),
     counters: new Map(source.counters),
     dayPlans: new Map(source.dayPlans),
     projects: new Map(source.projects),
@@ -1402,6 +1411,8 @@ export function createInMemoryUnitOfWork(
 
   const restore = (target: InMemoryData, source: InMemoryData): void => {
     target.tasks = source.tasks;
+    target.rules = source.rules;
+    target.ruleRuns = source.ruleRuns;
     target.counters = source.counters;
     target.dayPlans = source.dayPlans;
     target.projects = source.projects;
@@ -1437,6 +1448,7 @@ export function createInMemoryUnitOfWork(
       const working = snapshot(data);
       const tx: TransactionContext = {
         tasks: taskRepository(working),
+        rules: ruleRepository(working),
         taskCounters: counterRepository(working),
         dayPlans: dayPlanRepository(working),
         projects: projectRepository(working),

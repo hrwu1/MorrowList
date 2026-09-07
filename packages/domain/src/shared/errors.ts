@@ -5,6 +5,7 @@
  */
 export type DomainErrorCode =
   | "VALIDATION_FAILED"
+  | "RULE_NOT_FOUND"
   | "TASK_NOT_FOUND"
   | "TASK_VERSION_CONFLICT"
   | "TASK_INVALID_STATUS"

@@ -1,6 +1,9 @@
 import { silentLogger } from "@morrowlist/observability";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { RuleEngine } from "../rules/engine.js";
+import type { WebhookDispatcher } from "../webhooks/dispatcher.js";
+
 import type { NotificationService } from "./service.js";
 import { startNotificationWorker } from "./worker.js";
 
@@ -94,4 +97,26 @@ describe("startNotificationWorker", () => {
     expect(order).toEqual(["deliver", "deliver"]);
     await worker.stop();
   });
+});
+
+it("continues automation and webhook consumers when notifications fail", async () => {
+  const service = fakeService();
+  service.deliverDue.mockRejectedValue(new Error("reminder failure"));
+  const rules = {
+    tick: vi.fn(async () => {
+      throw new Error("rules failure");
+    }),
+  };
+  const webhooks = { tick: vi.fn(async () => ({ delivered: 1 })) };
+  const worker = startNotificationWorker({
+    service: service as unknown as NotificationService,
+    logger: silentLogger,
+    pollIntervalMs: 1000,
+    ruleEngine: rules as unknown as RuleEngine,
+    webhookDispatcher: webhooks as unknown as WebhookDispatcher,
+  });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(rules.tick).toHaveBeenCalledTimes(1);
+  expect(webhooks.tick).toHaveBeenCalledTimes(1);
+  await worker.stop();
 });
