@@ -359,7 +359,7 @@ export function createTaskRepository(db: Database): TaskRepository {
       // rather than one task request per lane. Archived statuses are excluded because they
       // are not board columns and therefore cannot safely receive or display live work.
       const rows = await db
-        .select({ task: taskEntityColumns })
+        .select(taskEntityColumns)
         .from(tasks)
         .innerJoin(workflowStatuses, eq(workflowStatuses.id, tasks.statusId))
         .where(
@@ -380,7 +380,7 @@ export function createTaskRepository(db: Database): TaskRepository {
 
       const hasMore = rows.length > limit;
       return {
-        items: rows.slice(0, limit).map((row) => toTask(row.task)),
+        items: rows.slice(0, limit).map(toTask),
         hasMore,
         truncated: hasMore,
       };
@@ -633,25 +633,27 @@ export function createTaskRepository(db: Database): TaskRepository {
     async tagsFor(workspaceId, taskIds) {
       const result = new Map<string, Tag[]>();
       if (taskIds.length === 0) return result;
-      // A typed UUID array keeps a large page to one bound parameter.
-      // Return each tag once, with its matching task IDs. A 500-card board with 20
-      // shared tags otherwise transfers and decodes 10,000 full tag records.
+      // Return each tag once, with compact positions in the requested task array.
+      // A 500-card board with 20 shared tags otherwise repeats 10,000 UUID strings.
+      // Deduplication preserves ANY semantics when a caller repeats an ID.
+      const ids = [...new Set(taskIds)];
+      const requested = sql`unnest(${sql.param(ids)}::uuid[]) with ordinality as requested(task_id, position)`;
       // normalized_name is COLLATE "C", matching the in-memory double's ordering.
       const rows = await db
-        .select({ taskIds: sql<string[]>`json_agg(${taskTags.taskId})`, tag: tags })
+        .select({
+          taskPositions: sql<number[]>`json_agg(requested.position - 1)`,
+          tag: tags,
+        })
         .from(taskTags)
+        .innerJoin(requested, sql`requested.task_id = ${taskTags.taskId}`)
         .innerJoin(tags, eq(tags.id, taskTags.tagId))
-        .where(
-          and(
-            eq(tags.workspaceId, workspaceId),
-            sql`${taskTags.taskId} = any(${sql.param(taskIds)}::uuid[])`,
-          ),
-        )
+        .where(eq(tags.workspaceId, workspaceId))
         .groupBy(tags.id)
         .orderBy(asc(tags.normalizedName), asc(tags.id));
       for (const row of rows) {
         const tag = toTag(row.tag);
-        for (const taskId of row.taskIds) {
+        for (const position of row.taskPositions) {
+          const taskId = ids[position] as string;
           const list = result.get(taskId) ?? [];
           list.push(tag);
           result.set(taskId, list);

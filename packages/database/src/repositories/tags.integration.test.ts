@@ -198,9 +198,10 @@ describe("tag commands", () => {
 
     const repository = createTaskRepository(handle.db);
     const grouped = await repository.tagsFor(workspaceId, [
-      first.id,
-      second.id,
       plain.id,
+      second.id,
+      first.id,
+      second.id, // Repeated input must not duplicate a task's tags.
     ]);
     expect([...grouped.keys()].sort()).toEqual([first.id, second.id].sort());
     expect(grouped.get(first.id)?.map((tag) => tag.name)).toEqual(["alpha", "Zulu"]);
