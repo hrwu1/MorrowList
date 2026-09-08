@@ -80,15 +80,22 @@ jobs:
           node --input-type=module <<'NODE'
           import { cpus, platform, arch } from 'node:os';
           import { createHash } from 'node:crypto';
-          import { appendFileSync } from 'node:fs';
+          import { appendFileSync, readFileSync } from 'node:fs';
+          let cpu = cpus()[0]?.model?.trim();
+          if (!cpu || cpu.toLowerCase() === 'unknown') {
+            const fields = readFileSync('/proc/cpuinfo', 'utf8').split('\n')
+              .map(line => line.match(/^(CPU (?:implementer|architecture|variant|part|revision))\s*:\s*(.+)$/i))
+              .filter(Boolean).map(([, key, value]) => `${key.toLowerCase()}=${value.trim()}`);
+            cpu = [...new Set(fields)].sort().join(';');
+          }
           const environment = {
-            cpu: cpus()[0]?.model, cores: cpus().length,
+            cpu, cores: cpus().length,
             platform: platform(), arch: arch(), node: process.version,
             scale: process.env.BENCH_SCALE, workload: process.env.BENCH_WORKLOAD,
           };
           if (!environment.cpu) throw new Error('Cannot identify benchmark CPU');
           const key = createHash('sha256').update(JSON.stringify(environment)).digest('hex');
-          appendFileSync(process.env.GITHUB_OUTPUT, `cache-prefix=benchmark-v2-${key}\n`);
+          appendFileSync(process.env.GITHUB_OUTPUT, `cache-prefix=benchmark-v2-${key}\ncpu-identity=${cpu}\n`);
           console.log('Benchmark environment:', environment);
           NODE
 
@@ -100,6 +107,8 @@ jobs:
           restore-keys: ${{ steps.environment.outputs.cache-prefix }}-
 
       - name: Run the benchmark
+        env:
+          BENCH_CPU_IDENTITY: ${{ steps.environment.outputs.cpu-identity }}
         run: |
           node scripts/bench.mjs \
             --scale "${{ inputs.scale || 'reference' }}" \

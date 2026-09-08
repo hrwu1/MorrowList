@@ -495,7 +495,8 @@ try {
     concurrency: CONCURRENCY,
     iterations: ITERATIONS,
     machine: {
-      cpu: cpus()[0]?.model ?? "unknown",
+      // Linux ARM may omit the model name; CI supplies its /proc/cpuinfo identity.
+      cpu: process.env.BENCH_CPU_IDENTITY || cpus()[0]?.model || "unknown",
       cores: cpus().length,
       memoryBytes: totalmem(),
       os: `${type()} ${release()}`,
