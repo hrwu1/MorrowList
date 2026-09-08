@@ -67,15 +67,35 @@ jobs:
       - name: Create the throwaway benchmark database
         run: PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE morrowlist_bench'
 
-      # The previous nightly's result, so a regression is measured runner against runner.
-      # A miss is fine: the first run has nothing to compare against and only the absolute
-      # budgets are enforced.
+      # Hosted ubuntu runners use different CPUs. Compare only matching hardware,
+      # runtimes and datasets; a cache miss still enforces every absolute budget.
+      - name: Identify comparable benchmark environment
+        id: environment
+        env:
+          BENCH_SCALE: ${{ inputs.scale || 'reference' }}
+          BENCH_WORKLOAD: ${{ hashFiles('scripts/bench.mjs', 'scripts/seed-scale.mjs', '.github/workflows/benchmark.yml') }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { cpus, platform, arch } from 'node:os';
+          import { createHash } from 'node:crypto';
+          import { appendFileSync } from 'node:fs';
+          const environment = {
+            cpu: cpus()[0]?.model, cores: cpus().length,
+            platform: platform(), arch: arch(), node: process.version,
+            scale: process.env.BENCH_SCALE, workload: process.env.BENCH_WORKLOAD,
+          };
+          if (!environment.cpu) throw new Error('Cannot identify benchmark CPU');
+          const key = createHash('sha256').update(JSON.stringify(environment)).digest('hex');
+          appendFileSync(process.env.GITHUB_OUTPUT, `cache-prefix=benchmark-v2-${key}\n`);
+          console.log('Benchmark environment:', environment);
+          NODE
+
       - id: baseline
         uses: actions/cache/restore@v4
         with:
           path: previous.json
-          key: benchmark-baseline-${{ github.run_id }}
-          restore-keys: benchmark-baseline-
+          key: ${{ steps.environment.outputs.cache-prefix }}-${{ github.run_id }}
+          restore-keys: ${{ steps.environment.outputs.cache-prefix }}-
 
       - name: Run the benchmark
         run: |
@@ -92,7 +112,7 @@ jobs:
         if: success()
         with:
           path: previous.json
-          key: benchmark-baseline-${{ github.run_id }}
+          key: ${{ steps.environment.outputs.cache-prefix }}-${{ github.run_id }}
 
       - uses: actions/upload-artifact@v4
         if: always()

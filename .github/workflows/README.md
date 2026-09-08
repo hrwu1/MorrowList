@@ -56,3 +56,8 @@ activity assertions aligned with the documented display format when changing tha
 
 Local passing checks do not update GitHub: the repair must be pushed and the resulting
 workflows verified before claiming remote CI or image publication succeeded.
+
+Benchmark regression baselines are partitioned by CPU model/core count, OS/architecture,
+exact Node version, selected dataset scale, and the benchmark/workflow source hash.
+A different environment starts a new baseline while retaining all absolute budgets;
+unchanged code is no longer compared across unrelated GitHub runner CPUs.
