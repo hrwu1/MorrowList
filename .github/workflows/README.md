@@ -21,3 +21,30 @@ commits, and require branches to be up to date before merging.
 The static job needs no database, so a formatting slip fails in about a minute instead of
 waiting behind a container. The database jobs are separated from each other so an
 integration failure and an end-to-end failure are distinguishable at a glance.
+
+## What the other workflows do
+
+`Publish image` builds the self-hosting image on native AMD64 and ARM64 runners.
+Each platform is smoke-tested against PostgreSQL before the shared image tags move.
+Pull requests only build; pushes to `main` publish `edge`, and version tags publish releases.
+It is separate from the four CI checks above.
+
+`Benchmark` runs nightly or manually. It samples latency after warm-up, enforces the
+spec's single-task read/mutation budgets, and compares p95 to its previous runner result.
+Maximum-size 200-task batches use that regression comparison rather than treating 200
+sequential operations as one common mutation with a 500 ms deadline.
+
+## Keeping local checks representative
+
+Before pushing, run `pnpm format:check`, `pnpm build`, `pnpm lint`, `pnpm typecheck`,
+`pnpm openapi:check`, `pnpm test`, and `pnpm test:integration`. Give integration and
+browser tests distinct disposable databases; both suites truncate their target tables.
+Run `CI=1 pnpm test:e2e` after building to exercise the production server used by CI.
+
+Browser specs import `test` from `e2e/fixtures.ts`. Each test attempt gets an independent
+forwarded client address so unrelated sign-ups do not exhaust one production IP quota.
+Rate limiting remains enabled and has its own browser regression test. Keep task-key and
+activity assertions aligned with the documented display format when changing that format.
+
+Local passing checks do not update GitHub: the repair must be pushed and the resulting
+workflows verified before claiming remote CI or image publication succeeded.
