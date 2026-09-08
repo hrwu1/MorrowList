@@ -629,10 +629,11 @@ export function createTaskRepository(db: Database): TaskRepository {
     async tagsFor(workspaceId, taskIds) {
       const result = new Map<string, Tag[]>();
       if (taskIds.length === 0) return result;
-      // One query for the whole page (spec 29.3). normalized_name is COLLATE "C", so the
-      // order is by code point and matches the in-memory double.
+      // Return each tag once, with its matching task IDs. A 500-card board with 20
+      // shared tags otherwise transfers and decodes 10,000 full tag records.
+      // normalized_name is COLLATE "C", matching the in-memory double's ordering.
       const rows = await db
-        .select({ taskId: taskTags.taskId, tag: tags })
+        .select({ taskIds: sql<string[]>`array_agg(${taskTags.taskId})`, tag: tags })
         .from(taskTags)
         .innerJoin(tags, eq(tags.id, taskTags.tagId))
         .where(
@@ -641,11 +642,15 @@ export function createTaskRepository(db: Database): TaskRepository {
             inArray(taskTags.taskId, [...taskIds]),
           ),
         )
+        .groupBy(tags.id)
         .orderBy(asc(tags.normalizedName), asc(tags.id));
       for (const row of rows) {
-        const list = result.get(row.taskId) ?? [];
-        list.push(toTag(row.tag));
-        result.set(row.taskId, list);
+        const tag = toTag(row.tag);
+        for (const taskId of row.taskIds) {
+          const list = result.get(taskId) ?? [];
+          list.push(tag);
+          result.set(taskId, list);
+        }
       }
       return result;
     },

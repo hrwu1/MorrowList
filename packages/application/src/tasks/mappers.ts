@@ -106,33 +106,33 @@ export function toTaskDto(
   edges: readonly RelationEdge[] = [],
   flow?: { readonly inStatusSince: Date | null; readonly ageDays: number | null },
 ): TaskDto {
-  const relations = edges.flatMap((edge): TaskRelationDto[] => {
+  const relations: TaskRelationDto[] = [];
+  const predecessors: Task[] = [];
+  for (const edge of edges) {
+    if (edge.relation.type === "blocks" && edge.target.id === task.id) {
+      predecessors.push(edge.source);
+    }
     const other =
       edge.source.id === task.id
         ? edge.target
         : edge.target.id === task.id
           ? edge.source
           : null;
-    if (!other || isDeleted(other)) return [];
-    return [
-      {
-        id: edge.relation.id,
-        type: edge.relation.type,
-        sourceTaskId: edge.relation.sourceTaskId,
-        targetTaskId: edge.relation.targetTaskId,
-        task: {
-          id: other.id,
-          key: taskKey(taskKeyPrefix, other.taskNumber),
-          title: other.title,
-          isCompleted: isCompleted(other),
-        },
-        createdAt: edge.relation.createdAt.toISOString(),
+    if (!other || isDeleted(other)) continue;
+    relations.push({
+      id: edge.relation.id,
+      type: edge.relation.type,
+      sourceTaskId: edge.relation.sourceTaskId,
+      targetTaskId: edge.relation.targetTaskId,
+      task: {
+        id: other.id,
+        key: taskKey(taskKeyPrefix, other.taskNumber),
+        title: other.title,
+        isCompleted: isCompleted(other),
       },
-    ];
-  });
-  const predecessors = edges
-    .filter((edge) => edge.relation.type === "blocks" && edge.target.id === task.id)
-    .map((edge) => edge.source);
+      createdAt: edge.relation.createdAt.toISOString(),
+    });
+  }
 
   return {
     id: task.id,

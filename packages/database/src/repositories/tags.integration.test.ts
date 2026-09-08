@@ -15,6 +15,8 @@ import {
 } from "../test-harness.js";
 import { createUnitOfWork } from "../unit-of-work.js";
 
+import { createTaskRepository } from "./tasks.js";
+
 /**
  * Tag persistence against real PostgreSQL (GAP-03, spec 12.1). Migration 0003 carries a
  * unique index, two cascading foreign keys, and a pinned collation; none of those can be
@@ -178,6 +180,51 @@ describe("migration 0003", () => {
 });
 
 describe("tag commands", () => {
+  it("returns shared and distinct tags only for the requested tasks and workspace", async () => {
+    const first = await tasks.create(context, { workspaceId, title: "First" });
+    const second = await tasks.create(context, { workspaceId, title: "Second" });
+    const plain = await tasks.create(context, { workspaceId, title: "Plain" });
+    const excluded = await tasks.create(context, { workspaceId, title: "Excluded" });
+    const zulu = await tagService.create(context, workspaceId, { name: "Zulu" });
+    const alpha = await tagService.create(context, workspaceId, {
+      name: "alpha",
+      colorToken: "teal",
+      description: "Shared metadata",
+    });
+    await tasks.addTag(context, workspaceId, first.id, zulu.id);
+    await tasks.addTag(context, workspaceId, first.id, alpha.id);
+    await tasks.addTag(context, workspaceId, second.id, alpha.id);
+    await tasks.addTag(context, workspaceId, excluded.id, zulu.id);
+
+    const repository = createTaskRepository(handle.db);
+    const grouped = await repository.tagsFor(workspaceId, [
+      first.id,
+      second.id,
+      plain.id,
+    ]);
+    expect([...grouped.keys()].sort()).toEqual([first.id, second.id].sort());
+    expect(grouped.get(first.id)?.map((tag) => tag.name)).toEqual(["alpha", "Zulu"]);
+    expect(grouped.get(second.id)).toEqual([
+      expect.objectContaining({
+        id: alpha.id,
+        workspaceId,
+        colorToken: "teal",
+        description: "Shared metadata",
+        createdAt: NOW,
+        updatedAt: NOW,
+      }),
+    ]);
+    expect(await repository.tagsFor(workspaceId, [])).toEqual(new Map());
+
+    const { workspace: other } = await bootstrapUser(
+      { unitOfWork: createUnitOfWork(handle), clock: fixedClock(NOW) },
+      { userId: uuidv7(), email: "other-tags@example.com", timezone: "UTC" },
+    );
+    expect(await repository.tagsFor(other.id, [first.id, second.id])).toEqual(
+      new Map(),
+    );
+  });
+
   it("creates, attaches, lists in name order, filters, counts, and deletes", async () => {
     const zulu = await tagService.create(context, workspaceId, { name: "Zulu" });
     const alpha = await tagService.create(context, workspaceId, {
