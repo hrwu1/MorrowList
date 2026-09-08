@@ -82,7 +82,7 @@ test("a select field is defined, set on a task, shown on the row, and filtered b
   await expect(inbox.getByText("Ship the beta")).toBeVisible();
   await page.reload();
   await expect(rows).toHaveCount(1);
-  await expect(page.getByText("Stage is Beta")).toBeVisible();
+  await expect(filters.getByText("Stage is Beta", { exact: true })).toBeVisible();
   await page.screenshot({
     path: "test-results/fields-inbox-filter.png",
     fullPage: true,

@@ -28,7 +28,7 @@ async function signUp(page: Page, label: string) {
 }
 
 async function capture(page: Page, title: string) {
-  const field = page.getByPlaceholder("Add a task and press Enter");
+  const field = page.getByRole("textbox", { name: "Task title", exact: true });
   await field.fill(title);
   await field.press("Enter");
   await expect(page.getByRole("link", { name: title })).toBeVisible();
@@ -156,7 +156,7 @@ test("recently opened views render offline with the indicator, and an unsent tas
     // The write is refused and the text survives a reload (spec 25.1).
     await page.goto("/inbox");
     await expect(page.getByTestId("offline-banner")).toBeVisible();
-    const field = page.getByPlaceholder("Add a task and press Enter");
+    const field = page.getByRole("textbox", { name: "Task title", exact: true });
     // Hydration of the stored document may client-render once; wait for it to settle.
     await expect(field).toHaveCount(1);
     await field.fill("Written while offline");
@@ -170,9 +170,9 @@ test("recently opened views render offline with the indicator, and an unsent tas
     );
 
     await page.reload();
-    await expect(page.getByPlaceholder("Add a task and press Enter")).toHaveValue(
-      "Written while offline",
-    );
+    await expect(
+      page.getByRole("textbox", { name: "Task title", exact: true }),
+    ).toHaveValue("Written while offline");
     await expect(page.getByText("Saved on this device")).toBeVisible();
   } finally {
     await goOnline(context);
@@ -183,7 +183,9 @@ test("recently opened views render offline with the indicator, and an unsent tas
   await expect(page.getByRole("link", { name: "Written while offline" })).toBeVisible();
   await expect(page.getByText("Saved on this device")).toHaveCount(0);
   await page.reload();
-  await expect(page.getByPlaceholder("Add a task and press Enter")).toHaveValue("");
+  await expect(
+    page.getByRole("textbox", { name: "Task title", exact: true }),
+  ).toHaveValue("");
 });
 
 test("signing out removes every partitioned cache and a second user cannot read the first user's Inbox", async ({
