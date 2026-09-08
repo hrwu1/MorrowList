@@ -99,9 +99,13 @@ function defaultWorkspaceName(input: BootstrapUserInput): string {
 
 /** Task key prefix: the workspace name's letters, as written, up to the 24 allowed. */
 export function defaultPrefix(name: string): string {
+  // A default name is "<label>'s Workspace" (see `defaultWorkspaceName`), and repeating
+  // that suffix in every key reads badly, so only the label becomes the prefix. The
+  // apostrophe is required: a name that merely ends in "s Workspace" keeps all of it.
+  const label = name.replace(/['’]s\s+Workspace$/i, "");
   // The prefix is displayed as written, so keep the name's own casing rather than
   // shouting an abbreviation of it. Non-letters go because the key separator is `-`.
-  const letters = name.replace(/[^A-Za-z]/g, "");
+  const letters = label.replace(/[^A-Za-z]/g, "");
   return letters.slice(0, 24) || "ML";
 }
 

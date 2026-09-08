@@ -3,12 +3,13 @@ import { describe, expect, it } from "vitest";
 
 import { SearchService } from "../search/service.js";
 import { TaskService } from "../tasks/service.js";
-import { WorkspaceService } from "./service.js";
 import {
   createInMemoryUnitOfWork,
   emptyData,
   seedWorkspace,
 } from "../testing/index.js";
+
+import { WorkspaceService } from "./service.js";
 
 const NOW = new Date("2026-09-07T09:00:00.000Z");
 const SECRET = "rename-check";

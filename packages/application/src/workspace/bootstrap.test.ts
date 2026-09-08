@@ -75,7 +75,8 @@ describe("bootstrapUser", () => {
     const result = await bootstrap({ displayName: "Morrow Team" });
 
     expect(result.workspace.name).toBe("Morrow Team's Workspace");
-    expect(result.workspace.taskKeyPrefix).toBe("MorrowTeamsWorkspace");
+    // The prefix is the label alone: repeating "'s Workspace" in every key reads badly.
+    expect(result.workspace.taskKeyPrefix).toBe("MorrowTeam");
   });
 
   it("honours an explicit workspace name and prefix from onboarding", async () => {
@@ -116,6 +117,20 @@ describe("slugify and defaultPrefix", () => {
 
   it("falls back to ML when a name has no letters", () => {
     expect(defaultPrefix("123")).toBe("ML");
+    expect(defaultPrefix("'s Workspace")).toBe("ML");
     expect(defaultPrefix("MorrowList")).toBe("MorrowList");
+  });
+
+  it("drops the suffix a default workspace name carries", () => {
+    expect(defaultPrefix("Alex's Workspace")).toBe("Alex");
+    expect(defaultPrefix("Jane Doe's Workspace")).toBe("JaneDoe");
+    // A curly apostrophe counts; a name merely ending in "s Workspace" does not.
+    expect(defaultPrefix("Alex’s Workspace")).toBe("Alex");
+    expect(defaultPrefix("Chris Workspace")).toBe("ChrisWorkspace");
+  });
+
+  it("keeps the casing and stops at 24 characters", () => {
+    expect(defaultPrefix("morrowlist")).toBe("morrowlist");
+    expect(defaultPrefix(`${"Ab".repeat(20)}'s Workspace`)).toBe("Ab".repeat(12));
   });
 });
