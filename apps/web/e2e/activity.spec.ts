@@ -42,19 +42,48 @@ test("a move and a title edit appear in the task's and the project's activity", 
   const ready = page.getByRole("region", { name: "Ready" });
   await expect(ready.getByRole("link", { name: "Draft research brief" })).toBeVisible();
 
-  await page
-    .getByLabel("Move Draft research brief")
-    .selectOption({ label: "In Progress" });
-  const inProgress = page.getByRole("region", { name: "In Progress" });
-  await expect(
-    inProgress.getByRole("link", { name: "Draft research brief" }),
-  ).toBeVisible();
-
-  await inProgress.getByRole("link", { name: "Draft research brief" }).click();
+  // Prime the detail cache before moving; a refetch must not be needed to learn the
+  // move's authoritative version before the next edit.
+  await ready.getByRole("link", { name: "Draft research brief" }).click();
   const panel = page.getByRole("complementary", { name: /Task details for/ });
-  await panel.getByLabel("Title").fill("Draft the research brief");
-  await panel.getByLabel("Title").blur();
-  await expect(panel.getByText("Saved")).toBeVisible();
+  await expect(panel.getByLabel("Title")).toHaveValue("Draft research brief");
+  await panel.getByRole("button", { name: "Close task details" }).click();
+  await expect(panel).toHaveCount(0);
+  let releaseMove = () => {};
+  let releaseReads = () => {};
+  const moveGate = new Promise<void>((resolve) => {
+    releaseMove = resolve;
+  });
+  const readGate = new Promise<void>((resolve) => {
+    releaseReads = resolve;
+  });
+  await page.route("**/api/v1/tasks/*/move", async (route) => {
+    const response = await route.fetch();
+    await moveGate;
+    await route.fulfill({ response });
+  });
+  await page.route("**/api/v1/tasks/*", async (route) => {
+    if (route.request().method() === "GET") await readGate;
+    await route.continue();
+  });
+
+  try {
+    await page
+      .getByLabel("Move Draft research brief")
+      .selectOption({ label: "In Progress" });
+    const inProgress = page.getByRole("region", { name: "In Progress" });
+    const link = inProgress.getByRole("link", { name: "Draft research brief" });
+    await expect(link).toBeVisible();
+    await expect(link).toBeDisabled();
+    releaseMove();
+    await link.click();
+    await panel.getByLabel("Title").fill("Draft the research brief");
+    await panel.getByLabel("Title").blur();
+    await expect(panel.getByText("Saved", { exact: true })).toBeVisible();
+  } finally {
+    releaseMove();
+    releaseReads();
+  }
 
   await panel.locator("summary").filter({ hasText: "Activity" }).click();
   const activity = panel.getByRole("list", {

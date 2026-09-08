@@ -105,6 +105,11 @@ export function KanbanCard({
         className="board-card__title"
         href={detailHref}
         id={`board-task-link-${task.key}`}
+        aria-disabled={moveDisabled}
+        title={moveDisabled ? "Saving move…" : undefined}
+        onClick={(event) => {
+          if (moveDisabled) event.preventDefault();
+        }}
       >
         {task.title}
       </Link>

@@ -14,7 +14,11 @@ import { moveTaskInBoard, type BoardPlacement } from "../lib/board-view";
 
 import { activityKeys } from "@/features/activity/hooks/use-activity";
 import { flowKeys } from "@/features/flow/hooks/use-flow";
-import { cachedTasks, taskKeys } from "@/features/tasks/hooks/use-tasks";
+import {
+  cachedTasks,
+  patchTaskEverywhere,
+  taskKeys,
+} from "@/features/tasks/hooks/use-tasks";
 import { useUndo } from "@/features/tasks/hooks/use-undo";
 import { neighboursOf, undoLabel } from "@/features/tasks/lib/undo";
 import { workspaceKeys } from "@/features/workspace/hooks/use-workspace";
@@ -99,6 +103,9 @@ export function useMoveBoardTask(projectId: string) {
       }
     },
     onSuccess: (result, input, context) => {
+      // A card may open immediately after its move. Detail/list caches must already
+      // carry the committed version, even while their background refetch is pending.
+      patchTaskEverywhere(queryClient, result.task);
       queryClient.setQueriesData<ProjectBoardResponse>(
         { queryKey: boardKey },
         (current) =>
