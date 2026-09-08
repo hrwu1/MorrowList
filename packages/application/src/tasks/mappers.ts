@@ -77,6 +77,7 @@ export async function loadTaskDtos(
     tx.tasks.relationsFor(workspace.id, ids),
   ]);
   const mapTag = createTagDtoMapper();
+  const edgesByTask = groupRelationsByTask(edges);
   return tasks.map((task) =>
     toTaskDto(
       task,
@@ -84,11 +85,26 @@ export async function loadTaskDtos(
       plans.get(task.id) ?? [],
       progress.get(task.id) ?? null,
       tags.get(task.id) ?? [],
-      edges,
+      edgesByTask.get(task.id),
       undefined,
       mapTag,
     ),
   );
+}
+
+/** Index a page's relations once instead of scanning every edge for every card. */
+export function groupRelationsByTask(
+  edges: readonly RelationEdge[],
+): Map<string, RelationEdge[]> {
+  const grouped = new Map<string, RelationEdge[]>();
+  for (const edge of edges) {
+    for (const taskId of new Set([edge.source.id, edge.target.id])) {
+      const list = grouped.get(taskId) ?? [];
+      list.push(edge);
+      grouped.set(taskId, list);
+    }
+  }
+  return grouped;
 }
 
 /**

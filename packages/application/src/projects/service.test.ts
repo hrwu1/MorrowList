@@ -174,6 +174,50 @@ describe("ProjectService reads", () => {
     expect(before.data.tasks[0]?.tags[0]?.name).toBe("Before");
   });
 
+  it("maps relations at both endpoints and retains blockers outside a truncated board", async () => {
+    const taskService = new TaskService({
+      unitOfWork,
+      clock: fixedClock(NOW),
+      cursorSecret: "test",
+    });
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const cards = ["First", "Second", "Outside"].map((title, index) =>
+      buildTask(seeded, ready.id, title, `a${index}`),
+    );
+    for (const task of cards) unitOfWork.data.tasks.set(task.id, task);
+    const [first, second, outside] = cards as [Task, Task, Task];
+    await taskService.addRelation(seeded.context, seeded.workspace.id, first.id, {
+      type: "related_to",
+      targetTaskId: second.id,
+    });
+    await taskService.addRelation(seeded.context, seeded.workspace.id, outside.id, {
+      type: "blocks",
+      targetTaskId: second.id,
+    });
+    const board = await service.board(
+      seeded.context,
+      seeded.workspace.id,
+      seeded.project.id,
+      { limit: 2 },
+    );
+    expect(board.data.tasks.map((task) => task.title)).toEqual(["First", "Second"]);
+    const [a, b] = board.data.tasks;
+    expect(a?.relations.map((edge) => edge.task.id)).toEqual([second.id]);
+    expect(b?.relations.map((edge) => edge.task.id).sort()).toEqual(
+      [first.id, outside.id].sort(),
+    );
+    expect(a?.isBlocked).toBe(false);
+    expect(b?.isBlocked).toBe(true);
+    const list = await taskService.list(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      projectId: seeded.project.id,
+      limit: 2,
+    });
+    expect(list.data.find((task) => task.id === second.id)?.relations).toEqual(
+      b?.relations,
+    );
+  });
+
   it("returns one normalized ordered board and reports truncation", async () => {
     const backlog = statusByCategory(seeded.statuses, "backlog");
     const ready = statusByCategory(seeded.statuses, "ready");

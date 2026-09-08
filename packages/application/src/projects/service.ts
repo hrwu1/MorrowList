@@ -37,7 +37,7 @@ import {
 } from "../shared/actor-context.js";
 import { recordEvent } from "../shared/event-recorder.js";
 import { createTagDtoMapper } from "../tags/mappers.js";
-import { toTaskDto } from "../tasks/mappers.js";
+import { groupRelationsByTask, toTaskDto } from "../tasks/mappers.js";
 import { slugify } from "../workspace/bootstrap.js";
 
 import {
@@ -334,6 +334,7 @@ export class ProjectService {
         cardFlowFields(tx, workspaceId, boardTaskIds, now),
       ]);
       const mapTag = createTagDtoMapper();
+      const edgesByTask = groupRelationsByTask(edges);
       const cards = tasks.items.map((task) =>
         toTaskDto(
           task,
@@ -341,7 +342,7 @@ export class ProjectService {
           plans.get(task.id) ?? [],
           progress.get(task.id) ?? null,
           tags.get(task.id) ?? [],
-          edges,
+          edgesByTask.get(task.id),
           flow.get(task.id) ?? { inStatusSince: null, ageDays: null },
           mapTag,
         ),
