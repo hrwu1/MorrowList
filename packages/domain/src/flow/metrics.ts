@@ -217,10 +217,15 @@ export function throughputByWeek(
   for (let week = startOfWeek(range.from); week <= range.to; week = addDays(week, 7)) {
     counts.set(week, 0);
   }
+  const weeks = new Map<PlainDate, PlainDate>();
   for (const completion of completions) {
     const date = localDate(completion);
     if (date < range.from || date > range.to) continue;
-    const week = startOfWeek(date);
+    let week = weeks.get(date);
+    if (week === undefined) {
+      week = startOfWeek(date);
+      weeks.set(date, week);
+    }
     counts.set(week, (counts.get(week) ?? 0) + 1);
   }
   return [...counts.entries()].map(([weekStart, count]) => ({ weekStart, count }));
@@ -256,16 +261,30 @@ export function cumulativeFlow(
   const days = dayOffset(range.from, range.to) + 1;
   if (days <= 0) return [];
 
+  // Adjacent intervals share a boundary. Convert each exact instant once, retaining
+  // the workspace timezone's midnight and daylight-saving behavior.
+  const fromMs = Date.parse(`${range.from}T00:00:00Z`);
+  const offsets = new Map<number, number>();
+  const offset = (instant: Date): number => {
+    const time = instant.getTime();
+    let value = offsets.get(time);
+    if (value === undefined) {
+      value = Math.round(
+        (Date.parse(`${localDate(instant)}T00:00:00Z`) - fromMs) / DAY_MS,
+      );
+      offsets.set(time, value);
+    }
+    return value;
+  };
+
   // Difference arrays: O(intervals + days) rather than O(intervals × days).
   const deltas = new Map<StatusCategory, Int32Array>(
     CATEGORIES.map((category) => [category, new Int32Array(days + 1)]),
   );
   for (const interval of intervals) {
-    const start = Math.max(0, dayOffset(range.from, localDate(interval.enteredAt)));
+    const start = Math.max(0, offset(interval.enteredAt));
     const end =
-      interval.leftAt === null
-        ? days
-        : Math.min(days, dayOffset(range.from, localDate(interval.leftAt)));
+      interval.leftAt === null ? days : Math.min(days, offset(interval.leftAt));
     if (start >= end) continue;
     const delta = deltas.get(interval.category) as Int32Array;
     delta[start] = (delta[start] ?? 0) + 1;

@@ -1,5 +1,4 @@
 import type { StatusIntervalRepository } from "@morrowlist/application";
-import type { StatusInterval } from "@morrowlist/domain";
 import { and, asc, eq, exists, gte, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
@@ -9,15 +8,14 @@ import { taskStatusIntervals } from "../schema/index.js";
 /** Status-interval writer and bulk readers (GAP-17). */
 
 export function createStatusIntervalRepository(db: Database): StatusIntervalRepository {
-  const toInterval = (
-    row: typeof taskStatusIntervals.$inferSelect,
-  ): StatusInterval => ({
-    taskId: row.taskId,
-    statusId: row.statusId,
-    category: row.category,
-    enteredAt: row.enteredAt,
-    leftAt: row.leftAt,
-  });
+  // The domain interval excludes storage identity and tenant/project columns.
+  const intervalColumns = {
+    taskId: taskStatusIntervals.taskId,
+    statusId: taskStatusIntervals.statusId,
+    category: taskStatusIntervals.category,
+    enteredAt: taskStatusIntervals.enteredAt,
+    leftAt: taskStatusIntervals.leftAt,
+  };
 
   return {
     async open(interval) {
@@ -48,7 +46,7 @@ export function createStatusIntervalRepository(db: Database): StatusIntervalRepo
     async listForTasks(workspaceId, taskIds) {
       if (taskIds.length === 0) return [];
       const rows = await db
-        .select()
+        .select(intervalColumns)
         .from(taskStatusIntervals)
         .where(
           and(
@@ -57,7 +55,7 @@ export function createStatusIntervalRepository(db: Database): StatusIntervalRepo
           ),
         )
         .orderBy(asc(taskStatusIntervals.taskId), asc(taskStatusIntervals.enteredAt));
-      return rows.map(toInterval);
+      return rows;
     },
 
     async listForProject(workspaceId, projectId, since) {
@@ -66,7 +64,7 @@ export function createStatusIntervalRepository(db: Database): StatusIntervalRepo
       // history of each such task comes back so cycle and lead time can look back.
       const touched = alias(taskStatusIntervals, "touched");
       const rows = await db
-        .select()
+        .select(intervalColumns)
         .from(taskStatusIntervals)
         .where(
           and(
@@ -86,7 +84,7 @@ export function createStatusIntervalRepository(db: Database): StatusIntervalRepo
           ),
         )
         .orderBy(asc(taskStatusIntervals.taskId), asc(taskStatusIntervals.enteredAt));
-      return rows.map(toInterval);
+      return rows;
     },
   };
 }

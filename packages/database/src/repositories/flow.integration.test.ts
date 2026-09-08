@@ -591,6 +591,9 @@ describe("flow read budget", () => {
     expect(summary.cycleTimeDays.samples).toBe(summary.completed);
     expect(summary.aging).toHaveLength(50);
     expect(summary.cumulativeFlow).toHaveLength(365);
+    console.info(
+      `Flow read samples (ms): ${timings.map((ms) => ms.toFixed(1)).join(", ")}`,
+    );
     expect(Math.max(...timings)).toBeLessThan(300);
   });
 });

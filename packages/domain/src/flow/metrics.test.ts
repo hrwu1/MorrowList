@@ -224,6 +224,29 @@ describe("throughputByWeek", () => {
 });
 
 describe("cumulativeFlow", () => {
+  it("keeps shared boundaries on local calendar days across a daylight-saving change", () => {
+    const intervals = history("t1", [
+      ["ready", "2026-03-07T12:00:00Z"],
+      ["in_progress", "2026-03-08T04:30:00Z"], // March 7, 23:30 in New York.
+      ["done", "2026-03-09T03:30:00Z"], // March 8, 23:30 after the clock change.
+    ]);
+    const range = { from: "2026-03-07" as PlainDate, to: "2026-03-09" as PlainDate };
+    expect(
+      cumulativeFlow(intervals, range, "America/New_York").map((day) => ({
+        date: day.date,
+        ready: day.counts.ready,
+        active: day.counts.in_progress,
+        done: day.counts.done,
+      })),
+    ).toEqual([
+      { date: "2026-03-07", ready: 0, active: 1, done: 0 },
+      { date: "2026-03-08", ready: 0, active: 0, done: 1 },
+      { date: "2026-03-09", ready: 0, active: 0, done: 1 },
+    ]);
+    // No boundary cache survives a call with a different timezone.
+    expect(cumulativeFlow(intervals, range, "UTC")[0]?.counts.ready).toBe(1);
+  });
+
   it("counts each task in exactly one category per day", () => {
     const range = { from: "2026-08-01" as PlainDate, to: "2026-08-05" as PlainDate };
     const intervals = [
