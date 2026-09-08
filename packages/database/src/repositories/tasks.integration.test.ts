@@ -786,9 +786,10 @@ describe("defer and deadline dates (GAP-16)", () => {
 
 /**
  * Bulk operations against real PostgreSQL (GAP-08, spec 10.4). What the in-memory double
- * cannot show is whether 200 single-item commands in one transaction stay inside the
- * mutation budget (spec 29.2), and whether a failing entry really rolls back every row
- * the earlier entries wrote — the activity and outbox rows included.
+ * cannot show is whether 200 single-item commands persist atomically, and whether a
+ * failing entry really rolls back every row the earlier entries wrote — the activity
+ * and outbox rows included. scripts/bench.mjs measures the batch latency budget with
+ * warm-up and repeated samples instead of a single timing on a shared CI runner.
  */
 describe("bulk task operations", () => {
   const BATCH_SIZE = 200;
@@ -803,10 +804,9 @@ describe("bulk task operations", () => {
     return created;
   }
 
-  it("applies 200 operations in one transaction inside the mutation budget", async () => {
+  it("persists all 200 operations and their activity in one transaction", async () => {
     const tasks = await seedTasks(BATCH_SIZE);
 
-    const started = performance.now();
     const result = await service.batch(context, workspaceId, {
       operations: tasks.map((task) => ({
         op: "setPriority" as const,
@@ -815,11 +815,14 @@ describe("bulk task operations", () => {
         priority: "high" as const,
       })),
     });
-    const elapsed = performance.now() - started;
 
     expect(result.data).toHaveLength(BATCH_SIZE);
     expect(result.data.every((item) => item.data.priority === "high")).toBe(true);
-    expect(elapsed).toBeLessThan(500);
+    const persisted = await handle.pool.query(
+      "select count(*)::int as count from tasks where workspace_id = $1 and priority = 'high' and version = 2",
+      [workspaceId],
+    );
+    expect(persisted.rows[0].count).toBe(BATCH_SIZE);
 
     // One per-task row plus the single administrative summary for the whole batch.
     const activity = await handle.pool.query(

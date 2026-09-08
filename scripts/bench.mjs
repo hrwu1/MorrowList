@@ -116,7 +116,7 @@ function summarise(name, budgetMs, samples, errors) {
     p95,
     p99: round(percentile(sorted, 0.99)),
     max: round(sorted[sorted.length - 1] ?? 0),
-    withinBudget: p95 <= budgetMs,
+    withinBudget: budgetMs === null || p95 <= budgetMs,
   };
 }
 
@@ -166,6 +166,7 @@ async function timed(path, init) {
  */
 async function run(scenario) {
   const iterations = scenario.iterations ?? ITERATIONS;
+  const concurrency = scenario.concurrency ?? CONCURRENCY;
   const samples = [];
   let errors = 0;
   let next = 0;
@@ -193,16 +194,16 @@ async function run(scenario) {
   // Warm up first: the first hit on a route pays for a cold connection pool and an empty
   // plan cache, which is not what a user experiences on their tenth click.
   next = 0;
-  await Promise.all(Array.from({ length: CONCURRENCY }, () => worker(false)));
+  await Promise.all(Array.from({ length: concurrency }, () => worker(false)));
   next = 0;
-  await Promise.all(Array.from({ length: CONCURRENCY }, () => worker(true)));
+  await Promise.all(Array.from({ length: concurrency }, () => worker(true)));
 
   const result = summarise(scenario.name, scenario.budgetMs, samples, errors);
   const verdict = result.withinBudget ? "ok " : "OVER";
   log(
     `${verdict} ${result.name.padEnd(22)} p50 ${String(result.p50).padStart(7)} ms  ` +
       `p95 ${String(result.p95).padStart(7)} ms  p99 ${String(result.p99).padStart(7)} ms  ` +
-      `(budget ${result.budgetMs} ms, n=${result.samples}, errors=${result.errors})`,
+      `(${result.budgetMs === null ? "runner baseline" : `budget ${result.budgetMs} ms`}, n=${result.samples}, errors=${result.errors})`,
   );
   return result;
 }
@@ -341,7 +342,7 @@ try {
 
   const mutable = [];
   let cursor;
-  while (mutable.length < MUTATION_ITERATIONS * 3) {
+  while (mutable.length < Math.max(200, MUTATION_ITERATIONS * 3)) {
     const page = await json(
       `/tasks?${ws}&inbox=true&limit=100${cursor ? `&cursor=${cursor}` : ""}`,
     );
@@ -350,6 +351,8 @@ try {
     if (!cursor) break;
   }
   log(`${mutable.length} inbox tasks available for the mutation scenarios`);
+  if (mutable.length < 200)
+    throw new Error("benchmark needs at least 200 mutable tasks");
 
   const boardStatuses = await json(`/projects/${boardProjectId}/statuses?${ws}`);
   const targetStatus = boardStatuses.data.find((status) => !status.isTerminal);
@@ -447,6 +450,28 @@ try {
         },
       }),
     },
+    // A maximum-size batch is 200 mutations, not spec 29.2's common single mutation.
+    // Run serially on a fixed set, alternating priority so every operation writes.
+    // The nightly workflow retains p95 and compares it to the prior runner result.
+    {
+      name: "batch priority (200)",
+      budgetMs: null,
+      iterations: 20,
+      concurrency: 1,
+      request: (index) => ({
+        path: `/tasks/batch?${ws}`,
+        init: {
+          method: "POST",
+          body: JSON.stringify({
+            operations: mutable.slice(0, 200).map((taskId) => ({
+              op: "setPriority",
+              taskId,
+              priority: index % 2 === 0 ? "high" : "low",
+            })),
+          }),
+        },
+      }),
+    },
     {
       name: "complete task",
       budgetMs: 500,
@@ -517,7 +542,12 @@ try {
   }
 
   stopServer();
-  if (over.length > 0 || regressed.length > 0) process.exit(1);
+  if (
+    over.length > 0 ||
+    regressed.length > 0 ||
+    results.some((result) => result.errors > 0)
+  )
+    process.exit(1);
 } finally {
   stopServer();
 }
