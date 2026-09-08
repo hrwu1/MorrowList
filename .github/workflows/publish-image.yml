@@ -92,8 +92,13 @@ jobs:
           cache-from: type=gha,scope=image-${{ matrix.arch }}
           cache-to: type=gha,scope=image-${{ matrix.arch }},mode=max
 
+      # GitHub's attestation API requires a public repository or Enterprise Cloud.
+      # Private Enterprise owners can explicitly enable it with this repository variable.
+      # BuildKit provenance and SBOMs above remain attached on every image build.
       - name: Attest the build provenance
-        if: github.event_name != 'pull_request'
+        if: >-
+          github.event_name != 'pull_request' &&
+          (!github.event.repository.private || vars.GITHUB_ATTESTATIONS_ENABLED == 'true')
         uses: actions/attest-build-provenance@v2
         with:
           subject-name: ${{ steps.image-name.outputs.value }}
@@ -203,6 +208,8 @@ jobs:
           echo "image=$image" >> "$GITHUB_OUTPUT"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - name: Attest the multi-platform image
+        if: >-
+          !github.event.repository.private || vars.GITHUB_ATTESTATIONS_ENABLED == 'true'
         uses: actions/attest-build-provenance@v2
         with:
           subject-name: ${{ steps.merge.outputs.image }}

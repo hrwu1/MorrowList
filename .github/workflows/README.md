@@ -29,6 +29,14 @@ Each platform is smoke-tested against PostgreSQL before the shared image tags mo
 Pull requests only build; pushes to `main` publish `edge`, and version tags publish releases.
 It is separate from the four CI checks above.
 
+BuildKit provenance (`mode=max`) and SBOMs are always attached to the platform images.
+GitHub-signed attestations additionally run for public repositories. Private repositories
+require GitHub Enterprise Cloud; eligible owners can set the repository variable
+`GITHUB_ATTESTATIONS_ENABLED=true`. A user-owned private repository cannot use that
+API, so it publishes with BuildKit metadata but without GitHub-signed attestations.
+This preserves repository privacy and does not suppress build or smoke-test failures.
+See the [official action's availability policy](https://github.com/actions/attest-build-provenance#readme).
+
 `Benchmark` runs nightly or manually. It samples latency after warm-up, enforces the
 spec's single-task read/mutation budgets, and compares p95 to its previous runner result.
 Maximum-size 200-task batches use that regression comparison rather than treating 200
