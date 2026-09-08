@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 // These tests exercise the Today UI and API state, including controlled request
 // failures. Offline/cache behavior is covered separately in the offline suites.

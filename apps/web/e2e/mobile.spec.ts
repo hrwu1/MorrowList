@@ -1,4 +1,4 @@
-import { devices, expect, test, type Page } from "@playwright/test";
+import { devices, expect, test, type Page } from "./fixtures";
 
 /**
  * The representative mobile viewport (spec 7.3, 9.5, 28.2): every view fits the screen
@@ -181,14 +181,14 @@ test("the board runs one lane at a time and the task detail opens as a sheet", a
   const panel = page.getByRole("complementary", { name: /Task details for/ });
   await expect(panel).toBeVisible();
   await expect(panel.getByLabel("Title")).toHaveValue("Open me on a phone");
-  await expect(page).toHaveURL(/\/inbox\?sort=created&task=MOBI-1$/);
+  await expect(page).toHaveURL(/\/inbox\?sort=created&task=MobileTester-000001$/);
   await page.goBack();
   await expect(panel).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Open me on a phone" })).toBeFocused();
   await expect(page).toHaveURL(/\/inbox\?sort=created$/);
   await page.goForward();
   await expect(panel).toBeVisible();
-  await expect(page).toHaveURL(/\/inbox\?sort=created&task=MOBI-1$/);
+  await expect(page).toHaveURL(/\/inbox\?sort=created&task=MobileTester-000001$/);
   const box = (await panel.boundingBox())!;
   const viewport = page.viewportSize()!;
   // A sheet: anchored to the bottom edge, full width, and the list still starts where it did.

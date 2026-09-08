@@ -1,6 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
-
 import { openProjectBoard, openSection } from "./disclosures";
+import { expect, test, type Locator, type Page } from "./fixtures";
 
 /**
  * Tags end to end (GAP-03, spec 12.1): create a tag from the task detail, see it on the

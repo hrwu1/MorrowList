@@ -1,6 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
-
 import { openProjectBoard } from "./disclosures";
+import { expect, test, type Locator, type Page } from "./fixtures";
 
 /**
  * Undo and bulk edit (GAP-08, spec 10.3, 10.4).

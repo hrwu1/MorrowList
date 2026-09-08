@@ -1,6 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-
 import { openProjectBoard, openSection } from "./disclosures";
+import { expect, test, type Page } from "./fixtures";
 
 /**
  * The daily loop (spec 9.2, 9.3): choose work for today, see it in Today, finish it

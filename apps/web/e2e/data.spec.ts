@@ -1,8 +1,7 @@
 import { readFile } from "node:fs/promises";
 
-import { expect, test, type Page } from "@playwright/test";
-
 import { openProjectBoard, openSection } from "./disclosures";
+import { expect, test, type Page } from "./fixtures";
 
 /**
  * Export and import end to end (GAP-07, spec 30): download the archive and the task CSV,

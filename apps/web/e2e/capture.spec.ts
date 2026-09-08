@@ -1,6 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-
 import { openSection } from "./disclosures";
+import { expect, test, type Page } from "./fixtures";
 
 /**
  * Natural-language quick add end to end (GAP-15, ADR pending-natural-language-capture):

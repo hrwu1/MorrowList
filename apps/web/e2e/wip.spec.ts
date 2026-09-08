@@ -1,6 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-
 import { openProjectBoard, openSection } from "./disclosures";
+import { expect, test, type Page } from "./fixtures";
 
 const PASSWORD = "correct-horse-battery-staple";
 

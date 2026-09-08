@@ -1,6 +1,5 @@
-import { expect, test } from "@playwright/test";
-
 import { openSection } from "./disclosures";
+import { expect, test } from "./fixtures";
 
 test("incoming tasks and background edits appear without reloading the workspace", async ({
   page,

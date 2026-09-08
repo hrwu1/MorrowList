@@ -1,6 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-
 import { openSection } from "./disclosures";
+import { expect, test, type Page } from "./fixtures";
 
 /**
  * Search and saved views end to end (GAP-02, spec 9.8): find a task by key, by a word

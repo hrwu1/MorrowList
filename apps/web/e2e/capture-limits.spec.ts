@@ -1,5 +1,4 @@
-import { expect, test } from "@playwright/test";
-
+import { expect, test } from "./fixtures";
 import { INBOUND_TEST_SECRET } from "./inbound-config";
 
 test("oversized shares stay copyable and large captured content remains editable", async ({

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 /**
  * Keyboard shortcuts, the command palette and the cheat sheet end to end (GAP-10,

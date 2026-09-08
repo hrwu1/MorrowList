@@ -1,6 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-
 import { openProjectBoard, openSection } from "./disclosures";
+import { expect, test, type Page } from "./fixtures";
 
 /**
  * Subtasks and checklists (spec 8.3): added from the detail, ticked off there, with
@@ -144,7 +143,7 @@ test("a subtask can be detached and a fourth nesting level is refused", async ({
     .click();
 
   // The subtask's own page: it names its parent and takes children of its own.
-  await expect(page).toHaveURL(/\/tasks\/[A-Z]+-2$/);
+  await expect(page).toHaveURL(/\/tasks\/[A-Za-z][A-Za-z0-9]*-000002$/);
   const levelTwoUrl = page.url();
   await expect(page.getByText(/Subtask of/)).toBeVisible();
   const two = page.getByLabel("Subtask name");
@@ -154,7 +153,7 @@ test("a subtask can be detached and a fourth nesting level is refused", async ({
     .getByRole("list", { name: "Subtasks" })
     .getByRole("link", { name: "Level three" })
     .click();
-  await expect(page).toHaveURL(/\/tasks\/[A-Z]+-3$/);
+  await expect(page).toHaveURL(/\/tasks\/[A-Za-z][A-Za-z0-9]*-000003$/);
   const three = page.getByLabel("Subtask name");
   await three.fill("Level four");
   await three.press("Enter");

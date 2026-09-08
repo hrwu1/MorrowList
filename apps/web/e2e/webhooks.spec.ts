@@ -1,9 +1,8 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { createServer, type Server } from "node:http";
 
-import { expect, test, type Page } from "@playwright/test";
-
 import { openProjectBoard, openSection } from "./disclosures";
+import { expect, test, type Page } from "./fixtures";
 
 /**
  * Webhooks end to end (GAP-18).

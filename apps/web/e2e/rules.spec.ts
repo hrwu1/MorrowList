@@ -1,6 +1,5 @@
-import { expect, test } from "@playwright/test";
-
 import { openSection } from "./disclosures";
+import { expect, test } from "./fixtures";
 
 test("create a tag-to-priority rule, trigger it, preview and inspect attributed runs", async ({
   page,

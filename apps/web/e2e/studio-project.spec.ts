@@ -1,7 +1,7 @@
 import type { WorkflowStatusDto } from "@morrowlist/contracts";
-import { expect, test, type Page } from "@playwright/test";
 
 import { openProjectBoard } from "./disclosures";
+import { expect, test, type Page } from "./fixtures";
 
 async function createStudio(page: Page) {
   await page.goto("/sign-up");

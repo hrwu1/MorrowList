@@ -1,6 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-
 import { openSection } from "./disclosures";
+import { expect, test, type Page } from "./fixtures";
 
 /**
  * Typed custom fields end to end (GAP-24): define a select field in settings, set it on a

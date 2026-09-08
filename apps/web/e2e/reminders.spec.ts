@@ -1,6 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-
 import { openSection } from "./disclosures";
+import { expect, test, type Page } from "./fixtures";
 
 /**
  * Reminders end to end (GAP-13): a task due in a minute gets a reminder at its due time,

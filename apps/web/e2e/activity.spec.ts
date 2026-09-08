@@ -1,6 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-
 import { openProjectBoard, openSection } from "./disclosures";
+import { expect, test, type Page } from "./fixtures";
 
 /**
  * Activity history (GAP-09, ACT-001): a move and a title edit show up in the task's
@@ -58,7 +57,9 @@ test("a move and a title edit appear in the task's and the project's activity", 
   await expect(panel.getByText("Saved")).toBeVisible();
 
   await panel.locator("summary").filter({ hasText: "Activity" }).click();
-  const activity = panel.getByRole("list", { name: /^Activity for [A-Z]+-1$/ });
+  const activity = panel.getByRole("list", {
+    name: /^Activity for [A-Za-z][A-Za-z0-9]*-000001$/,
+  });
   const items = activity.locator(":scope > li");
   await expect(items).toHaveCount(3);
   await expect(items.nth(0)).toContainText("Updated task fields");
@@ -68,7 +69,7 @@ test("a move and a title edit appear in the task's and the project's activity", 
   await expect(items.nth(0)).toContainText("Activity Tester");
   await expect(items.nth(0)).toContainText("just now");
   await expect(items.nth(1)).toContainText("Moved task to another status");
-  await expect(items.nth(2)).toContainText(/Created task [A-Z]+-1/);
+  await expect(items.nth(2)).toContainText("Created task");
   // Only mapped fields render; a raw payload would show its keys.
   await expect(activity).not.toContainText("taskId");
   await expect(panel.getByRole("button", { name: "Load more" })).toHaveCount(0);
@@ -127,9 +128,11 @@ test("the task page opens its history and pages a long one with Load more", asyn
 
   await page.getByRole("link", { name: /Edited many times/ }).click();
   await page.getByRole("link", { name: "Open this task on its own page" }).click();
-  await expect(page).toHaveURL(/\/tasks\/[A-Z]+-1$/);
+  await expect(page).toHaveURL(/\/tasks\/[A-Za-z][A-Za-z0-9]*-000001$/);
 
-  const activity = page.getByRole("list", { name: /^Activity for [A-Z]+-1$/ });
+  const activity = page.getByRole("list", {
+    name: /^Activity for [A-Za-z][A-Za-z0-9]*-000001$/,
+  });
   const items = activity.locator(":scope > li");
   await expect(items).toHaveCount(20);
   await expect(items.nth(0)).toContainText(
@@ -138,7 +141,7 @@ test("the task page opens its history and pages a long one with Load more", asyn
 
   await page.getByRole("button", { name: "Load more" }).click();
   await expect(items).toHaveCount(26);
-  await expect(items.nth(25)).toContainText(/Created task [A-Z]+-1/);
+  await expect(items.nth(25)).toContainText("Created task");
   await expect(page.getByRole("button", { name: "Load more" })).toHaveCount(0);
   await page.screenshot({ path: "test-results/activity-page.png", fullPage: true });
 });

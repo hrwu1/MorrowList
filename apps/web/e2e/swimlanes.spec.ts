@@ -1,6 +1,5 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
-
 import { openProjectBoard } from "./disclosures";
+import { expect, test, type Locator, type Page } from "./fixtures";
 
 /**
  * Swimlanes and the board that spans projects (spec 9.5, GAP-19). The board is still a

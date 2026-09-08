@@ -1,5 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
-
+import { expect, test, type Page } from "./fixtures";
 import { INBOUND_TEST_SECRET } from "./inbound-config";
 
 const PASSWORD = "correct-horse-battery-staple";

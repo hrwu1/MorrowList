@@ -1,6 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-
 import { openSection } from "./disclosures";
+import { expect, test, type Page } from "./fixtures";
 
 /**
  * Recurring tasks (GAP-12): give a task a weekly rule, complete it, find the next
@@ -88,7 +87,7 @@ test("a weekly task spawns its next occurrence on completion, can be skipped, an
   await expect(row(page, "Water plants")).toHaveCount(1);
   await expect(row(page, "Water plants").getByText(`Due ${nextWeek}`)).toBeVisible();
   await expect(detail.getByRole("list", { name: "Other occurrences" })).toContainText(
-    "RECU-2",
+    "RecurrenceTester-000002",
   );
 
   const upcomingLink = page.getByRole("link", { name: "Upcoming", exact: true });
@@ -108,7 +107,9 @@ test("a weekly task spawns its next occurrence on completion, can be skipped, an
   // Skip moves the same task on another week; nothing new appears.
   await group.getByRole("link", { name: "Water plants" }).click();
   const next = panel(page);
-  await expect(next.getByText("RECU-2", { exact: true })).toBeVisible();
+  await expect(
+    next.getByText("RecurrenceTester-000002", { exact: true }),
+  ).toBeVisible();
   await next.getByText("More actions").click();
   await next.getByRole("button", { name: "Skip this occurrence" }).click();
   const twoWeeks = addDays(today, 14);
@@ -122,7 +123,7 @@ test("a weekly task spawns its next occurrence on completion, can be skipped, an
   );
   await expect(upcomingLink).toContainText("1");
 
-  // A new rule on this occurrence shapes the next one; the completed RECU-1 is untouched.
+  // A new rule on this occurrence shapes the next one; the completed RecurrenceTester-000001 is untouched.
   await openSection(next, "Scheduling & priority");
   await next.getByLabel("Repeat", { exact: true }).selectOption("daily");
   await expect(next.getByText(/^Every day\. Completing/)).toBeVisible();
@@ -137,15 +138,15 @@ test("a weekly task spawns its next occurrence on completion, can be skipped, an
   ).toBeVisible();
   const occurrences = next.getByRole("list", { name: "Other occurrences" });
   await expect(occurrences.getByRole("listitem")).toHaveCount(2);
-  await expect(occurrences).toContainText("RECU-1");
-  await expect(occurrences).toContainText("RECU-3");
+  await expect(occurrences).toContainText("RecurrenceTester-000001");
+  await expect(occurrences).toContainText("RecurrenceTester-000003");
   await page.screenshot({ path: "test-results/recurrence-series.png", fullPage: true });
 
-  // RECU-1 was completed under the weekly rule and keeps its own history.
-  await page.goto("/tasks/RECU-1");
+  // RecurrenceTester-000001 was completed under the weekly rule and keeps its own history.
+  await page.goto("/tasks/RecurrenceTester-000001");
   await expect(page.getByRole("button", { name: "Reopen task" })).toBeVisible();
   await expect(page.getByLabel("Repeat", { exact: true })).toHaveValue("none");
   await expect(
-    page.getByText("Completed task; next occurrence is RECU-2"),
+    page.getByText("Completed task; next occurrence is #000002"),
   ).toBeVisible();
 });

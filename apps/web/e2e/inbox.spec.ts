@@ -1,6 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-
 import { openSection } from "./disclosures";
+import { expect, test, type Page } from "./fixtures";
 
 /**
  * The capture-to-completion journey (US-001, US-006). This is the path that must never
@@ -64,7 +63,7 @@ test("captures a task, completes it, and reopens it", async ({ page }) => {
   const list = page.getByRole("list", { name: "Inbox tasks" });
   await expect(list.getByText("Prepare research presentation")).toBeVisible();
   // The first task in a fresh workspace is number 1, not 2.
-  await expect(list.getByText(/-1$/)).toBeVisible();
+  await expect(list.getByText(/-000001$/)).toBeVisible();
 
   // Capture keeps focus so several thoughts can be recorded in a row (spec 10.1).
   await expect(field).toBeFocused();
@@ -228,7 +227,7 @@ test("the task detail route renders on its own", async ({ page }) => {
   await page.getByRole("link", { name: "Reachable by link" }).click();
   await page.getByRole("link", { name: "Open this task on its own page" }).click();
 
-  await expect(page).toHaveURL(/\/tasks\/[A-Z]+-1$/);
+  await expect(page).toHaveURL(/\/tasks\/[A-Za-z][A-Za-z0-9]*-000001$/);
   await expect(page.getByLabel("Title")).toHaveValue("Reachable by link");
 });
 
