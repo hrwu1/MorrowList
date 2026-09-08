@@ -12,3 +12,16 @@ export function toTagDto(tag: Tag): TagDto {
     updatedAt: tag.updatedAt.toISOString(),
   };
 }
+
+/** A page shares tag entities across cards; format each tag once per response. */
+export function createTagDtoMapper(): (tag: Tag) => TagDto {
+  const cache = new Map<string, TagDto>();
+  return (tag) => {
+    let dto = cache.get(tag.id);
+    if (!dto) {
+      dto = toTagDto(tag);
+      cache.set(tag.id, dto);
+    }
+    return dto;
+  };
+}

@@ -633,7 +633,7 @@ export function createTaskRepository(db: Database): TaskRepository {
       // shared tags otherwise transfers and decodes 10,000 full tag records.
       // normalized_name is COLLATE "C", matching the in-memory double's ordering.
       const rows = await db
-        .select({ taskIds: sql<string[]>`array_agg(${taskTags.taskId})`, tag: tags })
+        .select({ taskIds: sql<string[]>`json_agg(${taskTags.taskId})`, tag: tags })
         .from(taskTags)
         .innerJoin(tags, eq(tags.id, taskTags.tagId))
         .where(
@@ -670,13 +670,30 @@ export function createTaskRepository(db: Database): TaskRepository {
 
     async relationsFor(workspaceId, taskIds) {
       if (taskIds.length === 0) return [];
-      // One query for the page (spec 29.3): the relation plus both endpoint rows, so
-      // the caller can show the other task and evaluate its completion state.
+      // One query for the page (spec 29.3). Endpoints only need identity, title, and
+      // completion/deletion state; full descriptions and task fields amplify every
+      // board read without contributing to relation display or blocking decisions.
       const source = alias(tasks, "source_task");
       const target = alias(tasks, "target_task");
       const ids = [...taskIds];
       const rows = await db
-        .select({ relation: taskRelations, source, target })
+        .select({
+          relation: taskRelations,
+          source: {
+            id: source.id,
+            taskNumber: source.taskNumber,
+            title: source.title,
+            completedAt: source.completedAt,
+            deletedAt: source.deletedAt,
+          },
+          target: {
+            id: target.id,
+            taskNumber: target.taskNumber,
+            title: target.title,
+            completedAt: target.completedAt,
+            deletedAt: target.deletedAt,
+          },
+        })
         .from(taskRelations)
         .innerJoin(source, eq(source.id, taskRelations.sourceTaskId))
         .innerJoin(target, eq(target.id, taskRelations.targetTaskId))
@@ -693,8 +710,8 @@ export function createTaskRepository(db: Database): TaskRepository {
       return rows.map(
         (row): RelationEdge => ({
           relation: toTaskRelation(row.relation),
-          source: toTask(row.source),
-          target: toTask(row.target),
+          source: row.source,
+          target: row.target,
         }),
       );
     },

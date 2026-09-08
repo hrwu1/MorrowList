@@ -81,7 +81,10 @@ export function assertNoBlocksCycle(
  * incomplete `blocks` predecessor (spec 8.4). Predecessors in the Trash do not count:
  * they are out of every normal view until restored.
  */
-export function isBlocked(task: Task, predecessors: readonly Task[]): boolean {
+export function isBlocked(
+  task: Task,
+  predecessors: readonly Pick<Task, "completedAt" | "deletedAt">[],
+): boolean {
   if (isCompleted(task)) return false;
   if (task.blockedReason !== null) return true;
   return predecessors.some(

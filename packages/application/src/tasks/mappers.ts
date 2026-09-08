@@ -22,7 +22,7 @@ import type {
   TransactionContext,
   Workspace,
 } from "../ports/index.js";
-import { toTagDto } from "../tags/mappers.js";
+import { createTagDtoMapper, toTagDto } from "../tags/mappers.js";
 
 /**
  * The list query as the repository's filter. One mapping, so the task list, a saved
@@ -76,6 +76,7 @@ export async function loadTaskDtos(
     tx.tasks.tagsFor(workspace.id, ids),
     tx.tasks.relationsFor(workspace.id, ids),
   ]);
+  const mapTag = createTagDtoMapper();
   return tasks.map((task) =>
     toTaskDto(
       task,
@@ -84,6 +85,8 @@ export async function loadTaskDtos(
       progress.get(task.id) ?? null,
       tags.get(task.id) ?? [],
       edges,
+      undefined,
+      mapTag,
     ),
   );
 }
@@ -105,9 +108,10 @@ export function toTaskDto(
   tags: readonly Tag[] = [],
   edges: readonly RelationEdge[] = [],
   flow?: { readonly inStatusSince: Date | null; readonly ageDays: number | null },
+  mapTag: typeof toTagDto = toTagDto,
 ): TaskDto {
   const relations: TaskRelationDto[] = [];
-  const predecessors: Task[] = [];
+  const predecessors: RelationEdge["source"][] = [];
   for (const edge of edges) {
     if (edge.relation.type === "blocks" && edge.target.id === task.id) {
       predecessors.push(edge.source);
@@ -167,7 +171,7 @@ export function toTaskDto(
     isCompleted: isCompleted(task),
     completedAt: task.completedAt?.toISOString() ?? null,
     version: task.version,
-    tags: tags.map(toTagDto),
+    tags: tags.map(mapTag),
     createdBy: { kind: task.createdBy.kind, id: task.createdBy.id },
     lastActor: { kind: task.lastActor.kind, id: task.lastActor.id },
     createdAt: task.createdAt.toISOString(),

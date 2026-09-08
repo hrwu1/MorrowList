@@ -100,11 +100,11 @@ export function parseTaskKey(
   return { prefix: match[1] as string, taskNumber };
 }
 
-export function isCompleted(task: Task): boolean {
+export function isCompleted(task: Pick<Task, "completedAt">): boolean {
   return task.completedAt !== null;
 }
 
-export function isDeleted(task: Task): boolean {
+export function isDeleted(task: Pick<Task, "deletedAt">): boolean {
   return task.deletedAt !== null;
 }
 

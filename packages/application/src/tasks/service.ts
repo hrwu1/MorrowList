@@ -1208,7 +1208,10 @@ export class TaskService {
   }
 
   /** The live `blocks` predecessors of one task, for the completion guard. */
-  private async blockersOf(tx: TransactionContext, task: Task): Promise<Task[]> {
+  private async blockersOf(
+    tx: TransactionContext,
+    task: Task,
+  ): Promise<Pick<Task, "completedAt" | "deletedAt">[]> {
     const edges = await tx.tasks.relationsFor(task.workspaceId, [task.id]);
     return edges
       .filter((edge) => edge.relation.type === "blocks" && edge.target.id === task.id)

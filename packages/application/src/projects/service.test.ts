@@ -2,6 +2,8 @@ import { fixedClock, rankBetween, uuidv7, type Task } from "@morrowlist/domain";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { SCOPES, type ActorContext } from "../shared/actor-context.js";
+import { TagService } from "../tags/service.js";
+import { TaskService } from "../tasks/service.js";
 import {
   buildActorContext,
   createInMemoryUnitOfWork,
@@ -121,6 +123,55 @@ describe("ProjectService reads", () => {
     expect(detail.statuses.map((status) => status.rank)).toEqual(
       [...detail.statuses.map((status) => status.rank)].sort(),
     );
+  });
+
+  it("refreshes shared tag metadata on the next board read after a rename", async () => {
+    const tagService = new TagService({ unitOfWork, clock: fixedClock(NOW) });
+    const taskService = new TaskService({
+      unitOfWork,
+      clock: fixedClock(NOW),
+      cursorSecret: "test",
+    });
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const tag = await tagService.create(seeded.context, seeded.workspace.id, {
+      name: "Before",
+    });
+    for (const [index, title] of ["First", "Second"].entries()) {
+      const task = buildTask(seeded, ready.id, title, `a${index}`);
+      unitOfWork.data.tasks.set(task.id, task);
+      await taskService.addTag(seeded.context, seeded.workspace.id, task.id, tag.id);
+    }
+    const before = await service.board(
+      seeded.context,
+      seeded.workspace.id,
+      seeded.project.id,
+    );
+    expect(before.data.tasks.map((task) => task.tags[0]?.name)).toEqual([
+      "Before",
+      "Before",
+    ]);
+
+    await tagService.update(seeded.context, seeded.workspace.id, tag.id, {
+      name: "After",
+      colorToken: "teal",
+      description: "Updated metadata",
+    });
+    const after = await service.board(
+      seeded.context,
+      seeded.workspace.id,
+      seeded.project.id,
+    );
+    for (const task of after.data.tasks) {
+      expect(task.tags).toEqual([
+        expect.objectContaining({
+          id: tag.id,
+          name: "After",
+          colorToken: "teal",
+          description: "Updated metadata",
+        }),
+      ]);
+    }
+    expect(before.data.tasks[0]?.tags[0]?.name).toBe("Before");
   });
 
   it("returns one normalized ordered board and reports truncation", async () => {

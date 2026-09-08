@@ -131,8 +131,11 @@ export interface UpcomingTaskQuery {
  */
 export interface RelationEdge {
   readonly relation: TaskRelation;
-  readonly source: Task;
-  readonly target: Task;
+  readonly source: Pick<
+    Task,
+    "id" | "taskNumber" | "title" | "completedAt" | "deletedAt"
+  >;
+  readonly target: RelationEdge["source"];
 }
 
 /** How far the blocks-cycle walk follows edges before giving up (spec 29.1 scale). */
