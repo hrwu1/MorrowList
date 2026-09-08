@@ -26,8 +26,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
       - run: pnpm format:check
+      - run: pnpm build
       - name: Lint and prove the architecture boundaries still fire
         run: pnpm lint
       - run: pnpm typecheck

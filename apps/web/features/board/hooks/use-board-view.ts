@@ -1,10 +1,6 @@
 "use client";
 
-import type {
-  BoardViewQuery,
-  TaskDto,
-  WipWarningDto,
-} from "@morrowlist/contracts";
+import type { BoardViewQuery, TaskDto, WipWarningDto } from "@morrowlist/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { boardViewKeys } from "../lib/board-keys";

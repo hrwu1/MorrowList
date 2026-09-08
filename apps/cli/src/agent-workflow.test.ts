@@ -239,24 +239,29 @@ describe("an agent working from `morrow usage` alone", { timeout: 60_000 }, () =
   });
 });
 
-it("creates a calendar URL and revokes it through the executable", async () => {
-  const created = await morrow(["--json", "calendar", "url"]);
-  expect(created.code).toBe(0);
-  expect(JSON.parse(created.stdout)).toMatchObject({
-    ok: true,
-    data: { url: "https://tasks.example/api/v1/feeds/fixture.ics" },
-  });
-  const revoked = await morrow(["--json", "calendar", "revoke"]);
-  expect(revoked.code).toBe(0);
-  expect(JSON.parse(revoked.stdout)).toEqual({ ok: true });
-  expect(
-    recorded.some(
-      (entry) => entry.method === "POST" && entry.url.includes("/me/calendar-feed"),
-    ),
-  ).toBe(true);
-  expect(
-    recorded.some(
-      (entry) => entry.method === "DELETE" && entry.url.includes("/me/calendar-feed"),
-    ),
-  ).toBe(true);
-});
+// Like the discovery journey above, this starts real TypeScript child processes.
+it(
+  "creates a calendar URL and revokes it through the executable",
+  { timeout: 60_000 },
+  async () => {
+    const created = await morrow(["--json", "calendar", "url"]);
+    expect(created.code).toBe(0);
+    expect(JSON.parse(created.stdout)).toMatchObject({
+      ok: true,
+      data: { url: "https://tasks.example/api/v1/feeds/fixture.ics" },
+    });
+    const revoked = await morrow(["--json", "calendar", "revoke"]);
+    expect(revoked.code).toBe(0);
+    expect(JSON.parse(revoked.stdout)).toEqual({ ok: true });
+    expect(
+      recorded.some(
+        (entry) => entry.method === "POST" && entry.url.includes("/me/calendar-feed"),
+      ),
+    ).toBe(true);
+    expect(
+      recorded.some(
+        (entry) => entry.method === "DELETE" && entry.url.includes("/me/calendar-feed"),
+      ),
+    ).toBe(true);
+  },
+);

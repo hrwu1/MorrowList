@@ -1,10 +1,6 @@
 import { z } from "zod";
 
-import {
-  boardLaneSchema,
-  boardPlacementSchema,
-  boardSwimlaneSchema,
-} from "./board.js";
+import { boardLaneSchema, boardPlacementSchema, boardSwimlaneSchema } from "./board.js";
 import { paginated, statusCategorySchema, uuidSchema } from "./common.js";
 import { taskSchema } from "./task.js";
 

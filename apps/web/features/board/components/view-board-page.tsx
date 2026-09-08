@@ -277,9 +277,7 @@ export function ViewBoardPage({
                     className="kanban-column"
                     data-header-only
                     data-category={column.category}
-                    data-mobile-active={
-                      column.key === activeColumn?.key || undefined
-                    }
+                    data-mobile-active={column.key === activeColumn?.key || undefined}
                   >
                     <header className="kanban-column__header">
                       <div className="kanban-column__heading">
@@ -287,9 +285,8 @@ export function ViewBoardPage({
                         <h2 id={`board-column-${column.key}`}>{column.label}</h2>
                         <span className="kanban-column__count">
                           {
-                            placements.filter(
-                              (entry) => entry.columnKey === column.key,
-                            ).length
+                            placements.filter((entry) => entry.columnKey === column.key)
+                              .length
                           }
                         </span>
                       </div>

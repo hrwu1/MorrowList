@@ -1,5 +1,9 @@
 import type { BoardColumnDto, TaskDto, WorkflowStatusDto } from "@morrowlist/contracts";
-import { DEFAULT_WORKFLOW, type StatusCategory, type WorkflowStatus } from "@morrowlist/domain";
+import {
+  DEFAULT_WORKFLOW,
+  type StatusCategory,
+  type WorkflowStatus,
+} from "@morrowlist/domain";
 
 /**
  * Board columns (spec 9.5, ADR-002): always workflow states, never another grouping.

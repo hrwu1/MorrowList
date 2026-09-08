@@ -167,7 +167,9 @@ describe("field definitions in PostgreSQL", () => {
     );
     // Picked by type rather than by row order: the select is unordered, and the fixed
     // clock gives every event in this test the same `created_at` to sort on.
-    expect(events.filter((event) => event.event_type === "field.deleted")).toMatchObject([
+    expect(
+      events.filter((event) => event.event_type === "field.deleted"),
+    ).toMatchObject([
       {
         event_type: "field.deleted",
         // Both the live and the trashed task lost the key: a restore must not bring it back.

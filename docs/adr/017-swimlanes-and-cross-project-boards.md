@@ -13,13 +13,13 @@ board — `lanes[]` plus a `placements[]` entry of `{taskId, columnKey, laneKey}
 existing flat `tasks[]` — never derived in the browser and never stored on the task.
 
 A board may span projects. Because a workflow status name belongs to its project
-(spec 11.3), a board that spans projects columns by *semantic category* instead:
+(spec 11.3), a board that spans projects columns by _semantic category_ instead:
 `columnsBy: "category"` with the six categories every workflow shares. Dropping a card
 into a category column resolves that category inside the card's own project by spec 11.5 —
 the lowest-ranked active status of that category, else the project's default — through the
 existing `TaskService.move`, which now accepts `statusCategory` instead of `statusId`.
 
-A lane is *writable* when dropping a card into it is an ordinary mutation of the card:
+A lane is _writable_ when dropping a card into it is an ordinary mutation of the card:
 priority, project and tag lanes are; due and parent lanes are not.
 
 ## Reasoning

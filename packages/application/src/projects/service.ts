@@ -7,7 +7,8 @@ import type {
   ProjectDetailDto,
   ProjectDto,
   ProjectListResponse,
-  UpdateProjectRequest, BoardPlacementDto 
+  UpdateProjectRequest,
+  BoardPlacementDto,
 } from "@morrowlist/contracts";
 import {
   DEFAULT_WORKFLOW,

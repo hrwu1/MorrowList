@@ -126,9 +126,7 @@ describe("taskDropCollision across swimlanes (GAP-19)", () => {
 
   it("drops into the lane the pointer is in, even when the card overhangs another", () => {
     // The dragged card's rect still overlaps the upper lane; the pointer does not.
-    expect(collideCells({ x: 400, y: 400 })[0]).toBe(
-      "cell:priority:low::status:ready",
-    );
+    expect(collideCells({ x: 400, y: 400 })[0]).toBe("cell:priority:low::status:ready");
     expect(collideCells({ x: 400, y: 150 })[0]).toBe(
       "cell:priority:urgent::status:ready",
     );
