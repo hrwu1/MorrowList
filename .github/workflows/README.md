@@ -61,3 +61,8 @@ Benchmark regression baselines are partitioned by CPU model/core count, OS/archi
 exact Node version, selected dataset scale, and the benchmark/workflow source hash.
 A different environment starts a new baseline while retaining all absolute budgets;
 unchanged code is no longer compared across unrelated GitHub runner CPUs.
+
+The reference performance job uses `ubuntu-24.04-arm`, matching the standard native
+ARM64 image runner. Its report records the actual CPU and core count. The x86 CI
+integration budgets remain enabled; the 100,000-task HTTP benchmark, concurrency
+four, 300 ms read budget and 20% comparable-run regression threshold are unchanged.

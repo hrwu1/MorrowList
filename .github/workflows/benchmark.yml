@@ -33,7 +33,9 @@ env:
 jobs:
   benchmark:
     name: Reference-scale benchmark
-    runs-on: ubuntu-latest
+    # Use one native reference architecture; the generic x86 pool rotates CPU models.
+    # This is the same standard ARM64 runner used by the published image smoke test.
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 45
     services:
       postgres:
