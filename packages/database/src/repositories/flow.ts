@@ -1,6 +1,6 @@
 import type { StatusIntervalRepository } from "@morrowlist/application";
 import type { StatusInterval } from "@morrowlist/domain";
-import { and, asc, eq, exists, gte, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, exists, gte, isNull, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import type { Database } from "../client.js";
@@ -53,7 +53,7 @@ export function createStatusIntervalRepository(db: Database): StatusIntervalRepo
         .where(
           and(
             eq(taskStatusIntervals.workspaceId, workspaceId),
-            inArray(taskStatusIntervals.taskId, [...taskIds]),
+            sql`${taskStatusIntervals.taskId} = any(${sql.param(taskIds)}::uuid[])`,
           ),
         )
         .orderBy(asc(taskStatusIntervals.taskId), asc(taskStatusIntervals.enteredAt));

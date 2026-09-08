@@ -28,7 +28,7 @@ import type {
  * shape the application layer sees.
  */
 
-type TaskRow = typeof tasks.$inferSelect;
+type TaskRow = Omit<typeof tasks.$inferSelect, "searchVector">;
 /** The writable columns: `search_vector` is generated and can never be assigned. */
 type TaskInsertRow = typeof tasks.$inferInsert;
 type ProjectRow = typeof projects.$inferSelect;

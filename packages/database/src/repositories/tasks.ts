@@ -27,6 +27,7 @@ import {
   eq,
   exists,
   gt,
+  getTableColumns,
   gte,
   inArray,
   isNotNull,
@@ -57,6 +58,9 @@ import {
   toTaskRelationRow,
   toTaskRow,
 } from "./mappers.js";
+
+// Search vectors serve SQL filtering/ranking; they are never part of a domain task.
+const { searchVector: _searchVector, ...taskEntityColumns } = getTableColumns(tasks);
 
 /** Drizzle implementation of the task ports (TASK-003). */
 
@@ -355,7 +359,7 @@ export function createTaskRepository(db: Database): TaskRepository {
       // rather than one task request per lane. Archived statuses are excluded because they
       // are not board columns and therefore cannot safely receive or display live work.
       const rows = await db
-        .select({ task: tasks })
+        .select({ task: taskEntityColumns })
         .from(tasks)
         .innerJoin(workflowStatuses, eq(workflowStatuses.id, tasks.statusId))
         .where(
@@ -612,7 +616,7 @@ export function createTaskRepository(db: Database): TaskRepository {
         .where(
           and(
             eq(tasks.workspaceId, workspaceId),
-            inArray(tasks.parentTaskId, [...taskIds]),
+            sql`${tasks.parentTaskId} = any(${sql.param(taskIds)}::uuid[])`,
             isNull(tasks.deletedAt),
           ),
         )
@@ -629,6 +633,7 @@ export function createTaskRepository(db: Database): TaskRepository {
     async tagsFor(workspaceId, taskIds) {
       const result = new Map<string, Tag[]>();
       if (taskIds.length === 0) return result;
+      // A typed UUID array keeps a large page to one bound parameter.
       // Return each tag once, with its matching task IDs. A 500-card board with 20
       // shared tags otherwise transfers and decodes 10,000 full tag records.
       // normalized_name is COLLATE "C", matching the in-memory double's ordering.
@@ -639,7 +644,7 @@ export function createTaskRepository(db: Database): TaskRepository {
         .where(
           and(
             eq(tags.workspaceId, workspaceId),
-            inArray(taskTags.taskId, [...taskIds]),
+            sql`${taskTags.taskId} = any(${sql.param(taskIds)}::uuid[])`,
           ),
         )
         .groupBy(tags.id)
@@ -701,8 +706,8 @@ export function createTaskRepository(db: Database): TaskRepository {
           and(
             eq(taskRelations.workspaceId, workspaceId),
             or(
-              inArray(taskRelations.sourceTaskId, ids),
-              inArray(taskRelations.targetTaskId, ids),
+              sql`${taskRelations.sourceTaskId} = any(${sql.param(ids)}::uuid[])`,
+              sql`${taskRelations.targetTaskId} = any(${sql.param(ids)}::uuid[])`,
             ),
           ),
         )

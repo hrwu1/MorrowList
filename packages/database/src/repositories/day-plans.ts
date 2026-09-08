@@ -1,6 +1,6 @@
 import type { DayPlanRepository } from "@morrowlist/application";
 import type { PlainDate } from "@morrowlist/domain";
-import { and, asc, eq, gte, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, gte, isNull, sql } from "drizzle-orm";
 
 import type { Database } from "../client.js";
 import { taskDayPlans, tasks } from "../schema/index.js";
@@ -49,7 +49,7 @@ export function createDayPlanRepository(db: Database): DayPlanRepository {
         .from(taskDayPlans)
         .where(
           and(
-            inArray(taskDayPlans.taskId, [...taskIds]),
+            sql`${taskDayPlans.taskId} = any(${sql.param(taskIds)}::uuid[])`,
             gte(taskDayPlans.planDate, from),
           ),
         )
