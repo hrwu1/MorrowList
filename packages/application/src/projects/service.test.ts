@@ -218,6 +218,53 @@ describe("ProjectService reads", () => {
     );
   });
 
+  it("keeps project choices and off-board parent titles in their selected swimlanes", async () => {
+    const ready = statusByCategory(seeded.statuses, "ready");
+    const parent = buildTask(seeded, ready.id, "Parent outside page", "a1");
+    const child = {
+      ...buildTask(seeded, ready.id, "Child", "a0"),
+      parentTaskId: parent.id,
+    };
+    for (const task of [parent, child]) unitOfWork.data.tasks.set(task.id, task);
+    const other = await service.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      name: "Other project",
+    });
+    const byParent = await service.board(
+      seeded.context,
+      seeded.workspace.id,
+      seeded.project.id,
+      {
+        swimlaneBy: "parent",
+        includeSubtasks: true,
+        limit: 1,
+      },
+    );
+    expect(byParent.data.tasks.map((task) => task.title)).toEqual(["Child"]);
+    expect(byParent.data.lanes).toContainEqual(
+      expect.objectContaining({
+        key: `parent:${parent.id}`,
+        label: parent.title,
+        count: 1,
+      }),
+    );
+    const byProject = await service.board(
+      seeded.context,
+      seeded.workspace.id,
+      seeded.project.id,
+      {
+        swimlaneBy: "project",
+      },
+    );
+    expect(byProject.data.lanes).toContainEqual(
+      expect.objectContaining({
+        key: `project:${other.project.id}`,
+        label: "Other project",
+        count: 0,
+      }),
+    );
+  });
+
   it("returns one normalized ordered board and reports truncation", async () => {
     const backlog = statusByCategory(seeded.statuses, "backlog");
     const ready = statusByCategory(seeded.statuses, "ready");

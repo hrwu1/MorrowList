@@ -312,20 +312,20 @@ export class ProjectService {
       const workspace = await requireWorkspace(tx, workspaceId);
       const project = await requireActiveProject(tx, workspaceId, projectId);
       const statuses = await tx.statuses.listByProject(project.id);
+      const now = this.clock.now();
+      const today = toLocalDate(now, workspace.timezone);
       const tasks = await tx.tasks.listBoard({
         workspaceId,
         projectId,
         limit: Math.min(query.limit ?? BOARD_TASK_LIMIT, BOARD_TASK_LIMIT),
         includeSubtasks: query.includeSubtasks ?? false,
         includeDeferred: query.includeDeferred ?? false,
-        today: toLocalDate(this.clock.now(), workspace.timezone),
+        today,
       });
       const boardTaskIds = tasks.items.map((task) => task.id);
       // Cards show the My Day indicator (spec 9.5), subtask progress, tag chips, the
       // blocked indicator (spec 29.3) and the flow fields (GAP-17); one query each
       // covers the whole board.
-      const now = this.clock.now();
-      const today = toLocalDate(now, workspace.timezone);
       const [plans, progress, tags, edges, flow] = await Promise.all([
         tx.dayPlans.listForTasks(boardTaskIds, today),
         tx.tasks.childSummary(workspaceId, boardTaskIds),
@@ -351,16 +351,22 @@ export class ProjectService {
       // Swimlanes are the board's second axis (GAP-19); the columns stay this project's
       // workflow statuses, so the same rendering serves a plain board and a pivoted one.
       const swimlaneBy = query.swimlaneBy ?? "none";
-      const parentIds = [
-        ...new Set(
-          cards.flatMap((card) => (card.parentTaskId ? [card.parentTaskId] : [])),
-        ),
-      ];
+      const parentIds =
+        swimlaneBy === "parent"
+          ? [
+              ...new Set(
+                cards.flatMap((card) => (card.parentTaskId ? [card.parentTaskId] : [])),
+              ),
+            ]
+          : [];
       const parents = await Promise.all(
         parentIds.map((id) => tx.tasks.findById(workspaceId, id)),
       );
       const { lanes, laneKeys } = buildLanes(swimlaneBy, cards, {
-        projects: await tx.projects.listByWorkspace(workspaceId),
+        projects:
+          swimlaneBy === "project"
+            ? await tx.projects.listByWorkspace(workspaceId)
+            : [],
         parentTitles: new Map(
           parents.flatMap((parent) => (parent ? [[parent.id, parent.title]] : [])),
         ),
