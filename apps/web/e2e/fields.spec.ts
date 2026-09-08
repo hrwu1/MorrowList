@@ -88,11 +88,24 @@ test("a select field is defined, set on a task, shown on the row, and filtered b
     fullPage: true,
   });
 
+  // Same-page filters use the task API and must work without a server render.
+  let renderRequests = 0;
+  await page.route("**/inbox?**", async (route) => {
+    if (route.request().headers()["rsc"] === "1") {
+      renderRequests++;
+      // Leave the render pending to model a slow server without a reload fallback.
+    } else await route.continue();
+  });
+
   // "is empty" finds the other one instead.
   await filters.locator("summary").click();
-  await filters.getByLabel("Stage comparison").selectOption("empty");
+  await filters
+    .getByRole("combobox", { name: "Stage comparison", exact: true })
+    .selectOption("empty");
+  await expect(page).toHaveURL(/field=stage%3Aempty/);
   await expect(rows).toHaveCount(1);
   await expect(inbox.getByText("Write the brief")).toBeVisible();
+  expect(renderRequests).toBe(0);
 });
 
 test("the eleventh field is refused with a clear error", async ({ page }) => {

@@ -2,7 +2,7 @@
 
 import type { SavedViewDto, TaskDto } from "@morrowlist/contracts";
 import { Alert, Button, EmptyState, Spinner } from "@morrowlist/ui";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -71,7 +71,6 @@ export function TaskListPage({
   savedView,
   toolbar,
 }: TaskListPageProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const params = new URLSearchParams(searchParams.toString());
@@ -93,11 +92,11 @@ export function TaskListPage({
   const navigate = useCallback(
     (next: URLSearchParams) => {
       const query = next.toString();
-      // `replace` rather than `push`: adjusting a filter should not fill the Back button
-      // with intermediate states.
-      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+      // These filters read from the task API. Synchronize search parameters without
+      // waiting for a server render; replace avoids filling Back with draft states.
+      window.history.replaceState(null, "", query ? `${pathname}?${query}` : pathname);
     },
-    [pathname, router],
+    [pathname],
   );
 
   function changeView(next: TaskView) {

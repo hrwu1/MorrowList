@@ -95,7 +95,9 @@ test("a weekly task spawns its next occurrence on completion, can be skipped, an
   await upcomingLink.click();
   await expect(page.getByRole("heading", { level: 1, name: "Upcoming" })).toBeVisible();
   // The later occurrences fall outside the default two-week horizon.
-  await page.getByLabel("Horizon").selectOption("all");
+  await page
+    .getByRole("combobox", { name: "Horizon", exact: true })
+    .selectOption("all");
   await expect(page).toHaveURL(/horizon=all/);
   const group = page.getByRole("list", { name: `Tasks due ${nextWeek}` });
   await expect(group.getByRole("link", { name: "Water plants" })).toBeVisible();

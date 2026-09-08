@@ -118,7 +118,9 @@ test("a task due tomorrow appears in Upcoming and can be rescheduled there", asy
   await row(page, "Due tomorrow").getByLabel("Planned", { exact: true }).fill(later);
   await expect(page.getByRole("heading", { name: "Nothing scheduled" })).toBeVisible();
 
-  await page.getByLabel("Horizon").selectOption("all");
+  await page
+    .getByRole("combobox", { name: "Horizon", exact: true })
+    .selectOption("all");
   await expect(page).toHaveURL(/horizon=all/);
   await expect(
     page.getByRole("list", { name: `Tasks due ${later}` }).getByRole("link", {
@@ -127,7 +129,9 @@ test("a task due tomorrow appears in Upcoming and can be rescheduled there", asy
   ).toBeVisible();
 
   await page.reload();
-  await expect(page.getByLabel("Horizon")).toHaveValue("all");
+  await expect(
+    page.getByRole("combobox", { name: "Horizon", exact: true }),
+  ).toHaveValue("all");
   await expect(
     page.getByRole("list", { name: `Tasks due ${later}` }).getByRole("link", {
       name: "Due tomorrow",
