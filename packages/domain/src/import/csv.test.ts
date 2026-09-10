@@ -27,7 +27,9 @@ describe("planFromCsv", () => {
         isCompleted: false,
         isArchived: false,
         externalId: "ML-000001",
+        sourceRow: 2,
         subtasks: [],
+        fields: {},
       },
     ]);
     expect(plan.statuses.map((status) => [status.name, status.category])).toEqual([
@@ -102,6 +104,21 @@ describe("planFromCsv", () => {
     expect(plan.issues).toEqual([
       { row: 3, title: null, reason: "The row has no title." },
     ]);
+  });
+
+  it("reads a field:<key> column whatever its spelling, and ignores an unusable one", () => {
+    const plan = planFromCsv(
+      [
+        "title,field:stage,Field: Story Points,field:,fieldstage",
+        "A task,Discovery,8,x,y",
+      ].join("\n"),
+    );
+
+    // The key is normalised, so a header a person typed matches the definition's key.
+    expect(plan.tasks[0]?.fields).toEqual({ stage: "Discovery", story_points: "8" });
+    // `field:` names nothing and `fieldstage` lacks the prefix: both are ordinary
+    // unmapped columns, reported rather than guessed at.
+    expect(plan.ignoredFields).toEqual(["field:", "fieldstage"]);
   });
 
   it("refuses a CSV with no title column and says what it found", () => {

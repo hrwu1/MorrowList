@@ -5,6 +5,7 @@ import { TASK_EVENTS, WORKSPACE_EVENTS } from "@morrowlist/contracts";
 import { DomainError, fixedClock } from "@morrowlist/domain";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { FieldService } from "../fields/service.js";
 import { ProjectService } from "../projects/service.js";
 import { TaskService } from "../tasks/service.js";
 import {
@@ -31,6 +32,7 @@ let seeded: SeededWorkspace;
 let imports: ImportService;
 let tasks: TaskService;
 let projects: ProjectService;
+let fields: FieldService;
 
 beforeEach(() => {
   unitOfWork = createInMemoryUnitOfWork(emptyData());
@@ -42,7 +44,21 @@ beforeEach(() => {
     cursorSecret: CURSOR_SECRET,
   });
   projects = new ProjectService({ unitOfWork, clock: fixedClock(NOW) });
+  fields = new FieldService({ unitOfWork, clock: fixedClock(NOW) });
 });
+
+/** The two definitions the field round-trip tests import into. */
+async function seedFieldDefinitions() {
+  await fields.create(seeded.context, workspaceId(), {
+    name: "Stage",
+    type: "select",
+    options: ["Discovery", "Delivery"],
+  });
+  await fields.create(seeded.context, workspaceId(), {
+    name: "Effort",
+    type: "number",
+  });
+}
 
 const workspaceId = () => seeded.workspace.id;
 
@@ -266,6 +282,85 @@ describe("ImportService.apply", () => {
     );
     expect(byTitle.get("Collect examples")?.isCompleted).toBe(true);
     expect(byTitle.get("Ship it")?.isCompleted).toBe(true);
+  });
+
+  it("restores typed field values from the columns the CSV export writes", async () => {
+    await seedFieldDefinitions();
+    const csv = [
+      "title,status,field:stage,field:effort",
+      "Draft the brief,Ready,Discovery,3",
+      "Ship it,Ready,Delivery,8",
+    ].join("\n");
+
+    const result = await imports.apply(seeded.context, workspaceId(), "csv", {
+      content: csv,
+      projectName: "Brief",
+    });
+
+    const listed = await tasks.list(seeded.context, {
+      workspaceId: workspaceId(),
+      projectId: result.projectId!,
+      limit: 50,
+      includeSubtasks: true,
+      sort: "rank",
+      order: "asc",
+    });
+    const byTitle = new Map(listed.data.map((task) => [task.title, task]));
+
+    // The number column comes back a number, not the string the cell held: the value is
+    // coerced by the definition, so a filter compares like with like.
+    expect(byTitle.get("Draft the brief")?.fields).toEqual({
+      stage: "Discovery",
+      effort: 3,
+    });
+    expect(byTitle.get("Ship it")?.fields).toEqual({ stage: "Delivery", effort: 8 });
+    expect(result.preview.ignoredFields).toEqual([]);
+    expect(result.preview.issues).toEqual([]);
+  });
+
+  it("imports the rest of a row when a field column or value cannot be used", async () => {
+    await seedFieldDefinitions();
+    const csv = [
+      "title,field:stage,field:effort,field:owner",
+      "Keeps its title,Nowhere,not a number,Alex",
+    ].join("\n");
+
+    const result = await imports.apply(seeded.context, workspaceId(), "csv", {
+      content: csv,
+      projectName: "Partial",
+    });
+
+    const listed = await tasks.list(seeded.context, {
+      workspaceId: workspaceId(),
+      projectId: result.projectId!,
+      limit: 50,
+      includeSubtasks: true,
+      sort: "rank",
+      order: "asc",
+    });
+
+    // The task exists with no field values rather than being refused outright, and both
+    // the unknown column and the two refused cells are reported.
+    expect(listed.data.map((task) => task.title)).toEqual(["Keeps its title"]);
+    expect(listed.data[0]?.fields).toEqual({});
+    expect(result.preview.ignoredFields).toEqual(["field:owner"]);
+    expect(result.preview.issues.map((issue) => [issue.row, issue.title])).toEqual([
+      [2, "Keeps its title"],
+      [2, "Keeps its title"],
+    ]);
+    expect(result.preview.issues.map((issue) => issue.reason).join(" ")).toMatch(
+      /Stage must be one of.*Effort must be a number/s,
+    );
+  });
+
+  it("says in the dry run what the real import would ignore", async () => {
+    await seedFieldDefinitions();
+
+    const result = await imports.preview(seeded.context, workspaceId(), "csv", {
+      content: "title,field:owner\nA task,Alex",
+    });
+
+    expect(result.preview.ignoredFields).toEqual(["field:owner"]);
   });
 
   it("reuses a tag that already exists rather than creating a second one", async () => {

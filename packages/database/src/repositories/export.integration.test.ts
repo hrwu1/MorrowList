@@ -1,5 +1,6 @@
 import {
   ExportService,
+  FieldService,
   ImportService,
   ProjectService,
   TagService,
@@ -43,6 +44,7 @@ let importService: ImportService;
 let tasks: TaskService;
 let tags: TagService;
 let projects: ProjectService;
+let fields: FieldService;
 
 beforeAll(async () => {
   handle = await setupTestDatabase();
@@ -86,6 +88,7 @@ beforeEach(async () => {
   });
   tags = new TagService({ unitOfWork, clock: fixedClock(NOW) });
   projects = new ProjectService({ unitOfWork, clock: fixedClock(NOW) });
+  fields = new FieldService({ unitOfWork, clock: fixedClock(NOW) });
 
   const created = await projects.create(context, { workspaceId, name: "Relaunch" });
   projectId = created.project.id;
@@ -148,6 +151,7 @@ describe("workspace export against PostgreSQL", () => {
       "projects",
       "statuses",
       "tasks",
+      "fields",
       "tags",
       "taskTags",
       "relations",
@@ -204,11 +208,18 @@ describe("workspace export against PostgreSQL", () => {
 
   it("exports a filtered task CSV that the importer reads back", async () => {
     const research = await tags.create(context, workspaceId, { name: "Research" });
+    await fields.create(context, workspaceId, {
+      name: "Stage",
+      type: "select",
+      options: ["Discovery", "Delivery"],
+    });
+    await fields.create(context, workspaceId, { name: "Effort", type: "number" });
     const parent = await tasks.create(context, {
       workspaceId,
       title: 'A "quoted", comma title',
       projectId,
       dueDate: "2026-09-15",
+      fields: { stage: "Discovery", effort: 3 },
     });
     await tasks.addTag(context, workspaceId, parent.id, research.id);
     await tasks.create(context, {
@@ -230,6 +241,10 @@ describe("workspace export against PostgreSQL", () => {
     expect(rows[1]?.[1]).toBe('A "quoted", comma title');
     expect(rows[1]?.[3]).toBe("Ready");
     expect(rows[1]?.[8]).toBe("Research");
+    // Typed custom fields are columns of their own, so the round trip keeps them too
+    // (GAP-24; this is the criterion GAP-07 and GAP-24 deferred at merge time).
+    expect(rows[0]?.slice(11)).toEqual(["field:stage", "field:effort"]);
+    expect(rows[1]?.slice(11)).toEqual(["Discovery", "3"]);
 
     const applied = await importService.apply(context, workspaceId, "csv", {
       content: csv,
@@ -247,6 +262,7 @@ describe("workspace export against PostgreSQL", () => {
       'A "quoted", comma title',
     ]);
     expect(roundTripped.data[0]?.tags.map((tag) => tag.name)).toEqual(["Research"]);
+    expect(roundTripped.data[0]?.fields).toEqual({ stage: "Discovery", effort: 3 });
   });
 });
 

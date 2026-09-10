@@ -1826,6 +1826,7 @@ describe("export and import endpoints (GAP-07)", () => {
       "projects",
       "statuses",
       "tasks",
+      "fields",
       "tags",
       "taskTags",
       "relations",

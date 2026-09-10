@@ -39,8 +39,20 @@ export interface PlannedTask {
   readonly isArchived: boolean;
   /** Where the row came from, recorded in the `task.created` payload. */
   readonly externalId: string | null;
+  /**
+   * The 1-based position in the source — a CSV line, a card's index in the board — so a
+   * problem the apply only discovers with the workspace in hand (a custom field value the
+   * definition refuses, GAP-24) can name the row a person has to fix.
+   */
+  readonly sourceRow: number;
   /** Checklist items or CSV children; one level only, matching spec 8.3's depth budget. */
   readonly subtasks: readonly PlannedSubtask[];
+  /**
+   * Raw `field:<key>` cells, keyed by normalised field key (GAP-24). They stay strings:
+   * the definitions belong to the target workspace, so only the apply can coerce and
+   * check them. A source without custom fields leaves this empty.
+   */
+  readonly fields: Readonly<Record<string, string>>;
 }
 
 export interface PlannedSubtask {

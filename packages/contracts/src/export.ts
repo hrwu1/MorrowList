@@ -10,6 +10,7 @@ import {
   uuidSchema,
 } from "./common.js";
 import { activityEventSchema } from "./events.js";
+import { fieldTypeSchema, fieldValuesSchema } from "./field.js";
 import { savedViewFiltersSchema, savedViewLayoutSchema } from "./saved-view.js";
 import {
   listTasksQuerySchema,
@@ -117,6 +118,24 @@ export const exportedTaskSchema = z.object({
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
   deletedAt: z.iso.datetime().nullable(),
+  /**
+   * Typed custom field values, keyed by the definition's `key` (GAP-24). Defaults to `{}`
+   * so an archive written before fields were exportable still validates.
+   */
+  fields: fieldValuesSchema.default({}),
+});
+
+/** A workspace's field definitions; the values live on each task (GAP-24, spec 20.3). */
+export const exportedFieldSchema = z.object({
+  id: uuidSchema,
+  key: z.string(),
+  name: z.string(),
+  type: fieldTypeSchema,
+  options: z.array(z.string()),
+  rank: z.string(),
+  showOnCard: z.boolean(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
 });
 
 export const exportedTagSchema = z.object({
@@ -168,6 +187,7 @@ export const workspaceExportSchema = z.object({
   projects: z.array(exportedProjectSchema),
   statuses: z.array(exportedStatusSchema),
   tasks: z.array(exportedTaskSchema),
+  fields: z.array(exportedFieldSchema),
   tags: z.array(exportedTagSchema),
   taskTags: z.array(exportedTaskTagSchema),
   relations: z.array(exportedRelationSchema),
@@ -184,6 +204,7 @@ export const EXPORT_ARRAY_SECTIONS = [
   "projects",
   "statuses",
   "tasks",
+  "fields",
   "tags",
   "taskTags",
   "relations",
@@ -289,6 +310,7 @@ export type ExportedWorkspaceDto = z.infer<typeof exportedWorkspaceSchema>;
 export type ExportedProjectDto = z.infer<typeof exportedProjectSchema>;
 export type ExportedStatusDto = z.infer<typeof exportedStatusSchema>;
 export type ExportedTaskDto = z.infer<typeof exportedTaskSchema>;
+export type ExportedFieldDto = z.infer<typeof exportedFieldSchema>;
 export type ExportedTagDto = z.infer<typeof exportedTagSchema>;
 export type ExportedTaskTagDto = z.infer<typeof exportedTaskTagSchema>;
 export type ExportedRelationDto = z.infer<typeof exportedRelationSchema>;

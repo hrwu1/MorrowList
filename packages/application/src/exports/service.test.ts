@@ -2,6 +2,7 @@ import { workspaceExportSchema } from "@morrowlist/contracts";
 import { fixedClock, parseCsv, planFromCsv } from "@morrowlist/domain";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { FieldService } from "../fields/service.js";
 import { SavedViewService } from "../saved-views/service.js";
 import { TagService } from "../tags/service.js";
 import { TaskService } from "../tasks/service.js";
@@ -25,6 +26,7 @@ let exports: ExportService;
 let tasks: TaskService;
 let tags: TagService;
 let views: SavedViewService;
+let fields: FieldService;
 
 beforeEach(() => {
   unitOfWork = createInMemoryUnitOfWork(emptyData());
@@ -37,6 +39,7 @@ beforeEach(() => {
   });
   tags = new TagService({ unitOfWork, clock: fixedClock(NOW) });
   views = new SavedViewService({ unitOfWork, clock: fixedClock(NOW) });
+  fields = new FieldService({ unitOfWork, clock: fixedClock(NOW) });
 });
 
 const workspaceId = () => seeded.workspace.id;
@@ -48,9 +51,22 @@ async function seedEverything() {
     name: "Research",
   });
 
+  // Typed custom fields travel too (GAP-24): the definitions in their own section, the
+  // values on the task that carries them.
+  const stage = await fields.create(seeded.context, workspaceId(), {
+    name: "Stage",
+    type: "select",
+    options: ["Discovery", "Delivery"],
+  });
+  const effort = await fields.create(seeded.context, workspaceId(), {
+    name: "Effort",
+    type: "number",
+  });
+
   const parent = await tasks.create(seeded.context, {
     workspaceId: workspaceId(),
     title: "Draft the brief",
+    fields: { stage: "Discovery", effort: 3 },
     projectId: seeded.project.id,
     statusId: ready.id,
     dueDate: "2026-09-15",
@@ -102,7 +118,7 @@ async function seedEverything() {
     layout: "list",
   });
 
-  return { parent, child, blocker, trashed, research };
+  return { parent, child, blocker, trashed, research, stage, effort };
 }
 
 describe("ExportService.workspace", () => {
@@ -154,6 +170,16 @@ describe("ExportService.workspace", () => {
       type: "blocks",
     });
     expect(archive.dayPlans).toEqual([{ taskId: parent.id, planDate: "2026-09-05" }]);
+    // The definitions and the values are both present: a restore needs the type and the
+    // select's options, not only the cell (GAP-24).
+    expect(
+      archive.fields.map((field) => [field.key, field.type, field.options]),
+    ).toEqual([
+      ["stage", "select", ["Discovery", "Delivery"]],
+      ["effort", "number", []],
+    ]);
+    expect(draft?.fields).toEqual({ stage: "Discovery", effort: 3 });
+    expect(exported.get(blocker.id)?.fields).toEqual({});
     expect(archive.savedViews.map((view) => view.name)).toEqual(["Overdue"]);
     expect(archive.activity.length).toBeGreaterThan(0);
   });
@@ -261,6 +287,9 @@ describe("ExportService.tasksCsv", () => {
       "tags",
       "parentKey",
       "completed",
+      // One column per definition, appended so the fixed columns keep their positions.
+      "field:stage",
+      "field:effort",
     ]);
     const draft = rows.find((row) => row[1] === "Draft the brief");
     expect(draft?.[0]).toBe("ML-000001");
@@ -269,6 +298,7 @@ describe("ExportService.tasksCsv", () => {
     expect(draft?.[5]).toBe("2026-09-15");
     expect(draft?.[8]).toBe("Research");
     expect(rows.find((row) => row[1] === "Collect examples")?.[9]).toBe("ML-000001");
+    expect(draft?.slice(11)).toEqual(["Discovery", "3"]);
 
     // The archive's own CSV is a valid import: the round trip closes.
     const plan = planFromCsv(csv, { projectName: "Round trip" });
@@ -278,6 +308,9 @@ describe("ExportService.tasksCsv", () => {
     ).toEqual([
       { title: "Collect examples", isCompleted: false, externalId: "ML-000002" },
     ]);
+    expect(plan.tasks.find((task) => task.title === "Draft the brief")?.fields).toEqual(
+      { stage: "Discovery", effort: "3" },
+    );
     expect(parent.key).toBe("ML-000001");
   });
 

@@ -32,6 +32,7 @@ function archive(overrides: Record<string, unknown> = {}) {
     projects: [],
     statuses: [],
     tasks: [],
+    fields: [],
     tags: [],
     taskTags: [],
     relations: [],
