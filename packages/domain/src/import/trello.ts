@@ -189,7 +189,10 @@ export function planFromTrelloBoard(
       isCompleted: dueComplete || inDoneList,
       isArchived: entry.closed === true,
       externalId: cardId,
+      sourceRow: row,
       subtasks: cardId ? (checklistsByCard.get(cardId) ?? []) : [],
+      // Trello custom fields are a paid power-up and are absent from a free board export.
+      fields: {},
     });
   }
 

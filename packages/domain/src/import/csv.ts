@@ -1,5 +1,6 @@
 import { isTerminalCategory } from "../project/status.js";
 import { parseCsv } from "../shared/csv.js";
+import { parseFieldColumn } from "../task/fields.js";
 import { normalizeTitle, TITLE_MAX_LENGTH } from "../task/values.js";
 
 import {
@@ -106,8 +107,16 @@ export function planFromCsv(text: string, options: CsvImportOptions = {}): Impor
   }
 
   const fields = new Map<CsvField, number>();
+  // Custom field columns, keyed by the normalised field key (GAP-24). The plan carries
+  // the raw cells; the apply resolves them against the target workspace's definitions.
+  const fieldColumns = new Map<string, number>();
   const ignoredFields: string[] = [];
   for (const [index, name] of header.entries()) {
+    const fieldKey = parseFieldColumn(name);
+    if (fieldKey !== null) {
+      if (!fieldColumns.has(fieldKey)) fieldColumns.set(fieldKey, index);
+      continue;
+    }
     const field = COLUMN_ALIASES[normalizeHeader(name)];
     // A repeated column keeps the first: a later duplicate would silently win otherwise.
     if (field && !fields.has(field)) fields.set(field, index);
@@ -179,7 +188,9 @@ export function planFromCsv(text: string, options: CsvImportOptions = {}): Impor
         isCompleted: isTruthy(record[fields.get("completed") ?? -1]) || inDoneColumn,
         isArchived: false,
         externalId: cell(record, "key"),
+        sourceRow: row,
         subtasks: [],
+        fields: readFieldCells(record, fieldColumns),
       },
     });
   }
@@ -191,6 +202,19 @@ export function planFromCsv(text: string, options: CsvImportOptions = {}): Impor
     ignoredFields,
     issues,
   };
+}
+
+/** The `field:<key>` cells of one row; a blank cell is no value, not an empty one. */
+function readFieldCells(
+  record: readonly string[],
+  columns: ReadonlyMap<string, number>,
+): Readonly<Record<string, string>> {
+  const values: Record<string, string> = {};
+  for (const [key, index] of columns) {
+    const value = record[index]?.trim();
+    if (value) values[key] = value;
+  }
+  return values;
 }
 
 /**

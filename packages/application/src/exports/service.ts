@@ -5,6 +5,7 @@ import {
   type ExportActivityScope,
   type ExportTasksCsvQuery,
   type ExportedDayPlanDto,
+  type ExportedFieldDto,
   type ExportedProjectDto,
   type ExportedRelationDto,
   type ExportedSavedViewDto,
@@ -17,12 +18,15 @@ import {
 } from "@morrowlist/contracts";
 import {
   DomainError,
+  fieldColumnName,
   formatCsv,
+  formatFieldValue,
   isCompleted,
   systemClock,
   taskKey,
   toLocalDate,
   type Clock,
+  type FieldDefinition,
   type PlainDate,
   type Tag,
   type Task,
@@ -123,6 +127,7 @@ export class ExportService {
         tasks,
       );
       const tags = await tx.tags.listByWorkspace(workspaceId);
+      const fields = await tx.fields.listByWorkspace(workspaceId);
       const savedViews = context.userId
         ? await tx.savedViews.listForOwner(workspaceId, context.userId)
         : [];
@@ -145,6 +150,7 @@ export class ExportService {
         projects: projects.map(toExportedProject),
         statuses,
         tasks: tasks.map((task) => toExportedTask(task, workspace.taskKeyPrefix)),
+        fields: fields.map(toExportedField),
         tags: tags.map(toExportedTag),
         taskTags,
         relations,
@@ -172,7 +178,15 @@ export class ExportService {
       const today = toLocalDate(this.clock.now(), workspace.timezone);
       const filter = toTaskFilter(query, today);
 
-      const rows: string[][] = [[...TASK_CSV_COLUMNS]];
+      // One column per definition, appended after the fixed ones, so a reader that
+      // knows only `TASK_CSV_COLUMNS` still finds every column where it expects it.
+      const definitions = await tx.fields.listByWorkspace(query.workspaceId);
+      const rows: string[][] = [
+        [
+          ...TASK_CSV_COLUMNS,
+          ...definitions.map((field) => fieldColumnName(field.key)),
+        ],
+      ];
       const tasksById = new Map<string, Task>();
       const collected: Task[] = [];
       let after: string | undefined;
@@ -221,6 +235,7 @@ export class ExportService {
           (tagsByTask.get(task.id) ?? []).map((tag) => tag.name).join(", "),
           parent ? taskKey(workspace.taskKeyPrefix, parent.taskNumber) : "",
           isCompleted(task) ? "yes" : "no",
+          ...definitions.map((field) => formatFieldValue(task.fields[field.key])),
         ]);
       }
 
@@ -437,6 +452,21 @@ function toExportedTask(task: Task, taskKeyPrefix: string): ExportedTaskDto {
     createdAt: task.createdAt.toISOString(),
     updatedAt: task.updatedAt.toISOString(),
     deletedAt: task.deletedAt?.toISOString() ?? null,
+    fields: task.fields,
+  };
+}
+
+function toExportedField(definition: FieldDefinition): ExportedFieldDto {
+  return {
+    id: definition.id,
+    key: definition.key,
+    name: definition.name,
+    type: definition.type,
+    options: [...definition.options],
+    rank: definition.rank,
+    showOnCard: definition.showOnCard,
+    createdAt: definition.createdAt.toISOString(),
+    updatedAt: definition.updatedAt.toISOString(),
   };
 }
 

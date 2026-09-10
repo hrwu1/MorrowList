@@ -269,6 +269,33 @@ export function sameFieldValues(left: FieldValues, right: FieldValues): boolean 
   return leftKeys.every((key) => Object.is(left[key], right[key]));
 }
 
+/**
+ * The task CSV carries one column per definition, named `field:<key>` (GAP-24). The
+ * prefix keeps them out of `COLUMN_ALIASES`' namespace, so a spreadsheet with a column
+ * literally called "status" still means the workflow column and not a custom field.
+ */
+export const FIELD_COLUMN_PREFIX = "field:";
+
+export function fieldColumnName(key: string): string {
+  return `${FIELD_COLUMN_PREFIX}${key}`;
+}
+
+/**
+ * The field key a CSV header names, or null when the header is not a field column. The
+ * key is normalised, so `Field: Story Points` and `field:story_points` are the same
+ * column; a header the key rules refuse is not a field column rather than an error,
+ * because the importer reports it as ignored instead of rejecting the whole file.
+ */
+export function parseFieldColumn(header: string): string | null {
+  const raw = header.trim();
+  if (!raw.toLocaleLowerCase("en-US").startsWith(FIELD_COLUMN_PREFIX)) return null;
+  try {
+    return normalizeFieldKey(raw.slice(FIELD_COLUMN_PREFIX.length));
+  } catch {
+    return null;
+  }
+}
+
 /** Human-readable value for a card, a row, or the CLI. */
 export function formatFieldValue(value: FieldValue | undefined): string {
   if (value === undefined) return "";

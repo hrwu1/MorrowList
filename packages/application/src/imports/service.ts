@@ -13,10 +13,12 @@ import {
   DomainError,
   ImportFormatError,
   ValidationError,
+  canonicalFieldValues,
   completeTask,
   countSubtasks,
   defaultPlannedStatus,
   deleteTask,
+  fieldColumnName,
   isTerminalCategory,
   normalizeTagName,
   planFromCsv,
@@ -29,7 +31,12 @@ import {
   taskCountByStatus,
   toTagColorToken,
   uuidv7,
+  validateFieldValue,
   type Clock,
+  type FieldDefinition,
+  type FieldValue,
+  type FieldValues,
+  type ImportIssue,
   type ImportPlan,
   type PlannedStatus,
   type PlannedTask,
@@ -100,7 +107,13 @@ export class ImportService {
     assertScope(context, SCOPES.importWrite);
 
     const plan = mapSource(source, request);
-    return { dryRun: true, projectId: null, preview: toPreview(source, plan) };
+    // The definitions are read here too: a dry run that did not mention an unusable
+    // field column would not be the plan the apply runs.
+    const definitions = await this.unitOfWork.execute((tx) =>
+      tx.fields.listByWorkspace(workspaceId),
+    );
+    const resolved = withResolvedFields(plan, resolvePlanFields(plan, definitions));
+    return { dryRun: true, projectId: null, preview: toPreview(source, resolved) };
   }
 
   /**
@@ -177,6 +190,10 @@ export class ImportService {
       });
 
       const tags = await this.resolveTags(tx, context, workspaceId, plan);
+      const resolvedFields = resolvePlanFields(
+        plan,
+        await tx.fields.listByWorkspace(workspaceId),
+      );
       const statusById = new Map(
         statuses.map((entry) => [entry.externalId, entry.status]),
       );
@@ -196,7 +213,7 @@ export class ImportService {
 
       let created = 0;
       let createdSubtasks = 0;
-      for (const planned of plan.tasks) {
+      for (const [index, planned] of plan.tasks.entries()) {
         const status =
           (planned.statusExternalId
             ? statusById.get(planned.statusExternalId)
@@ -208,6 +225,7 @@ export class ImportService {
           project,
           status: landing,
           planned,
+          fields: resolvedFields.values[index] ?? {},
           tags,
           parentTaskId: null,
           doneStatus,
@@ -222,10 +240,12 @@ export class ImportService {
             project,
             status: landing,
             planned: {
-              ...emptyPlannedTask(subtask.title),
+              ...emptyPlannedTask(subtask.title, planned.sourceRow),
               isCompleted: subtask.isCompleted,
               externalId: subtask.externalId,
             },
+            // A checklist item or a child row carries no field columns of its own.
+            fields: {},
             tags,
             parentTaskId: parent.id,
             doneStatus,
@@ -234,7 +254,7 @@ export class ImportService {
         }
       }
 
-      const preview = toPreview(source, plan);
+      const preview = toPreview(source, withResolvedFields(plan, resolvedFields));
       await recordEvent(tx, context, this.clock, {
         workspaceId,
         aggregateType: "workspace",
@@ -308,6 +328,8 @@ export class ImportService {
       project: Project;
       status: WorkflowStatus;
       planned: PlannedTask;
+      /** Already checked against this workspace's definitions (GAP-24). */
+      fields: FieldValues;
       tags: ReadonlyMap<string, Tag>;
       parentTaskId: string | null;
       doneStatus: WorkflowStatus | undefined;
@@ -328,6 +350,7 @@ export class ImportService {
         deadline: planned.deadline,
         deferUntil: planned.deferUntil,
         parentTaskId: input.parentTaskId,
+        fields: input.fields,
         project: { id: input.project.id, status: input.status },
       },
       origin: {
@@ -493,7 +516,7 @@ const COLORS: Record<WorkflowStatus["category"], string> = {
   done: "green",
 };
 
-function emptyPlannedTask(title: string): PlannedTask {
+function emptyPlannedTask(title: string, sourceRow: number): PlannedTask {
   return {
     title,
     descriptionMd: null,
@@ -506,7 +529,75 @@ function emptyPlannedTask(title: string): PlannedTask {
     isCompleted: false,
     isArchived: false,
     externalId: null,
+    sourceRow,
     subtasks: [],
+    fields: {},
+  };
+}
+
+/**
+ * The typed custom field values of every planned row, resolved against the definitions
+ * the *target* workspace has (GAP-24).
+ *
+ * Import never creates a definition: a type and a select's options cannot be inferred
+ * from a spreadsheet cell, and the ten-field cap is a design rule rather than a limit to
+ * route around. So a column naming a field this workspace does not define is reported as
+ * ignored, and a value its definition refuses becomes a row issue — the two channels the
+ * preview already has for "this was not silently dropped".
+ */
+interface ResolvedPlanFields {
+  /** Canonical values per planned task, in plan order. */
+  readonly values: readonly FieldValues[];
+  readonly ignoredColumns: readonly string[];
+  readonly issues: readonly ImportIssue[];
+}
+
+function resolvePlanFields(
+  plan: ImportPlan,
+  definitions: readonly FieldDefinition[],
+): ResolvedPlanFields {
+  const byKey = new Map(definitions.map((definition) => [definition.key, definition]));
+  const ignoredColumns = new Set<string>();
+  const issues: ImportIssue[] = [];
+  const values: FieldValues[] = [];
+
+  for (const planned of plan.tasks) {
+    const resolved: Record<string, FieldValue> = {};
+    for (const [key, raw] of Object.entries(planned.fields)) {
+      const definition = byKey.get(key);
+      if (!definition) {
+        ignoredColumns.add(fieldColumnName(key));
+        continue;
+      }
+      try {
+        resolved[key] = validateFieldValue(definition, raw);
+      } catch (error) {
+        issues.push({
+          row: planned.sourceRow,
+          title: planned.title,
+          reason:
+            error instanceof Error
+              ? error.message
+              : `${definition.name} could not be read.`,
+        });
+      }
+    }
+    values.push(canonicalFieldValues(resolved, definitions));
+  }
+
+  return { values, ignoredColumns: [...ignoredColumns], issues };
+}
+
+/** The plan the preview and the apply share, with the workspace's fields resolved. */
+function withResolvedFields(
+  plan: ImportPlan,
+  resolved: ResolvedPlanFields,
+): ImportPlan {
+  if (resolved.ignoredColumns.length === 0 && resolved.issues.length === 0) return plan;
+  return {
+    ...plan,
+    ignoredFields: [...plan.ignoredFields, ...resolved.ignoredColumns],
+    issues: [...plan.issues, ...resolved.issues],
   };
 }
 

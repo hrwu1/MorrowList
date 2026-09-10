@@ -59,6 +59,7 @@ export {
   type Task,
 } from "./task/task.js";
 export {
+  FIELD_COLUMN_PREFIX,
   FIELD_FILTER_OPERATORS,
   FIELD_KEY_MAX_LENGTH,
   FIELD_NAME_MAX_LENGTH,
@@ -71,6 +72,7 @@ export {
   SELECT_OPTION_MAX_LENGTH,
   applyFields,
   canonicalFieldValues,
+  fieldColumnName,
   formatFieldFilter,
   formatFieldValue,
   isFieldType,
@@ -79,6 +81,7 @@ export {
   normalizeFieldName,
   normalizeFieldOptions,
   operatorsForType,
+  parseFieldColumn,
   parseFieldFilter,
   resolveFieldFilter,
   sameFieldValues,
