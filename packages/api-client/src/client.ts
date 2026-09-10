@@ -48,6 +48,7 @@ import type {
   NotificationDto,
   NotificationListResponse,
   NotificationPreferencesDto,
+  PushConfigDto,
   PushSubscriptionDto,
   PushSubscriptionRequest,
   ProjectBoardQuery,
@@ -999,6 +1000,17 @@ export class ApiClient {
       "PATCH",
       `/me/notification-preferences${this.queryString({}, options)}`,
       body,
+      options,
+    );
+    return response.data;
+  }
+
+  /** Whether this deployment can send push, and the key a browser subscribes with. */
+  async getPushConfig(options: RequestOptions = {}): Promise<PushConfigDto> {
+    const response = await this.send<{ data: PushConfigDto }>(
+      "GET",
+      "/me/push-config",
+      undefined,
       options,
     );
     return response.data;

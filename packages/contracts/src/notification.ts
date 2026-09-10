@@ -85,6 +85,19 @@ export const pushSubscriptionResponseSchema = z.object({
   data: pushSubscriptionSchema,
 });
 
+/**
+ * Whether this deployment can send web push, and the application server key a browser
+ * subscribes with. Deployment configuration rather than stored preference, so it has its
+ * own resource — as the inbound capture address does.
+ */
+export const pushConfigSchema = z.object({
+  enabled: z.boolean(),
+  /** VAPID public key, base64url; null when push is not configured. */
+  publicKey: z.string().nullable(),
+});
+
+export const pushConfigResponseSchema = z.object({ data: pushConfigSchema });
+
 export type NotificationKind = z.infer<typeof notificationKindSchema>;
 export type NotificationDto = z.infer<typeof notificationSchema>;
 export type ListNotificationsQuery = z.infer<typeof listNotificationsQuerySchema>;
@@ -96,3 +109,4 @@ export type UpdateNotificationPreferencesRequest = z.infer<
 >;
 export type PushSubscriptionRequest = z.infer<typeof pushSubscriptionRequestSchema>;
 export type PushSubscriptionDto = z.infer<typeof pushSubscriptionSchema>;
+export type PushConfigDto = z.infer<typeof pushConfigSchema>;

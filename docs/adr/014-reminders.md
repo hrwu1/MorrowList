@@ -53,8 +53,16 @@ every channel beyond the inbox is opt-in.
 - Email addresses are read through a `UserDirectory` port implemented in `@morrowlist/auth`,
   keeping the provider tables behind that package (§18.3). Email is sent after the
   claiming transaction commits and is not retried; the in-app row is the durable record.
-- The push channel is incomplete until GAP-11 ships a service worker: registrations are
-  stored and exposed on the API, but nothing is pushed and no VAPID configuration exists
-  yet. Adding it later changes no contract.
+- The push channel landed in two parts, and adding the second changed no contract, as
+  this record expected. Registrations and their two endpoints shipped with the rest of
+  GAP-13; delivery followed on 2026-09-09, once GAP-11's service worker existed to show a
+  notification. It adds `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` — all
+  optional, and push simply stays off without them — plus `GET /me/push-config` so a
+  browser can learn the application server key. RFC 8291 encryption and the RFC 8292 JWT
+  are implemented against `node:crypto`, adding no dependency, as webhook signing is.
+- A push that fails follows the email rule rather than inventing a second one: it is
+  logged and dropped, because the in-app row is already committed and is the durable
+  record. The one exception is an endpoint the push service reports as 404 or 410, which
+  is deleted — a browser that has thrown a registration away is gone, not unreachable.
 - What this makes harder: a second reminder per task, per-project channels, SMS, or
   location reminders would all need a deliberate reversal of the flood rule, not a flag.

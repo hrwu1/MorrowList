@@ -12,6 +12,7 @@ import {
 } from "../testing/index.js";
 
 import { createRecordingEmailSender } from "./email.js";
+import { createRecordingPushSender, type PushResult } from "./push.js";
 import { NotificationService } from "./service.js";
 
 /**
@@ -27,6 +28,7 @@ let unitOfWork: InMemoryUnitOfWork;
 let seeded: SeededWorkspace;
 let tasks: TaskService;
 let emails: ReturnType<typeof createRecordingEmailSender>;
+let pushes: ReturnType<typeof createRecordingPushSender>;
 let notifications: NotificationService;
 
 function service(clock = fixedClock(NOW)) {
@@ -35,6 +37,7 @@ function service(clock = fixedClock(NOW)) {
     clock,
     cursorSecret: CURSOR_SECRET,
     emailSender: emails,
+    pushSender: pushes,
     userDirectory: {
       findById: async (id) =>
         id === seeded.userId ? { id, email: "alex@example.com", name: "Alex" } : null,
@@ -52,6 +55,7 @@ beforeEach(() => {
     cursorSecret: CURSOR_SECRET,
   });
   emails = createRecordingEmailSender();
+  pushes = createRecordingPushSender();
   notifications = service();
 });
 
@@ -126,6 +130,87 @@ describe("NotificationService.deliverDue", () => {
         text: expect.stringContaining("https://morrow.example/tasks/ML-000001"),
       },
     ]);
+  });
+
+  it("pushes to every registered device after the commit when the push channel is on", async () => {
+    await notifications.updatePreferences(seeded.context, seeded.workspace.id, {
+      channels: { push: true },
+    });
+    for (const endpoint of [
+      "https://push.example/laptop",
+      "https://push.example/phone",
+    ]) {
+      await notifications.addPushSubscription(seeded.context, {
+        endpoint,
+        keys: { p256dh: "p", auth: "a" },
+      });
+    }
+    const task = await timed();
+
+    await notifications.deliverDue(FIRES_AT);
+
+    expect(pushes.sent.map((push) => push.subscription.endpoint)).toEqual([
+      "https://push.example/laptop",
+      "https://push.example/phone",
+    ]);
+    expect(pushes.sent[0]).toMatchObject({
+      title: "Reminder: Call the bank",
+      body: "ML-000001 is due 2026-09-03 at 12:00 (Europe/Berlin).",
+      url: "https://morrow.example/tasks/ML-000001",
+      // Tagged by the task, so a snooze replaces this rather than stacking beside it.
+      tag: `reminder:${task.id}`,
+    });
+    // The channel is recorded like any other, so the history says how it was delivered.
+    expect(
+      unitOfWork.data.activity.find((e) => e.eventType === TASK_EVENTS.reminderSent)
+        ?.payload,
+    ).toMatchObject({ channels: ["inApp", "push"] });
+  });
+
+  it("sends no push when the channel is off, however many devices are registered", async () => {
+    await notifications.addPushSubscription(seeded.context, {
+      endpoint: "https://push.example/laptop",
+      keys: { p256dh: "p", auth: "a" },
+    });
+    await timed();
+
+    await notifications.deliverDue(FIRES_AT);
+
+    expect(pushes.sent).toHaveLength(0);
+  });
+
+  it("removes a device the push service reports gone, and keeps one that merely failed", async () => {
+    pushes = createRecordingPushSender(
+      new Map<string, PushResult>([
+        ["https://push.example/cleared", { ok: false, gone: true, error: "410" }],
+        ["https://push.example/offline", { ok: false, error: "timeout" }],
+      ]),
+    );
+    notifications = service();
+    await notifications.updatePreferences(seeded.context, seeded.workspace.id, {
+      channels: { push: true },
+    });
+    for (const endpoint of [
+      "https://push.example/cleared",
+      "https://push.example/offline",
+    ]) {
+      await notifications.addPushSubscription(seeded.context, {
+        endpoint,
+        keys: { p256dh: "p", auth: "a" },
+      });
+    }
+    await timed();
+
+    await notifications.deliverDue(FIRES_AT);
+
+    expect(
+      [...unitOfWork.data.pushSubscriptions.values()].map((s) => s.endpoint),
+    ).toEqual(["https://push.example/offline"]);
+    // A failed push never rolls back what the user was already told in the app.
+    const inbox = await notifications.list(seeded.context, seeded.workspace.id, {
+      limit: 50,
+    });
+    expect(inbox.data).toHaveLength(1);
   });
 
   it("sends nothing to a member who turned every channel off", async () => {
@@ -223,6 +308,31 @@ describe("NotificationService.digest", () => {
     // Work that appears later the same day waits for tomorrow's digest.
     await timed();
     expect(await notifications.digest(new Date("2026-09-03T09:10:00.000Z"))).toBe(0);
+  });
+
+  it("pushes a short digest that points at Today rather than listing it", async () => {
+    await enableDigest({ channels: { push: true }, timezone: "UTC" });
+    await notifications.addPushSubscription(seeded.context, {
+      endpoint: "https://push.example/phone",
+      keys: { p256dh: "p", auth: "a" },
+    });
+    await tasks.create(seeded.context, {
+      workspaceId: seeded.workspace.id,
+      title: "Overdue",
+      dueDate: "2026-09-01",
+    });
+
+    expect(await notifications.digest(NOW)).toBe(1);
+
+    expect(pushes.sent).toEqual([
+      expect.objectContaining({
+        title: "Today: 1 task",
+        // A lock screen has no room for the list the in-app row and the email carry.
+        body: "Open Today to see what you planned for 2026-09-03.",
+        url: "https://morrow.example/today",
+        tag: "digest:2026-09-03",
+      }),
+    ]);
   });
 
   it("groups the digest by Today section and emails it when enabled", async () => {

@@ -13970,6 +13970,39 @@
         ],
         "additionalProperties": false
       },
+      "PushConfig": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "publicKey": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "enabled",
+              "publicKey"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
       "Webhook": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -18813,7 +18846,7 @@
     "/me/push-subscriptions": {
       "post": {
         "summary": "Register a browser for web push",
-        "description": "Accepts the browser's PushSubscription.toJSON() shape. Delivery over push starts once the service worker ships; the keys are never returned.",
+        "description": "Accepts the browser's PushSubscription.toJSON() shape. The keys are credentials and are never returned.",
         "requestBody": {
           "required": true,
           "content": {
@@ -18892,6 +18925,64 @@
         "responses": {
           "204": {
             "description": "Removed, or was never registered"
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/push-config": {
+      "get": {
+        "summary": "Whether this deployment can send web push",
+        "description": "Reports the VAPID application server key a browser subscribes with, or enabled:false when no keys are configured. Deployment configuration, not stored preference.",
+        "responses": {
+          "200": {
+            "description": "The push configuration",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushConfig"
+                }
+              }
+            }
           },
           "401": {
             "description": "Authentication required",

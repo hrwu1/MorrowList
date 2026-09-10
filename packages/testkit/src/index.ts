@@ -5,7 +5,10 @@
  * beside the ports they implement; re-exporting them here keeps one import path for
  * tests while avoiding a cycle between the two packages.
  */
-export { createRecordingEmailSender } from "@morrowlist/application";
+export {
+  createRecordingEmailSender,
+  createRecordingPushSender,
+} from "@morrowlist/application";
 export {
   TEST_TIMEZONE,
   buildActorContext,

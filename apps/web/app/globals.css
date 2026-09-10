@@ -4232,6 +4232,15 @@
     margin-bottom: 0.25rem;
     font-weight: 600;
   }
+  /* The push channel carries a hint under it; the other two are one line each. */
+  .notification-settings__push {
+    display: grid;
+    gap: 0.35rem;
+  }
+  .notification-settings__push > .task-detail__hint {
+    margin: 0;
+    padding-left: 1.55rem;
+  }
 
   .workspace-settings__link a {
     color: var(--accent-text);

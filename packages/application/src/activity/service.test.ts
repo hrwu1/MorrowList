@@ -3,6 +3,7 @@ import { fixedClock, uuidv7 } from "@morrowlist/domain";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createRecordingEmailSender } from "../notifications/email.js";
+import { createRecordingPushSender } from "../notifications/push.js";
 import { NotificationService } from "../notifications/service.js";
 import { ProjectService } from "../projects/service.js";
 import { TagService } from "../tags/service.js";
@@ -50,6 +51,7 @@ beforeEach(() => {
     clock: fixedClock(NOW),
     cursorSecret: CURSOR_SECRET,
     emailSender: createRecordingEmailSender(),
+    pushSender: createRecordingPushSender(),
     userDirectory: { findById: async () => null },
     appUrl: "http://localhost:3200",
   });

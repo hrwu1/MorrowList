@@ -12,7 +12,8 @@ import { requireWorkspace } from "./workspace.js";
 
 /**
  * `GET /me` — the caller, their workspaces, and what this credential may do (spec 20.3) —
- * plus the caller's own notification preferences and push registrations (GAP-13).
+ * plus the caller's own notification preferences, push registrations, and whether this
+ * deployment can send push at all (GAP-13).
  */
 export function meRoutes(deps: ApiDependencies) {
   return new Hono<ApiEnv>()
@@ -56,6 +57,13 @@ export function meRoutes(deps: ApiDependencies) {
       }
       await deps.notificationService.removePushSubscription(c.get("actor"), endpoint);
       return c.body(null, 204);
+    })
+
+    .get("/me/push-config", (c) => {
+      // The public key is public by design: a browser must present it to subscribe. The
+      // private half stays in the server's environment and is never reachable from here.
+      const publicKey = deps.pushPublicKey ?? null;
+      return c.json({ data: { enabled: publicKey !== null, publicKey } });
     })
 
     .get("/me", async (c) => {

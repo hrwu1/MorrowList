@@ -6,6 +6,7 @@ export {
   devices,
   expect,
   type BrowserContext,
+  type CDPSession,
   type Locator,
   type Page,
 } from "@playwright/test";

@@ -6,9 +6,12 @@ import { useId, useState, type FormEvent } from "react";
 
 import {
   useNotificationPreferences,
+  usePushRegistration,
+  useSetPushEnabled,
   useUpdateNotificationPreferences,
 } from "../hooks/use-notifications";
 import { REMINDER_OPTIONS } from "../lib/notification-view";
+import { pushState } from "../lib/push";
 
 /** Channels, daily digest, and the default reminder for new timed tasks (GAP-13). */
 export function NotificationPreferencesPage() {
@@ -122,10 +125,7 @@ function PreferencesForm({
           />
           Email
         </label>
-        <label className="notification-settings__check">
-          <input type="checkbox" checked={false} disabled />
-          Push (available once the app can be installed)
-        </label>
+        <PushChannel enabled={current.channels.push} />
       </fieldset>
 
       <fieldset className="notification-settings__group">
@@ -203,5 +203,59 @@ function PreferencesForm({
         </Alert>
       ) : null}
     </form>
+  );
+}
+
+/**
+ * The push channel (GAP-13 step 7). It is not part of the form's dirty state: switching
+ * it asks the browser for permission and registers the device, which cannot wait for a
+ * Save the user might never press — and a preference saved without a registration behind
+ * it would be a channel that silently delivers nothing.
+ */
+function PushChannel({ enabled }: { readonly enabled: boolean }) {
+  const registration = usePushRegistration();
+  const setEnabled = useSetPushEnabled();
+
+  const state = pushState({
+    configured: registration.data?.configured ?? false,
+    supported: registration.data?.supported ?? false,
+    permission: registration.data?.permission ?? null,
+    subscribed: registration.data?.subscribed ?? false,
+  });
+  // On until both halves agree: the stored preference and a device registered here.
+  const on = enabled && state.subscribed;
+  const blocked = state.blocker !== null && !on;
+
+  return (
+    <div className="notification-settings__push">
+      <label className="notification-settings__check">
+        <input
+          type="checkbox"
+          checked={on}
+          disabled={registration.isPending || setEnabled.isPending || blocked}
+          onChange={(event) =>
+            setEnabled.mutate({
+              enabled: event.target.checked,
+              publicKey: registration.data?.publicKey ?? null,
+            })
+          }
+        />
+        Push notifications on this device
+      </label>
+      <p className="task-detail__hint" aria-live="polite">
+        {setEnabled.isPending
+          ? "Asking your browser…"
+          : enabled && !state.subscribed && state.blocker === null
+            ? "Push is on for your account, but this device is not registered yet."
+            : state.hint}
+      </p>
+      {setEnabled.isError ? (
+        <Alert tone="error" title="Push could not be changed">
+          {setEnabled.error instanceof Error
+            ? setEnabled.error.message
+            : "Something went wrong."}
+        </Alert>
+      ) : null}
+    </div>
   );
 }

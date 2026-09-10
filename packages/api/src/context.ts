@@ -47,6 +47,12 @@ export interface ApiDependencies {
   readonly searchService: SearchService;
   readonly savedViewService: SavedViewService;
   readonly notificationService: NotificationService;
+  /**
+   * The VAPID public key browsers subscribe with, or null when this deployment has no
+   * push keys configured (GAP-13 step 7). Configuration, so it is a value rather than a
+   * service: nothing in the application layer needs it.
+   */
+  readonly pushPublicKey?: string | null;
   readonly webhookService: WebhookService;
   readonly logger: Logger;
   readonly metrics?: Metrics;
