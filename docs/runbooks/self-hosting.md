@@ -85,6 +85,27 @@ that matter most.
 | `WORKER_MODE`          | `embedded`              | reminders run in the web process; `off` disables them |
 | `RUN_MIGRATIONS`       | `true`                  | see below                                             |
 | `TRASH_RETENTION_DAYS` | `30`                    | how long deleted tasks are recoverable                |
+| `VAPID_*`              | unset                   | optional web push; see below                          |
+
+### Web push
+
+Push notifications are off unless you configure a VAPID key pair. Generate one once:
+
+```sh
+node scripts/generate-vapid.mjs mailto:you@example.com
+```
+
+Put the three lines it prints in your environment. Keep the pair: rotating it invalidates
+every browser registration, because a browser subscribes with the public key and the push
+service checks the sender holds the private half. `VAPID_PRIVATE_KEY` is a signing
+credential and never reaches a browser.
+
+Push needs `APP_URL` on `https://` — browsers refuse to register a service worker on a
+plain-HTTP origin other than `localhost` — and it does not need anything opened inbound:
+the server makes an outbound POST to each browser's push service.
+
+Without the keys nothing breaks: `GET /me/push-config` reports push off and the
+notification settings page says so rather than offering a control that cannot work.
 
 ### Behind a reverse proxy
 

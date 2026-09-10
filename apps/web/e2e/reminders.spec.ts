@@ -97,6 +97,15 @@ test("a task due in a minute reminds at its due time, and settings persist", asy
   await expect(form.getByLabel("Default reminder for new timed tasks")).toHaveValue(
     "60",
   );
+  // Push is offered as a real control now (GAP-13 step 7), but this deployment sets no
+  // VAPID keys, so it says why instead of asking for a permission it could not use.
+  const push = form.getByLabel("Push notifications on this device");
+  await expect(push).toBeDisabled();
+  await expect(push).not.toBeChecked();
+  await expect(
+    form.getByText("This server has no push keys configured, so nothing can be sent."),
+  ).toBeVisible();
+
   await page.screenshot({
     path: "test-results/reminders-settings.png",
     fullPage: true,

@@ -48,6 +48,7 @@ import {
   notificationListResponseSchema,
   notificationPreferencesResponseSchema,
   notificationResponseSchema,
+  pushConfigResponseSchema,
   pushSubscriptionRequestSchema,
   pushSubscriptionResponseSchema,
   updateNotificationPreferencesRequestSchema,
@@ -172,6 +173,7 @@ const registry = {
   UpdateNotificationPreferencesRequest: updateNotificationPreferencesRequestSchema,
   PushSubscriptionRequest: pushSubscriptionRequestSchema,
   PushSubscription: pushSubscriptionResponseSchema,
+  PushConfig: pushConfigResponseSchema,
   Webhook: webhookSubscriptionResponseSchema,
   CreatedWebhook: createdWebhookSubscriptionResponseSchema,
   WebhookList: webhookSubscriptionListResponseSchema,
@@ -465,7 +467,7 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
         post: {
           summary: "Register a browser for web push",
           description:
-            "Accepts the browser's PushSubscription.toJSON() shape. Delivery over push starts once the service worker ships; the keys are never returned.",
+            "Accepts the browser's PushSubscription.toJSON() shape. The keys are credentials and are never returned.",
           requestBody: {
             required: true,
             ...jsonContent(ref("PushSubscriptionRequest")),
@@ -490,6 +492,20 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
           ],
           responses: {
             "204": { description: "Removed, or was never registered" },
+            ...commonErrors,
+          },
+        },
+      },
+      "/me/push-config": {
+        get: {
+          summary: "Whether this deployment can send web push",
+          description:
+            "Reports the VAPID application server key a browser subscribes with, or enabled:false when no keys are configured. Deployment configuration, not stored preference.",
+          responses: {
+            "200": {
+              description: "The push configuration",
+              ...jsonContent(ref("PushConfig")),
+            },
             ...commonErrors,
           },
         },

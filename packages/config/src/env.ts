@@ -21,6 +21,11 @@ const optionalString = z
   .optional()
   .transform((value) => (value === "" ? undefined : value));
 
+/** Bytes a base64url string decodes to, without throwing on a malformed one. */
+function decodedLength(value: string): number {
+  return Buffer.from(value, "base64url").length;
+}
+
 export const serverEnvSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -54,6 +59,16 @@ export const serverEnvSchema = z
     EMAIL_FROM: z.string().default("morrowlist@localhost"),
 
     /**
+     * Web push (GAP-13 step 7). Generate a pair with `node scripts/generate-vapid.mjs`.
+     * All three are set together or push stays off and the settings page says so; the
+     * private key is a signing credential and is never sent to a browser.
+     */
+    VAPID_PUBLIC_KEY: optionalString,
+    VAPID_PRIVATE_KEY: optionalString,
+    /** `mailto:` or `https:` contact a push service can reach (RFC 8292 §2.1). */
+    VAPID_SUBJECT: optionalString,
+
+    /**
      * Where the reminder worker runs (GAP-13): inside the web process (one-container
      * deploys), as `pnpm worker`, or nowhere.
      */
@@ -65,6 +80,37 @@ export const serverEnvSchema = z
     OUTBOX_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
   })
   .superRefine((env, ctx) => {
+    const vapid = [env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY, env.VAPID_SUBJECT];
+    if (vapid.some(Boolean) && !vapid.every(Boolean)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["VAPID_PUBLIC_KEY"],
+        message:
+          "VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT must be set together.",
+      });
+    }
+    if (env.VAPID_SUBJECT && !/^(?:mailto:|https:\/\/)/i.test(env.VAPID_SUBJECT)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["VAPID_SUBJECT"],
+        message: "VAPID_SUBJECT must be a mailto: or https:// contact.",
+      });
+    }
+    // 65 raw bytes for the uncompressed point, 32 for the scalar; base64url of each.
+    if (env.VAPID_PUBLIC_KEY && decodedLength(env.VAPID_PUBLIC_KEY) !== 65) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["VAPID_PUBLIC_KEY"],
+        message: "VAPID_PUBLIC_KEY must be a base64url P-256 public key (65 bytes).",
+      });
+    }
+    if (env.VAPID_PRIVATE_KEY && decodedLength(env.VAPID_PRIVATE_KEY) !== 32) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["VAPID_PRIVATE_KEY"],
+        message: "VAPID_PRIVATE_KEY must be a base64url P-256 private key (32 bytes).",
+      });
+    }
     if (env.INBOUND_EMAIL_DOMAIN && !env.AUTH_SECRET) {
       ctx.addIssue({
         code: "custom",

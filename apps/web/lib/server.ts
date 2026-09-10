@@ -24,6 +24,8 @@ import {
   WorkspaceService,
   bootstrapUser,
   createConsoleEmailSender,
+  createConsolePushSender,
+  createWebPushSender,
   createFetchWebhookSender,
   startNotificationWorker,
   type NotificationWorker,
@@ -110,10 +112,27 @@ export function getContainer(): Container {
   if (env.EMAIL_PROVIDER === "smtp") {
     logger.warn("EMAIL_PROVIDER=smtp has no transport yet; using the console sender");
   }
+  // Push needs a VAPID pair; without one the console adapter logs what would have been
+  // sent, exactly as the email adapter does, and `GET /me/push-config` reports it off so
+  // the settings page never offers a control that cannot work.
+  const vapidKeys =
+    env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT
+      ? {
+          publicKey: env.VAPID_PUBLIC_KEY,
+          privateKey: env.VAPID_PRIVATE_KEY,
+          subject: env.VAPID_SUBJECT,
+        }
+      : null;
+  if (!vapidKeys) {
+    logger.info("web push is not configured; set VAPID_* to enable it");
+  }
   const notificationService = new NotificationService({
     unitOfWork,
     cursorSecret,
     emailSender: createConsoleEmailSender(logger),
+    pushSender: vapidKeys
+      ? createWebPushSender({ keys: vapidKeys, logger })
+      : createConsolePushSender(logger),
     userDirectory: createUserDirectory(database.db),
     appUrl: env.APP_URL,
     logger,
@@ -147,6 +166,7 @@ export function getContainer(): Container {
     }),
     auth,
     unitOfWork,
+    pushPublicKey: vapidKeys?.publicKey ?? null,
     workspaceService: new WorkspaceService({ unitOfWork }),
     projectService: new ProjectService({ unitOfWork }),
     workflowService: new WorkflowService({ unitOfWork }),

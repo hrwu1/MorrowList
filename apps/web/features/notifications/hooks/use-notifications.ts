@@ -13,6 +13,12 @@ import {
 } from "@tanstack/react-query";
 
 import { patchNotificationInList } from "../lib/notification-view";
+import {
+  currentSubscription,
+  pushSupported,
+  subscribeToPush,
+  unsubscribeFromPush,
+} from "../lib/push";
 
 import { activityKeys } from "@/features/activity/hooks/use-activity";
 import { apiClient } from "@/lib/api-client";
@@ -32,6 +38,7 @@ export const notificationKeys = {
   list: (unread: boolean) => [...notificationKeys.lists(), { unread }] as const,
   badge: () => [...notificationKeys.all, "badge"] as const,
   preferences: () => [...notificationKeys.all, "preferences"] as const,
+  push: () => [...notificationKeys.all, "push"] as const,
 };
 
 export function useNotifications(unread: boolean) {
@@ -127,5 +134,69 @@ export function useUpdateNotificationPreferences() {
       queryClient.setQueryData(notificationKeys.preferences(), updated),
     onSettled: () =>
       void queryClient.invalidateQueries({ queryKey: notificationKeys.preferences() }),
+  });
+}
+
+/**
+ * Whether this deployment can send push and whether this browser is registered (GAP-13).
+ *
+ * Server configuration and browser state are one query on purpose: the settings page
+ * needs both before it can say anything truthful about the control, and asking for them
+ * separately would render a checkbox that flips as the second answer arrives.
+ */
+export function usePushRegistration() {
+  return useQuery({
+    queryKey: notificationKeys.push(),
+    queryFn: async () => {
+      const config = await apiClient.getPushConfig();
+      const supported = pushSupported();
+      return {
+        configured: config.enabled,
+        publicKey: config.publicKey,
+        supported,
+        permission: supported ? Notification.permission : null,
+        subscribed: supported ? (await currentSubscription()) !== null : false,
+      };
+    },
+    // Permission can be revoked in browser settings while the page is open, so this is
+    // re-read on focus rather than cached for the session.
+    refetchOnWindowFocus: true,
+  });
+}
+
+/**
+ * Turn the push channel on or off for this browser. Registration and the preference move
+ * together: the channel is never on without a device behind it, and turning it off
+ * unregisters rather than leaving the server pushing into a device that ignores it.
+ */
+export function useSetPushEnabled() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      enabled,
+      publicKey,
+    }: {
+      enabled: boolean;
+      publicKey: string | null;
+    }) => {
+      if (enabled) {
+        if (!publicKey) throw new Error("This server has no push key configured.");
+        const subscription = await subscribeToPush(publicKey);
+        // The user dismissed or refused the permission prompt: nothing changes.
+        if (!subscription) return false;
+        await apiClient.addPushSubscription(subscription);
+        await apiClient.updateNotificationPreferences({ channels: { push: true } });
+        return true;
+      }
+
+      const endpoint = await unsubscribeFromPush();
+      if (endpoint) await apiClient.removePushSubscription(endpoint);
+      await apiClient.updateNotificationPreferences({ channels: { push: false } });
+      return true;
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: notificationKeys.push() });
+      void queryClient.invalidateQueries({ queryKey: notificationKeys.preferences() });
+    },
   });
 }

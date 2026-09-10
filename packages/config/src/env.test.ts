@@ -1,3 +1,5 @@
+import { createECDH } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
 import { EnvironmentValidationError, parseServerEnv } from "./env.js";
@@ -73,4 +75,61 @@ it("enables inbound email only with a valid receiving domain, ingress secret and
     { ...valid, INBOUND_EMAIL_SECRET: "" },
   ])
     expect(() => parseServerEnv(values)).toThrow(EnvironmentValidationError);
+});
+
+describe("web push configuration (GAP-13)", () => {
+  /** A real P-256 pair, in the raw base64url form the generator script writes. */
+  function vapid() {
+    const ecdh = createECDH("prime256v1");
+    const publicKey = ecdh.generateKeys().toString("base64url");
+    return {
+      VAPID_PUBLIC_KEY: publicKey,
+      VAPID_PRIVATE_KEY: ecdh.getPrivateKey().toString("base64url"),
+      VAPID_SUBJECT: "mailto:ops@morrow.example",
+    };
+  }
+
+  it("starts with push off when no VAPID key is set", () => {
+    const env = parseServerEnv(base as NodeJS.ProcessEnv);
+
+    expect(env.VAPID_PUBLIC_KEY).toBeUndefined();
+    expect(env.VAPID_PRIVATE_KEY).toBeUndefined();
+  });
+
+  it("accepts a complete key pair", () => {
+    const keys = vapid();
+
+    const env = parseServerEnv({ ...base, ...keys } as NodeJS.ProcessEnv);
+
+    expect(env.VAPID_PUBLIC_KEY).toBe(keys.VAPID_PUBLIC_KEY);
+    expect(env.VAPID_SUBJECT).toBe("mailto:ops@morrow.example");
+  });
+
+  it("refuses a half-configured pair rather than starting with push that cannot sign", () => {
+    const { VAPID_PRIVATE_KEY: _private, ...partial } = vapid();
+
+    expect(() => parseServerEnv({ ...base, ...partial } as NodeJS.ProcessEnv)).toThrow(
+      /must be set together/,
+    );
+  });
+
+  it("refuses a key of the wrong length and a subject that is not a contact", () => {
+    const keys = vapid();
+
+    expect(() =>
+      parseServerEnv({
+        ...base,
+        ...keys,
+        VAPID_PUBLIC_KEY: Buffer.alloc(32).toString("base64url"),
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/65 bytes/);
+
+    expect(() =>
+      parseServerEnv({
+        ...base,
+        ...keys,
+        VAPID_SUBJECT: "ops@morrow.example",
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/mailto:/);
+  });
 });

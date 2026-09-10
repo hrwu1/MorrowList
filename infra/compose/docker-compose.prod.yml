@@ -63,6 +63,10 @@ services:
       INBOUND_EMAIL_SECRET: ${INBOUND_EMAIL_SECRET:-}
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
       EMAIL_FROM: ${EMAIL_FROM:-morrowlist@localhost}
+      # Web push stays off unless all three are set; see the runbook.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
       TRASH_RETENTION_DAYS: ${TRASH_RETENTION_DAYS:-30}

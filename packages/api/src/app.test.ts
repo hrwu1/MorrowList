@@ -27,6 +27,7 @@ import { createLogger, silentLogger } from "@morrowlist/observability";
 import {
   createInMemoryUnitOfWork,
   createRecordingEmailSender,
+  createRecordingPushSender,
   emptyData,
   type InMemoryUnitOfWork,
 } from "@morrowlist/testkit";
@@ -41,6 +42,8 @@ import type { ApiDependencies } from "./context.js";
  */
 
 const NOW = new Date("2026-08-29T09:00:00.000Z");
+/** A VAPID public key: 65 base64url bytes, as `GET /me/push-config` publishes it. */
+const PUSH_PUBLIC_KEY = Buffer.alloc(65, 4).toString("base64url");
 
 let unitOfWork: InMemoryUnitOfWork;
 let app: ReturnType<typeof createApiApp>;
@@ -107,6 +110,7 @@ beforeEach(async () => {
     }),
     auth,
     unitOfWork,
+    pushPublicKey: PUSH_PUBLIC_KEY,
     workspaceService: new WorkspaceService({ unitOfWork, clock: fixedClock(NOW) }),
     projectService: new ProjectService({ unitOfWork, clock: fixedClock(NOW) }),
     workflowService: new WorkflowService({ unitOfWork, clock: fixedClock(NOW) }),
@@ -133,6 +137,7 @@ beforeEach(async () => {
       clock: fixedClock(NOW),
       cursorSecret: "test-secret",
       emailSender: createRecordingEmailSender(),
+      pushSender: createRecordingPushSender(),
       userDirectory: { findById: async () => currentUser },
       appUrl: "http://localhost:3200",
     }),
@@ -1655,6 +1660,26 @@ describe("notifications", () => {
     currentUser = null;
     expect((await request("/api/v1/notifications")).status).toBe(401);
     expect((await request("/api/v1/me/notification-preferences")).status).toBe(401);
+  });
+
+  it("publishes the push key when configured, and reports push off when it is not", async () => {
+    const configured = await request("/api/v1/me/push-config");
+    expect(configured.status).toBe(200);
+    expect((await configured.json()).data).toEqual({
+      enabled: true,
+      publicKey: PUSH_PUBLIC_KEY,
+    });
+
+    // A deployment with no VAPID pair says so rather than handing out a key that
+    // would produce registrations nothing can ever deliver to.
+    const withoutKeys = createApiApp({ ...deps, pushPublicKey: null });
+    const off = await withoutKeys.request("/api/v1/me/push-config", {
+      headers: { cookie: "session=test" },
+    });
+    expect(await off.json()).toEqual({ data: { enabled: false, publicKey: null } });
+
+    currentUser = null;
+    expect((await request("/api/v1/me/push-config")).status).toBe(401);
   });
 
   it("registers and removes a push subscription", async () => {

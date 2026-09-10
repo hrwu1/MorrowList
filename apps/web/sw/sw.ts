@@ -1,6 +1,12 @@
 /// <reference lib="webworker" />
 
 import {
+  notificationTarget,
+  readPushNotification,
+  FALLBACK_NOTIFICATION,
+  type PushNotification,
+} from "../features/notifications/lib/push-payload";
+import {
   CACHED_AT_HEADER,
   MAX_ENTRIES,
   META_CACHE,
@@ -126,6 +132,68 @@ worker.addEventListener("message", (event) => {
   } else return;
   event.waitUntil(inbox.then(acknowledge));
 });
+
+/**
+ * A reminder or digest the server encrypted to this device (GAP-13 step 7).
+ *
+ * The push service only relays bytes; the payload is decrypted by the browser before it
+ * reaches here, so this is the first place the notification exists as text. A push that
+ * arrives without a readable payload still shows something, because a browser that has
+ * granted permission may otherwise show its own "this site was updated in the background"
+ * notice instead.
+ */
+worker.addEventListener("push", (event) => {
+  const notification = readPushPayload(event.data);
+  event.waitUntil(
+    worker.registration.showNotification(notification.title, {
+      body: notification.body,
+      tag: notification.tag,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url: notification.url },
+    }),
+  );
+});
+
+/**
+ * Clicking one opens the task or Today it names. An already-open window is focused and
+ * navigated rather than a second one opened, so the app is never running twice.
+ */
+worker.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL(
+    notificationTarget(
+      (event.notification.data as { url?: string } | undefined)?.url ?? "/today",
+      worker.registration.scope,
+    ),
+  );
+
+  event.waitUntil(
+    (async () => {
+      const clients = await worker.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      for (const client of clients) {
+        if (new URL(client.url).origin !== target.origin) continue;
+        await client.focus();
+        if ("navigate" in client) await client.navigate(target.href);
+        return;
+      }
+      await worker.clients.openWindow(target.href);
+    })(),
+  );
+});
+
+/** `PushMessageData.json()` throws on a payload that is not JSON; the fallback covers it. */
+function readPushPayload(data: PushMessageData | null): PushNotification {
+  if (!data) return FALLBACK_NOTIFICATION;
+  try {
+    return readPushNotification(data.json());
+  } catch {
+    return FALLBACK_NOTIFICATION;
+  }
+}
 
 worker.addEventListener("fetch", (event) => {
   const { request } = event;

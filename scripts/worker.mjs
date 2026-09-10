@@ -40,10 +40,23 @@ const handle = database.createDatabase({
   applicationName: "morrowlist-worker",
 });
 const unitOfWork = database.createUnitOfWork(handle);
+// Same rule as the web process: a configured VAPID pair sends, otherwise the console
+// adapter logs what would have been sent (GAP-13 step 7).
+const vapidKeys =
+  env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT
+    ? {
+        publicKey: env.VAPID_PUBLIC_KEY,
+        privateKey: env.VAPID_PRIVATE_KEY,
+        subject: env.VAPID_SUBJECT,
+      }
+    : null;
 const service = new application.NotificationService({
   unitOfWork,
   cursorSecret: env.AUTH_SECRET ?? "development-only-cursor-secret",
   emailSender: application.createConsoleEmailSender(logger),
+  pushSender: vapidKeys
+    ? application.createWebPushSender({ keys: vapidKeys, logger })
+    : application.createConsolePushSender(logger),
   userDirectory: auth.createUserDirectory(handle.db),
   appUrl: env.APP_URL,
   logger,
