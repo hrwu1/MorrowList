@@ -65,9 +65,22 @@ export const architecturePlugin = {
         const isTest =
           /\.(test|spec)\.[cm]?[jt]sx?$/.test(path) || path.includes("/testing/");
         const isConfig =
-          /(?:^|\/)[^/]*config\.[cm]?[jt]s$/.test(path) || path.includes("/vitest/");
+          /^(apps|packages)\/[^/]+\/[^/]+\.config\.[cm]?[jt]s$/.test(path) ||
+          /^packages\/config\/vitest\//.test(path);
         const isComposition = path === "apps/web/lib/server.ts";
         const isDatabaseHarness = path === "apps/web/e2e/global-setup.ts";
+
+        function ambient(node, name) {
+          for (
+            let scope = context.sourceCode.getScope(node);
+            scope;
+            scope = scope.upper
+          ) {
+            const variable = scope.set.get(name);
+            if (variable) return variable.defs.length === 0;
+          }
+          return true;
+        }
 
         function check(node, value) {
           if (!value) return;
@@ -84,11 +97,14 @@ export const architecturePlugin = {
           } else if (
             value.startsWith(".") ||
             isAbsolute(value) ||
-            value.startsWith("@/")
+            value.startsWith("@/") ||
+            value.startsWith("file:")
           ) {
             const absolute = value.startsWith("@/")
               ? resolve(root, "apps/web", value.slice(2))
-              : resolve(dirname(filename), value);
+              : value.startsWith("file:")
+                ? fileURLToPath(value)
+                : resolve(dirname(filename), value);
             target = ownerOf(normalize(relative(root, absolute)));
             crossPath = target !== undefined && target !== source;
           }
@@ -145,10 +161,20 @@ export const architecturePlugin = {
             if (node.callee.type === "Identifier" && node.callee.name === "require")
               check(node, specifierOf(node.arguments[0]));
             if (
-              source === "application" &&
+              ["domain", "contracts", "application", "observability"].includes(
+                source,
+              ) &&
               !isTest &&
-              node.callee.type === "Identifier" &&
-              node.callee.name === "fetch"
+              ((node.callee.type === "Identifier" &&
+                node.callee.name === "fetch" &&
+                ambient(node, "fetch")) ||
+                (node.callee.type === "MemberExpression" &&
+                  node.callee.object.type === "Identifier" &&
+                  ["globalThis", "window", "self"].includes(node.callee.object.name) &&
+                  ambient(node, node.callee.object.name) &&
+                  (node.callee.computed
+                    ? specifierOf(node.callee.property) === "fetch"
+                    : node.callee.property.name === "fetch")))
             )
               context.report({ node, messageId: "framework", data: { source } });
           },

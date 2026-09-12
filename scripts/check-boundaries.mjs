@@ -37,6 +37,30 @@ for (const [source, allowed] of Object.entries(allowedDependencies)) {
 }
 const probes = [
   [
+    "application",
+    "export function transform(fetch: (x: number) => number) { return fetch(1); }",
+    false,
+    "local function named fetch",
+  ],
+  [
+    "application",
+    'export const load = () => globalThis.fetch("https://example.com");',
+    true,
+    "ambient fetch",
+  ],
+  [
+    "domain",
+    'export const load = () => fetch("https://example.com");',
+    true,
+    "domain fetch",
+  ],
+  [
+    "contracts",
+    'export const load = () => globalThis["fetch"]("https://example.com");',
+    true,
+    "computed fetch",
+  ],
+  [
     "domain",
     'import { createDatabase } from "../../database/src/index.js";\nexport { createDatabase };',
     true,
@@ -80,6 +104,7 @@ for (const [area, source, blocked, name] of probes)
   cases.push({ path: sourcePath(area), source, blocked, name });
 for (const [path, target, blocked] of [
   ["apps/web/lib/server.ts", "database", false],
+  ["packages/application/src/email-config.ts", "config", true],
   ["apps/web/e2e/global-setup.ts", "database", false],
   ["apps/web/e2e/workflow.spec.ts", "database", true],
   ["packages/api/src/app.test.ts", "testkit", false],
