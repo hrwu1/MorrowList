@@ -1,34 +1,11 @@
 "use client";
 
-import type { TaskDto } from "@morrowlist/contracts";
-import { useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
 
-import { activityKeys } from "../../activity/hooks/use-activity";
-import { boardViewKeys } from "../../board/lib/board-keys";
-import { calendarKeys } from "../../calendar/lib/calendar-view";
-import { flowKeys } from "../../flow/hooks/use-flow";
-import { projectKeys } from "../../projects/hooks/use-projects";
-import { searchKeys } from "../../search/hooks/use-search";
-import { todayKeys } from "../../today/hooks/use-today";
-import { upcomingKeys } from "../../upcoming/hooks/use-upcoming";
-import { workspaceKeys } from "../../workspace/hooks/use-workspace";
-
-import { taskKeys } from "./use-tasks";
+import { isTaskProjection } from "../lib/task-cache";
 
 const REFRESH_INTERVAL_MS = 5_000;
-const projectionKeys: readonly QueryKey[] = [
-  taskKeys.all,
-  projectKeys.boards(),
-  boardViewKeys.all,
-  todayKeys.all,
-  upcomingKeys.all,
-  calendarKeys.all,
-  activityKeys.all,
-  flowKeys.all,
-  searchKeys.all,
-  workspaceKeys.me(),
-];
 
 /** Incoming mail and rule actions share the same task projections as local edits. */
 export async function refreshActiveTaskProjections(client: QueryClient): Promise<void> {
@@ -36,23 +13,9 @@ export async function refreshActiveTaskProjections(client: QueryClient): Promise
   await client.refetchQueries(
     {
       type: "active",
-      predicate: (query) => {
-        if (query.state.fetchStatus !== "idle") return false;
-        const key = query.queryKey;
-        if (
-          !projectionKeys.some((prefix) =>
-            prefix.every((part, index) => key[index] === part),
-          )
-        ) {
-          return false;
-        }
-        // Deletion leaves a usable confirmation in the drawer; its read endpoint 404s.
-        if (key[0] === taskKeys.all[0] && key[1] === "detail") {
-          const task = query.state.data as TaskDto | undefined;
-          if (task?.deletedAt) return false;
-        }
-        return true;
-      },
+      predicate: (query) =>
+        query.state.fetchStatus === "idle" &&
+        isTaskProjection(query.queryKey, query.state.data),
     },
     { cancelRefetch: false },
   );

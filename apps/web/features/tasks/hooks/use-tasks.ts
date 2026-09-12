@@ -1,51 +1,41 @@
 "use client";
 
 import type {
-  CalendarViewResponse,
   CreateTaskRequest,
   ListTasksQuery,
-  ProjectBoardResponse,
   ReorderTaskRequest,
   TaskDto,
-  TaskListResponse,
-  TodayViewResponse,
-  UpcomingViewResponse,
   UpdateTaskRequest,
 } from "@morrowlist/contracts";
 import {
   useMutation,
   useQuery,
   useQueryClient,
-  type QueryClient,
   type QueryKey,
 } from "@tanstack/react-query";
 
-import { activityKeys } from "../../activity/hooks/use-activity";
-import { boardViewKeys } from "../../board/lib/board-keys";
-import { flowKeys } from "../../flow/hooks/use-flow";
-import { projectKeys, type BoardViewOptions } from "../../projects/hooks/use-projects";
-import { localToday, patchTaskInToday } from "../../today/lib/today-view";
-import { patchTaskInUpcoming } from "../../upcoming/lib/upcoming-view";
+import { projectKeys } from "../../projects/lib/project-keys";
 import {
-  applyProgressDelta,
-  parentProgressDeltas,
-  patchTaskInBoard,
-  selectInboxDestination,
-} from "../lib/task-projections";
-import { matchesFilters } from "../lib/task-view";
+  cachedTasks,
+  patchTaskEverywhere,
+  invalidateTaskProjections,
+  cancelTaskProjections,
+  snapshotTaskProjections,
+  restoreTaskProjections,
+  workspaceToday,
+} from "../lib/task-cache";
+import { taskKeys } from "../lib/task-keys";
+import { selectInboxDestination } from "../lib/task-projections";
 import { neighboursOf, undoLabel, type UndoOffer } from "../lib/undo";
 
 import { useUndo } from "./use-undo";
 
-import {
-  calendarKeys,
-  patchTaskInCalendar,
-} from "@/features/calendar/lib/calendar-view";
-import { searchKeys } from "@/features/search/hooks/use-search";
-import { todayKeys } from "@/features/today/hooks/use-today";
-import { upcomingKeys } from "@/features/upcoming/hooks/use-upcoming";
-import { workspaceKeys } from "@/features/workspace/hooks/use-workspace";
 import { apiClient } from "@/lib/api-client";
+export {
+  cachedTasks,
+  patchTaskEverywhere,
+  invalidateTaskProjections,
+} from "../lib/task-cache";
 
 /**
  * Task server state (spec 23.2, 23.3).
@@ -56,235 +46,7 @@ import { apiClient } from "@/lib/api-client";
  * still belongs in a given list instead of every view re-implementing that rule.
  */
 
-export const taskKeys = {
-  all: ["tasks"] as const,
-  lists: () => [...taskKeys.all, "list"] as const,
-  list: (filters: Partial<ListTasksQuery>) =>
-    [...taskKeys.lists(), filters] as const satisfies QueryKey,
-  details: () => [...taskKeys.all, "detail"] as const,
-  detail: (idOrKey: string) => [...taskKeys.details(), idOrKey] as const,
-};
-
-type ListSnapshot = readonly [QueryKey, TaskListResponse | undefined][];
-type Snapshot<T> = readonly [QueryKey, T | undefined][];
-
-interface TaskProjectionSnapshot {
-  readonly lists: ListSnapshot;
-  readonly boards: Snapshot<ProjectBoardResponse>;
-  readonly today: Snapshot<TodayViewResponse>;
-  readonly upcoming: Snapshot<UpcomingViewResponse>;
-  readonly calendar: Snapshot<CalendarViewResponse>;
-  readonly details: Snapshot<TaskDto>;
-}
-
-function filtersOf(key: QueryKey): Partial<ListTasksQuery> {
-  return (key[2] ?? {}) as Partial<ListTasksQuery>;
-}
-
-/** The variant a cached board shows: subtasks and deferred tasks hidden or shown. */
-function boardViewOf(key: QueryKey): Partial<BoardViewOptions> {
-  return (key[3] ?? {}) as Partial<BoardViewOptions>;
-}
-
-/**
- * The one canonical optimistic patch (spec 23.3, "do not duplicate patch logic per
- * view"). A task is replaced wherever it is cached, and drops out of the lists whose
- * filters it no longer satisfies. Its parents' progress lines follow the change, so a
- * card reads "1/2" the moment a subtask is ticked rather than after the refetch.
- */
-export function patchTaskEverywhere(queryClient: QueryClient, task: TaskDto): void {
-  const previous = findCachedTask(queryClient, task.id);
-  replaceTaskInCaches(queryClient, task);
-
-  for (const [parentId, delta] of parentProgressDeltas(previous, task)) {
-    const parent = findCachedTask(queryClient, parentId);
-    if (parent) replaceTaskInCaches(queryClient, applyProgressDelta(parent, delta));
-  }
-}
-
-/**
- * Every task the browser currently has, from any projection. Undoing a move needs the
- * neighbours the task used to sit between, and this is where they are already known —
- * no extra request, and no view has to hand its rows down for it.
- */
-export function cachedTasks(queryClient: QueryClient): readonly TaskDto[] {
-  const seen = new Map<string, TaskDto>();
-  for (const [, current] of snapshotLists(queryClient)) {
-    for (const task of current?.data ?? []) seen.set(task.id, task);
-  }
-  for (const [, current] of snapshotBoards(queryClient)) {
-    for (const task of current?.data.tasks ?? []) seen.set(task.id, task);
-  }
-  for (const [, current] of snapshotViews<CalendarViewResponse>(
-    queryClient,
-    calendarKeys.all,
-  )) {
-    for (const task of current?.data.tasks ?? []) seen.set(task.id, task);
-  }
-  return [...seen.values()];
-}
-
-function findCachedTask(queryClient: QueryClient, taskId: string): TaskDto | undefined {
-  for (const [, current] of snapshotDetails(queryClient)) {
-    if (current?.id === taskId) return current;
-  }
-  for (const [, current] of snapshotLists(queryClient)) {
-    const hit = current?.data.find((candidate) => candidate.id === taskId);
-    if (hit) return hit;
-  }
-  for (const [, current] of snapshotBoards(queryClient)) {
-    const hit = current?.data.tasks.find((candidate) => candidate.id === taskId);
-    if (hit) return hit;
-  }
-  for (const [, current] of snapshotViews<CalendarViewResponse>(
-    queryClient,
-    calendarKeys.all,
-  )) {
-    const hit = current?.data.tasks.find((candidate) => candidate.id === taskId);
-    if (hit) return hit;
-  }
-  return undefined;
-}
-
-function replaceTaskInCaches(queryClient: QueryClient, task: TaskDto): void {
-  for (const [key, current] of snapshotLists(queryClient)) {
-    if (!current?.data.some((candidate) => candidate.id === task.id)) continue;
-    const filters = filtersOf(key);
-    queryClient.setQueryData<TaskListResponse>(key, {
-      ...current,
-      data: current.data.flatMap((candidate) =>
-        candidate.id !== task.id
-          ? [candidate]
-          : matchesFilters(task, filters)
-            ? [task]
-            : [],
-      ),
-    });
-  }
-
-  for (const [key, current] of snapshotBoards(queryClient)) {
-    if (current) {
-      queryClient.setQueryData<ProjectBoardResponse>(
-        key,
-        patchTaskInBoard(current, task, {
-          ...boardViewOf(key),
-          today: workspaceToday(queryClient),
-        }),
-      );
-    }
-  }
-
-  for (const [key, current] of snapshotViews<TodayViewResponse>(
-    queryClient,
-    todayKeys.all,
-  )) {
-    if (current) queryClient.setQueryData(key, patchTaskInToday(current, task));
-  }
-  for (const [key, current] of snapshotViews<UpcomingViewResponse>(
-    queryClient,
-    upcomingKeys.all,
-  )) {
-    if (current) queryClient.setQueryData(key, patchTaskInUpcoming(current, task));
-  }
-
-  for (const [key, current] of snapshotViews<CalendarViewResponse>(
-    queryClient,
-    calendarKeys.all,
-  )) {
-    if (current) queryClient.setQueryData(key, patchTaskInCalendar(current, task));
-  }
-
-  // Only refresh detail entries that are actually cached; never conjure one.
-  for (const [key, current] of snapshotDetails(queryClient)) {
-    if (current?.id === task.id) queryClient.setQueryData(key, task);
-  }
-}
-
-function snapshotLists(queryClient: QueryClient): ListSnapshot {
-  return queryClient.getQueriesData<TaskListResponse>({ queryKey: taskKeys.lists() });
-}
-
-function snapshotDetails(queryClient: QueryClient): Snapshot<TaskDto> {
-  return queryClient.getQueriesData<TaskDto>({ queryKey: taskKeys.details() });
-}
-
-function snapshotBoards(queryClient: QueryClient): Snapshot<ProjectBoardResponse> {
-  return queryClient.getQueriesData<ProjectBoardResponse>({
-    queryKey: projectKeys.boards(),
-  });
-}
-
-function snapshotViews<T>(queryClient: QueryClient, queryKey: QueryKey): Snapshot<T> {
-  return queryClient.getQueriesData<T>({ queryKey });
-}
-
-function snapshotTaskProjections(queryClient: QueryClient): TaskProjectionSnapshot {
-  return {
-    lists: snapshotLists(queryClient),
-    boards: snapshotBoards(queryClient),
-    today: snapshotViews(queryClient, todayKeys.all),
-    upcoming: snapshotViews(queryClient, upcomingKeys.all),
-    calendar: snapshotViews(queryClient, calendarKeys.all),
-    details: snapshotDetails(queryClient),
-  };
-}
-
-function restoreSnapshot<T>(queryClient: QueryClient, snapshot: Snapshot<T>): void {
-  for (const [key, value] of snapshot) queryClient.setQueryData(key, value);
-}
-
-function restoreTaskProjections(
-  queryClient: QueryClient,
-  snapshot: TaskProjectionSnapshot,
-): void {
-  restoreSnapshot(queryClient, snapshot.lists);
-  restoreSnapshot(queryClient, snapshot.boards);
-  restoreSnapshot(queryClient, snapshot.today);
-  restoreSnapshot(queryClient, snapshot.upcoming);
-  restoreSnapshot(queryClient, snapshot.calendar);
-  restoreSnapshot(queryClient, snapshot.details);
-}
-
-function invalidateLists(queryClient: QueryClient): void {
-  void queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
-}
-
-/** Every projection that shows tasks: lists, boards, and the Today and Upcoming views. */
-export function invalidateTaskProjections(queryClient: QueryClient): void {
-  invalidateLists(queryClient);
-  void queryClient.invalidateQueries({ queryKey: projectKeys.boards() });
-  void queryClient.invalidateQueries({ queryKey: boardViewKeys.all });
-  // Every mutation records history, so any open activity list is now behind.
-  void queryClient.invalidateQueries({ queryKey: activityKeys.all });
-  void queryClient.invalidateQueries({ queryKey: flowKeys.all });
-  void queryClient.invalidateQueries({ queryKey: todayKeys.all });
-  void queryClient.invalidateQueries({ queryKey: upcomingKeys.all });
-  void queryClient.invalidateQueries({ queryKey: calendarKeys.all });
-  // The shell's in-progress counter follows every move, complete, and reopen (GAP-20).
-  void queryClient.invalidateQueries({ queryKey: workspaceKeys.me() });
-  void queryClient.invalidateQueries({ queryKey: searchKeys.all });
-}
-
-async function cancelTaskProjections(queryClient: QueryClient): Promise<void> {
-  await Promise.all([
-    queryClient.cancelQueries({ queryKey: taskKeys.all }),
-    queryClient.cancelQueries({ queryKey: projectKeys.boards() }),
-    queryClient.cancelQueries({ queryKey: boardViewKeys.all }),
-    queryClient.cancelQueries({ queryKey: todayKeys.all }),
-    queryClient.cancelQueries({ queryKey: upcomingKeys.all }),
-    queryClient.cancelQueries({ queryKey: calendarKeys.all }),
-  ]);
-}
-
-/**
- * The workspace's current date as the browser last saw it in a Today response, falling
- * back to the browser's own date. Only an optimistic guess; the server's answer replaces
- * it on success (spec 12.3).
- */
-function workspaceToday(queryClient: QueryClient): string {
-  const cached = queryClient.getQueryData<TodayViewResponse>(todayKeys.view());
-  return cached?.data.date ?? localToday();
-}
+export { taskKeys } from "../lib/task-keys";
 
 export function useTaskList(
   filters: Partial<ListTasksQuery>,
@@ -314,7 +76,7 @@ export function useCreateTask() {
   return useMutation({
     mutationFn: (request: CreateTaskRequest) => apiClient.createTask(request),
     onSuccess: (created) => {
-      patchTaskEverywhere(queryClient, created);
+      patchTaskEverywhere(queryClient, created, { previous: null });
       invalidateTaskProjections(queryClient);
     },
   });
@@ -436,20 +198,22 @@ export function useUpdateTask() {
     onMutate: async ({ task, patch }) => {
       await cancelTaskProjections(queryClient);
       const previous = snapshotTaskProjections(queryClient);
-      patchTaskEverywhere(queryClient, {
+      const optimistic: TaskDto = {
         ...task,
         ...stripControlFields(patch),
         // The field patch is a per-key delta, not a replacement (GAP-24).
         ...(patch.fields
           ? { fields: mergeFieldValues(task.fields, patch.fields) }
           : {}),
-      });
-      return { previous };
+      };
+      patchTaskEverywhere(queryClient, optimistic);
+      return { previous, optimistic };
     },
     onError: (_error, _variables, context) => {
       if (context) restoreTaskProjections(queryClient, context.previous);
     },
-    onSuccess: (updated) => patchTaskEverywhere(queryClient, updated),
+    onSuccess: (updated, _variables, context) =>
+      patchTaskEverywhere(queryClient, updated, { previous: context?.optimistic }),
     onSettled: () => invalidateTaskProjections(queryClient),
   });
 }
@@ -678,14 +442,15 @@ export function useTaskAction<V = TaskDto>(
     onMutate: async (variables: V) => {
       await cancelTaskProjections(queryClient);
       const previous = snapshotTaskProjections(queryClient);
-      patchTaskEverywhere(queryClient, guess(variables, workspaceToday(queryClient)));
-      return { previous };
+      const optimistic = guess(variables, workspaceToday(queryClient));
+      patchTaskEverywhere(queryClient, optimistic);
+      return { previous, optimistic };
     },
     onError: (_error, _variables, context) => {
       if (context) restoreTaskProjections(queryClient, context.previous);
     },
-    onSuccess: (task, variables) => {
-      patchTaskEverywhere(queryClient, task);
+    onSuccess: (task, variables, context) => {
+      patchTaskEverywhere(queryClient, task, { previous: context?.optimistic });
       const undo = undoOf?.(task, variables);
       if (undo) {
         offer({

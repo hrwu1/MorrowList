@@ -12,16 +12,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { projectKeys, type BoardViewOptions } from "../../projects/hooks/use-projects";
 import { moveTaskInBoard, type BoardPlacement } from "../lib/board-view";
 
-import { activityKeys } from "@/features/activity/hooks/use-activity";
-import { flowKeys } from "@/features/flow/hooks/use-flow";
+import { useUndo } from "@/features/tasks/hooks/use-undo";
 import {
   cachedTasks,
   patchTaskEverywhere,
-  taskKeys,
-} from "@/features/tasks/hooks/use-tasks";
-import { useUndo } from "@/features/tasks/hooks/use-undo";
+  invalidateTaskProjections,
+  cancelTaskProjections,
+  snapshotTaskProjections,
+  restoreTaskProjections,
+} from "@/features/tasks/lib/task-cache";
 import { neighboursOf, undoLabel } from "@/features/tasks/lib/undo";
-import { workspaceKeys } from "@/features/workspace/hooks/use-workspace";
 import { apiClient } from "@/lib/api-client";
 
 export function useProjectBoard(
@@ -74,13 +74,8 @@ export function useMoveBoardTask(projectId: string) {
       });
     },
     onMutate: async (input) => {
-      await Promise.all([
-        queryClient.cancelQueries({ queryKey: boardKey }),
-        queryClient.cancelQueries({ queryKey: taskKeys.all }),
-      ]);
-      const previous = queryClient.getQueriesData<ProjectBoardResponse>({
-        queryKey: boardKey,
-      });
+      await cancelTaskProjections(queryClient);
+      const previous = snapshotTaskProjections(queryClient);
       // Where the card sits now, read before the optimistic patch moves it: this is the
       // position an undo has to restore.
       const origin = neighboursOf(input.task, cachedTasks(queryClient));
@@ -98,14 +93,12 @@ export function useMoveBoardTask(projectId: string) {
       return { previous, origin };
     },
     onError: (_error, _input, context) => {
-      for (const [key, value] of context?.previous ?? []) {
-        queryClient.setQueryData(key, value);
-      }
+      if (context) restoreTaskProjections(queryClient, context.previous);
     },
     onSuccess: (result, input, context) => {
       // A card may open immediately after its move. Detail/list caches must already
       // carry the committed version, even while their background refetch is pending.
-      patchTaskEverywhere(queryClient, result.task);
+      patchTaskEverywhere(queryClient, result.task, { previous: input.task });
       queryClient.setQueriesData<ProjectBoardResponse>(
         { queryKey: boardKey },
         (current) =>
@@ -131,18 +124,11 @@ export function useMoveBoardTask(projectId: string) {
             ...context.origin,
             expectedVersion: result.task.version,
           });
-          void queryClient.invalidateQueries({ queryKey: boardKey });
-          void queryClient.invalidateQueries({ queryKey: taskKeys.all });
+          invalidateTaskProjections(queryClient);
         },
       });
     },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: boardKey });
-      void queryClient.invalidateQueries({ queryKey: taskKeys.all });
-      void queryClient.invalidateQueries({ queryKey: activityKeys.all });
-      void queryClient.invalidateQueries({ queryKey: workspaceKeys.me() });
-      void queryClient.invalidateQueries({ queryKey: flowKeys.all });
-    },
+    onSettled: () => invalidateTaskProjections(queryClient),
   });
 }
 

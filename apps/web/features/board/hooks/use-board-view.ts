@@ -6,12 +6,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { boardViewKeys } from "../lib/board-keys";
 import type { BoardDropStep } from "../lib/board-view";
 
-import { activityKeys } from "@/features/activity/hooks/use-activity";
-import { flowKeys } from "@/features/flow/hooks/use-flow";
-import { projectKeys } from "@/features/projects/hooks/use-projects";
-import { taskKeys } from "@/features/tasks/hooks/use-tasks";
-import { todayKeys } from "@/features/today/hooks/use-today";
-import { workspaceKeys } from "@/features/workspace/hooks/use-workspace";
+import {
+  invalidateTaskProjections,
+  patchTaskEverywhere,
+} from "@/features/tasks/lib/task-cache";
 import { apiClient } from "@/lib/api-client";
 
 export function useBoardView(query: Partial<BoardViewQuery>) {
@@ -100,18 +98,8 @@ export function useBoardDrop() {
 
       return { task: current, warnings };
     },
-    onSettled: () => {
-      for (const key of [
-        boardViewKeys.all,
-        projectKeys.boards(),
-        taskKeys.all,
-        todayKeys.all,
-        activityKeys.all,
-        flowKeys.all,
-        workspaceKeys.me(),
-      ]) {
-        void queryClient.invalidateQueries({ queryKey: key });
-      }
-    },
+    onSuccess: (result, { task }) =>
+      patchTaskEverywhere(queryClient, result.task, { previous: task }),
+    onSettled: () => invalidateTaskProjections(queryClient),
   });
 }

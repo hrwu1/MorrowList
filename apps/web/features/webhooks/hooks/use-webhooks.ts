@@ -16,14 +16,15 @@ export const DELIVERY_POLL_MS = 15_000;
 
 export const webhookKeys = {
   all: ["webhooks"] as const,
-  list: () => [...webhookKeys.all, "list"] as const,
+  lists: () => [...webhookKeys.all, "list"] as const,
+  list: (limit = 100) => [...webhookKeys.lists(), limit] as const,
   deliveries: (id: string) => [...webhookKeys.all, "deliveries", id] as const,
 };
 
-export function useWebhooks() {
+export function useWebhooks(limit = 100) {
   return useQuery({
-    queryKey: webhookKeys.list(),
-    queryFn: () => apiClient.listWebhooks({ limit: 100 }),
+    queryKey: webhookKeys.list(limit),
+    queryFn: () => apiClient.listWebhooks({ limit }),
   });
 }
 
@@ -45,7 +46,7 @@ export function useCreateWebhook() {
   return useMutation({
     mutationFn: (request: CreateWebhookRequest) => apiClient.createWebhook(request),
     onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: webhookKeys.list() }),
+      void queryClient.invalidateQueries({ queryKey: webhookKeys.lists() }),
   });
 }
 
@@ -55,7 +56,7 @@ export function useUpdateWebhook() {
     mutationFn: (input: { id: string; request: UpdateWebhookRequest }) =>
       apiClient.updateWebhook(input.id, input.request),
     onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: webhookKeys.list() }),
+      void queryClient.invalidateQueries({ queryKey: webhookKeys.lists() }),
   });
 }
 

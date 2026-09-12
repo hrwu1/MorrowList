@@ -3,6 +3,8 @@
 import type { ActivityListResponse } from "@morrowlist/contracts";
 import { useInfiniteQuery } from "@tanstack/react-query";
 
+import { activityKeys } from "../lib/activity-keys";
+
 import { apiClient } from "@/lib/api-client";
 
 /**
@@ -14,11 +16,7 @@ export type ActivitySource =
   | { readonly kind: "task"; readonly idOrKey: string }
   | { readonly kind: "project"; readonly projectId: string };
 
-export const activityKeys = {
-  all: ["activity"] as const,
-  task: (idOrKey: string) => [...activityKeys.all, "task", idOrKey] as const,
-  project: (projectId: string) => [...activityKeys.all, "project", projectId] as const,
-};
+export { activityKeys } from "../lib/activity-keys";
 
 export const ACTIVITY_PAGE_SIZE = 20;
 

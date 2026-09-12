@@ -14,13 +14,15 @@ import {
   Spinner,
   TextInput,
 } from "@morrowlist/ui";
-import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 
 import { useRuleMutations, useRuleRuns, useRules } from "../hooks/use-rules";
 
-import { apiClient } from "@/lib/api-client";
+import { useProjects } from "@/features/projects/hooks/use-projects";
+import { useTags } from "@/features/tags/hooks/use-tags";
+import { useTaskList } from "@/features/tasks/hooks/use-tasks";
+import { useWebhooks } from "@/features/webhooks/hooks/use-webhooks";
 
 type Action = CreateRuleRequest["actions"][number];
 type Condition = CreateRuleRequest["conditions"][number];
@@ -190,18 +192,9 @@ function RuleForm({ rule, onSaved }: { rule: RuleDto | null; onSaved: () => void
   );
   const [error, setError] = useState<string | null>(null);
   const mutation = useRuleMutations();
-  const tags = useQuery({
-    queryKey: ["rules", "tags"],
-    queryFn: () => apiClient.listTags(),
-  });
-  const projects = useQuery({
-    queryKey: ["rules", "projects"],
-    queryFn: () => apiClient.listProjects(),
-  });
-  const webhooks = useQuery({
-    queryKey: ["rules", "webhooks"],
-    queryFn: () => apiClient.listWebhooks({ limit: 200 }),
-  });
+  const tags = useTags();
+  const projects = useProjects();
+  const webhooks = useWebhooks(200);
   const patch = (next: Partial<CreateRuleRequest>) =>
     setValue((current) => ({ ...current, ...next }));
   const action = (index: number, next: Action) =>
@@ -653,10 +646,7 @@ function RunLog({ rule }: { rule: RuleDto }) {
   const runs = useRuleRuns(rule.id);
   const mutation = useRuleMutations();
   const [taskId, setTaskId] = useState("");
-  const tasks = useQuery({
-    queryKey: ["rules", "test-tasks"],
-    queryFn: () => apiClient.listTasks({ limit: 200 }),
-  });
+  const tasks = useTaskList({ limit: 200 });
   return (
     <section className="stack" aria-label={`Runs for ${rule.name}`}>
       <h3>Test on a task</h3>

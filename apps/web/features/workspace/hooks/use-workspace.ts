@@ -3,6 +3,9 @@
 import type { MeResponse, UpdateWorkspaceRequest } from "@morrowlist/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { workspaceKeys } from "../lib/workspace-keys";
+
+import { invalidateTaskProjections } from "@/features/tasks/lib/task-cache";
 import { apiClient } from "@/lib/api-client";
 
 /**
@@ -11,10 +14,7 @@ import { apiClient } from "@/lib/api-client";
  * task mutation invalidates it, which keeps the count right after any move, complete,
  * or reopen.
  */
-export const workspaceKeys = {
-  all: ["workspace"] as const,
-  me: () => [...workspaceKeys.all, "me"] as const,
-};
+export { workspaceKeys } from "../lib/workspace-keys";
 
 export function useMe() {
   return useQuery({ queryKey: workspaceKeys.me(), queryFn: () => apiClient.me() });
@@ -53,7 +53,7 @@ export function useUpdateWorkspace() {
             }
           : me,
       );
-      void queryClient.invalidateQueries({ queryKey: workspaceKeys.me() });
+      invalidateTaskProjections(queryClient);
     },
   });
 }

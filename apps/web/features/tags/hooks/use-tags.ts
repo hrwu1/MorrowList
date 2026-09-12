@@ -15,8 +15,8 @@ import {
 
 import { sortTags } from "../lib/tags";
 
-import { projectKeys } from "@/features/projects/hooks/use-projects";
-import { taskKeys, useTaskAction } from "@/features/tasks/hooks/use-tasks";
+import { useTaskAction } from "@/features/tasks/hooks/use-tasks";
+import { invalidateTaskProjections } from "@/features/tasks/lib/task-cache";
 import { apiClient } from "@/lib/api-client";
 
 /**
@@ -31,8 +31,7 @@ export const tagKeys = {
 
 function invalidateTagProjections(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: tagKeys.all });
-  void queryClient.invalidateQueries({ queryKey: taskKeys.all });
-  void queryClient.invalidateQueries({ queryKey: projectKeys.boards() });
+  invalidateTaskProjections(queryClient);
 }
 
 export function useTags() {

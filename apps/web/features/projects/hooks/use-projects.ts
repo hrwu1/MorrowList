@@ -1,7 +1,6 @@
 "use client";
 
 import type {
-  BoardSwimlane,
   CreateProjectRequest,
   ListProjectsQuery,
   ProjectBoardResponse,
@@ -16,32 +15,12 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 
+import { projectKeys } from "../lib/project-keys";
+
+import { invalidateTaskProjections } from "@/features/tasks/lib/task-cache";
 import { apiClient } from "@/lib/api-client";
 
-/**
- * The board variants a project can be cached as: subtasks and deferred tasks shown or
- * hidden, and the swimlane it is pivoted by (GAP-19), because the lanes come back with
- * the projection rather than being derived in the browser.
- */
-export interface BoardViewOptions {
-  readonly includeSubtasks: boolean;
-  readonly includeDeferred: boolean;
-  readonly swimlaneBy?: BoardSwimlane;
-}
-
-export const projectKeys = {
-  all: ["projects"] as const,
-  lists: () => [...projectKeys.all, "list"] as const,
-  list: (filters: Partial<ListProjectsQuery> = {}) =>
-    [...projectKeys.lists(), filters] as const,
-  detail: (projectId: string) => [...projectKeys.all, "detail", projectId] as const,
-  boards: () => [...projectKeys.all, "board"] as const,
-  /** Every cached variant of one project's board, whichever subtask view it shows. */
-  projectBoards: (projectId: string) =>
-    [...projectKeys.all, "board", projectId] as const,
-  board: (projectId: string, view: BoardViewOptions) =>
-    [...projectKeys.projectBoards(projectId), view] as const,
-};
+export { projectKeys, type BoardViewOptions } from "../lib/project-keys";
 
 export function useProjects(filters: Partial<ListProjectsQuery> = {}) {
   return useQuery({
@@ -65,6 +44,7 @@ export function useCreateProject() {
     onSuccess: (detail) => {
       queryClient.setQueryData(projectKeys.detail(detail.project.id), detail);
       void queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+      invalidateTaskProjections(queryClient);
     },
   });
 }
@@ -80,6 +60,7 @@ function patchProjectEverywhere(queryClient: QueryClient, project: ProjectDto): 
     (board) => (board ? { ...board, data: { ...board.data, project } } : board),
   );
   void queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+  invalidateTaskProjections(queryClient);
 }
 
 export function useUpdateProject(projectId: string) {
@@ -100,6 +81,7 @@ export function useArchiveProject() {
       queryClient.removeQueries({ queryKey: projectKeys.detail(project.id) });
       queryClient.removeQueries({ queryKey: projectKeys.projectBoards(project.id) });
       void queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+      invalidateTaskProjections(queryClient);
     },
   });
 }
@@ -110,6 +92,7 @@ export function useRestoreProject() {
     mutationFn: (projectId: string) => apiClient.restoreProject(projectId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+      invalidateTaskProjections(queryClient);
     },
   });
 }

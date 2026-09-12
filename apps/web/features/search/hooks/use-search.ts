@@ -1,7 +1,8 @@
 "use client";
 
-import type { SearchQuery } from "@morrowlist/contracts";
 import { useInfiniteQuery } from "@tanstack/react-query";
+
+import { searchKeys, type SearchFilters } from "../lib/search-keys";
 
 import { apiClient } from "@/lib/api-client";
 
@@ -11,13 +12,7 @@ import { apiClient } from "@/lib/api-client";
  * a hit's title or state may have changed.
  */
 
-export type SearchFilters = Omit<Partial<SearchQuery>, "q" | "cursor" | "limit">;
-
-export const searchKeys = {
-  all: ["search"] as const,
-  results: (q: string, filters: SearchFilters, limit: number) =>
-    [...searchKeys.all, q, filters, limit] as const,
-};
+export { searchKeys, type SearchFilters } from "../lib/search-keys";
 
 export function useSearch(
   q: string,

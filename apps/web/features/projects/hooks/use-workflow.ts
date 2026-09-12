@@ -24,9 +24,7 @@ import {
 
 import { projectKeys } from "./use-projects";
 
-import { activityKeys } from "@/features/activity/hooks/use-activity";
-import { taskKeys } from "@/features/tasks/hooks/use-tasks";
-import { workspaceKeys } from "@/features/workspace/hooks/use-workspace";
+import { invalidateTaskProjections } from "@/features/tasks/lib/task-cache";
 import { apiClient } from "@/lib/api-client";
 
 /**
@@ -109,6 +107,7 @@ function invalidateStatuses(queryClient: QueryClient, projectId: string): void {
     queryKey: projectKeys.projectBoards(projectId),
   });
   void queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) });
+  invalidateTaskProjections(queryClient);
 }
 
 /** The optimistic shape of a column after a patch; omitted fields stay as they are. */
@@ -162,16 +161,7 @@ export function useUpdateStatus(projectId: string) {
       if (context) restoreStatuses(queryClient, projectId, context.previous);
     },
     onSuccess: (status) => patchStatusEverywhere(queryClient, projectId, status),
-    onSettled: (_status, _error, { patch }) => {
-      invalidateStatuses(queryClient, projectId);
-      // A category change may have completed or reopened the column's tasks, and it
-      // changes what counts as in progress (GAP-20).
-      if (patch.category !== undefined) {
-        void queryClient.invalidateQueries({ queryKey: taskKeys.all });
-        void queryClient.invalidateQueries({ queryKey: activityKeys.all });
-        void queryClient.invalidateQueries({ queryKey: workspaceKeys.me() });
-      }
-    },
+    onSettled: () => invalidateStatuses(queryClient, projectId),
   });
 }
 
@@ -226,10 +216,6 @@ export function useArchiveStatus(projectId: string) {
     onSuccess: (status) => {
       patchStatusEverywhere(queryClient, projectId, status);
       invalidateStatuses(queryClient, projectId);
-      // The moved tasks each recorded a task.moved event (spec 19.5).
-      void queryClient.invalidateQueries({ queryKey: taskKeys.all });
-      void queryClient.invalidateQueries({ queryKey: activityKeys.all });
-      void queryClient.invalidateQueries({ queryKey: workspaceKeys.me() });
     },
   });
 }

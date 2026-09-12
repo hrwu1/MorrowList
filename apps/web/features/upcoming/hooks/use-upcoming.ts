@@ -3,12 +3,11 @@
 import type { UpcomingHorizon } from "@morrowlist/contracts";
 import { useQuery } from "@tanstack/react-query";
 
+import { upcomingKeys } from "../lib/upcoming-keys";
+
 import { apiClient } from "@/lib/api-client";
 
-export const upcomingKeys = {
-  all: ["views", "upcoming"] as const,
-  view: (horizon: UpcomingHorizon) => [...upcomingKeys.all, horizon] as const,
-};
+export { upcomingKeys } from "../lib/upcoming-keys";
 
 export function useUpcomingView(horizon: UpcomingHorizon) {
   return useQuery({

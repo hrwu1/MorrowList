@@ -9,8 +9,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { projectKeys } from "@/features/projects/hooks/use-projects";
 import { tagKeys } from "@/features/tags/hooks/use-tags";
-import { taskKeys } from "@/features/tasks/hooks/use-tasks";
-import { workspaceKeys } from "@/features/workspace/hooks/use-workspace";
+import { invalidateTaskProjections } from "@/features/tasks/lib/task-cache";
 import { apiClient } from "@/lib/api-client";
 
 /**
@@ -64,9 +63,8 @@ export function useApplyImport() {
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: projectKeys.all });
-      void queryClient.invalidateQueries({ queryKey: taskKeys.all });
+      invalidateTaskProjections(queryClient);
       void queryClient.invalidateQueries({ queryKey: tagKeys.all });
-      void queryClient.invalidateQueries({ queryKey: workspaceKeys.me() });
     },
   });
 }

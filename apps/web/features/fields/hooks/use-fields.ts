@@ -12,8 +12,7 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 
-import { projectKeys } from "@/features/projects/hooks/use-projects";
-import { taskKeys } from "@/features/tasks/hooks/use-tasks";
+import { invalidateTaskProjections } from "@/features/tasks/lib/task-cache";
 import { apiClient } from "@/lib/api-client";
 
 /**
@@ -29,8 +28,7 @@ export const fieldKeys = {
 
 function invalidateFieldProjections(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: fieldKeys.all });
-  void queryClient.invalidateQueries({ queryKey: taskKeys.all });
-  void queryClient.invalidateQueries({ queryKey: projectKeys.boards() });
+  invalidateTaskProjections(queryClient);
 }
 
 export function useFields() {

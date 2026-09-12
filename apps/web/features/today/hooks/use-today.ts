@@ -2,6 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 
+import { todayKeys } from "../lib/today-keys";
+
 import { apiClient } from "@/lib/api-client";
 
 /**
@@ -9,10 +11,7 @@ import { apiClient } from "@/lib/api-client";
  * is its own cache entry; the current day is keyed as "current" because the browser does
  * not know the workspace's calendar date until the response says so.
  */
-export const todayKeys = {
-  all: ["views", "today"] as const,
-  view: (date?: string | undefined) => [...todayKeys.all, date ?? "current"] as const,
-};
+export { todayKeys } from "../lib/today-keys";
 
 export function useTodayView(date?: string | undefined) {
   return useQuery({
