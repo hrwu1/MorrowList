@@ -34,14 +34,9 @@ import {
   type ActorContext,
 } from "../shared/actor-context.js";
 import { recordEvent } from "../shared/event-recorder.js";
+import { assertVersion, versionConflict } from "../shared/version.js";
 
-import {
-  assertVersion,
-  requireActiveProject,
-  requireStatus,
-  requireWorkspace,
-  versionConflict,
-} from "./lookup.js";
+import { requireActiveProject, requireStatus, requireWorkspace } from "./lookup.js";
 import { toWorkflowStatusDto } from "./mappers.js";
 
 export interface WorkflowServiceOptions {

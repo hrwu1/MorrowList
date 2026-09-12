@@ -1,7 +1,6 @@
 import {
   MAX_IMPORT_SAMPLE,
   PROJECT_EVENTS,
-  TAG_EVENTS,
   TASK_EVENTS,
   WORKSPACE_EVENTS,
   type ImportPreviewDto,
@@ -9,7 +8,6 @@ import {
   type ImportSource,
 } from "@morrowlist/contracts";
 import {
-  DEFAULT_TAG_COLOR,
   DomainError,
   ImportFormatError,
   ValidationError,
@@ -20,7 +18,6 @@ import {
   deleteTask,
   fieldColumnName,
   isTerminalCategory,
-  normalizeTagName,
   planFromCsv,
   planFromTrelloJson,
   plannedTagNames,
@@ -29,7 +26,6 @@ import {
   systemClock,
   tagLookupKey,
   taskCountByStatus,
-  toTagColorToken,
   uuidv7,
   validateFieldValue,
   type Clock,
@@ -45,8 +41,6 @@ import {
   type WorkflowStatus,
 } from "@morrowlist/domain";
 
-import { syncIntervals } from "../flow/intervals.js";
-import { recomputeReminder } from "../notifications/scheduler.js";
 import type {
   Project,
   TransactionContext,
@@ -61,7 +55,9 @@ import {
   type ActorContext,
 } from "../shared/actor-context.js";
 import { recordEvent } from "../shared/event-recorder.js";
+import { TagService } from "../tags/service.js";
 import { insertNewTask } from "../tasks/create.js";
+import { persistTaskTransition } from "../tasks/persist.js";
 import { slugify } from "../workspace/bootstrap.js";
 
 /**
@@ -282,6 +278,7 @@ export class ImportService {
     plan: ImportPlan,
   ): Promise<Map<string, Tag>> {
     const resolved = new Map<string, Tag>();
+    const tags = new TagService({ unitOfWork: this.unitOfWork, clock: this.clock });
     for (const name of plannedTagNames(plan)) {
       const normalizedName = tagLookupKey(name);
       const existing = await tx.tags.findByNormalizedName(workspaceId, normalizedName);
@@ -289,26 +286,7 @@ export class ImportService {
         resolved.set(normalizedName, existing);
         continue;
       }
-      const now = this.clock.now();
-      const tag: Tag = {
-        id: uuidv7(),
-        workspaceId,
-        name: normalizeTagName(name),
-        normalizedName,
-        colorToken: toTagColorToken(DEFAULT_TAG_COLOR),
-        description: null,
-        createdAt: now,
-        updatedAt: now,
-      };
-      await tx.tags.insert(tag);
-      await recordEvent(tx, context, this.clock, {
-        workspaceId,
-        aggregateType: "tag",
-        aggregateId: tag.id,
-        eventType: TAG_EVENTS.created,
-        summary: `Created tag ${tag.name}`,
-        payload: { tagId: tag.id, name: tag.name, colorToken: tag.colorToken },
-      });
+      const tag = await tags.insertTag(tx, context, workspaceId, { name });
       resolved.set(normalizedName, tag);
     }
     return resolved;
@@ -364,7 +342,7 @@ export class ImportService {
     let current = created;
     if (planned.isCompleted)
       current = await this.complete(tx, context, workspace, current, input.doneStatus);
-    if (planned.isArchived) current = await this.trash(tx, context, current);
+    if (planned.isArchived) current = await this.trash(tx, context, workspace, current);
     return current;
   }
 
@@ -386,13 +364,13 @@ export class ImportService {
       { doneStatus: { status: doneStatus, rank: rankBetween(lastRank, null) } },
       { actor: actorRef(context), clock: this.clock },
     );
-    await tx.tasks.update(completed, task.version);
-    await syncIntervals(tx, task, completed, doneStatus);
-    await recomputeReminder(tx, completed, workspace.timezone, this.clock.now());
-    await recordEvent(tx, context, this.clock, {
-      workspaceId: task.workspaceId,
-      aggregateType: "task",
-      aggregateId: task.id,
+    await persistTaskTransition({
+      tx,
+      context,
+      clock: this.clock,
+      workspace,
+      previous: task,
+      next: completed,
       eventType: TASK_EVENTS.completed,
       summary: "Completed task",
       payload: { taskId: task.id, statusId: completed.statusId },
@@ -403,16 +381,17 @@ export class ImportService {
   private async trash(
     tx: TransactionContext,
     context: ActorContext,
+    workspace: Workspace,
     task: Task,
   ): Promise<Task> {
     const deleted = deleteTask(task, { actor: actorRef(context), clock: this.clock });
-    await tx.tasks.update(deleted, task.version);
-    await syncIntervals(tx, task, deleted);
-    await tx.reminders.delete(task.id);
-    await recordEvent(tx, context, this.clock, {
-      workspaceId: task.workspaceId,
-      aggregateType: "task",
-      aggregateId: task.id,
+    await persistTaskTransition({
+      tx,
+      context,
+      clock: this.clock,
+      workspace,
+      previous: task,
+      next: deleted,
       eventType: TASK_EVENTS.deleted,
       summary: "Moved task to Trash",
       payload: { taskId: task.id, importedArchived: true },

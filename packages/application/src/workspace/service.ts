@@ -13,7 +13,7 @@ import {
 } from "@morrowlist/domain";
 
 import type { TransactionContext, UnitOfWork, Workspace } from "../ports/index.js";
-import { assertVersion, versionConflict } from "../projects/lookup.js";
+import { assertVersion, versionConflict } from "../shared/version.js";
 import {
   SCOPES,
   assertScope,

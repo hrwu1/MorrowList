@@ -45,7 +45,7 @@ import {
   assertWorkspaceAccess,
   type ActorContext,
 } from "../shared/actor-context.js";
-import { loadTaskDtos, toTaskDto } from "../tasks/mappers.js";
+import { loadTaskDtos } from "../tasks/mappers.js";
 
 export interface ViewServiceOptions {
   readonly unitOfWork: UnitOfWork;
@@ -122,25 +122,21 @@ export class ViewService {
           ? await tx.dayPlans.listUnfinished(workspace.id, addDays(date, -1))
           : [];
 
-      const candidateIds = [...page.items, ...unfinished].map((task) => task.id);
-      // My Day dates, subtask progress and tags each come from one query for the view.
-      const [plans, progress, tags, edges] = await Promise.all([
-        tx.dayPlans.listForTasks(candidateIds, date < today ? date : today),
-        tx.tasks.childSummary(workspace.id, candidateIds),
-        tx.tasks.tagsFor(workspace.id, candidateIds),
-        tx.tasks.relationsFor(workspace.id, candidateIds),
-      ]);
+      const candidates = [...page.items, ...unfinished];
+      const projected = new Map(
+        (
+          await loadTaskDtos(tx, workspace, candidates, date < today ? date : today)
+        ).map((task) => [task.id, task]),
+      );
       const plannedFor = (task: Task, day: PlainDate) =>
-        plans.get(task.id)?.includes(day) ?? false;
-      const dto = (task: Task) =>
-        toTaskDto(
-          task,
-          workspace.taskKeyPrefix,
-          (plans.get(task.id) ?? []).filter((planDate) => planDate >= today),
-          progress.get(task.id) ?? null,
-          tags.get(task.id) ?? [],
-          edges,
-        );
+        projected.get(task.id)?.dayPlans.includes(day) ?? false;
+      const dto = (task: Task) => {
+        const projectedTask = projected.get(task.id)!;
+        return {
+          ...projectedTask,
+          dayPlans: projectedTask.dayPlans.filter((planDate) => planDate >= today),
+        };
+      };
 
       const planned = new Set(
         page.items.filter((task) => plannedFor(task, date)).map((task) => task.id),
@@ -187,13 +183,12 @@ export class ViewService {
         to,
         limit: UPCOMING_LIMIT,
       });
-      const taskIds = page.items.map((task) => task.id);
-      const [plans, progress, tags, edges] = await Promise.all([
-        tx.dayPlans.listForTasks(taskIds, today),
-        tx.tasks.childSummary(workspace.id, taskIds),
-        tx.tasks.tagsFor(workspace.id, taskIds),
-        tx.tasks.relationsFor(workspace.id, taskIds),
-      ]);
+      const projected = new Map(
+        (await loadTaskDtos(tx, workspace, page.items, today)).map((task) => [
+          task.id,
+          task,
+        ]),
+      );
 
       return {
         data: {
@@ -201,16 +196,7 @@ export class ViewService {
           horizon: request.horizon,
           groups: upcomingGroups(page.items, from, horizonDays).map((group) => ({
             date: group.date,
-            tasks: group.tasks.map((task) =>
-              toTaskDto(
-                task,
-                workspace.taskKeyPrefix,
-                plans.get(task.id) ?? [],
-                progress.get(task.id) ?? null,
-                tags.get(task.id) ?? [],
-                edges,
-              ),
-            ),
+            tasks: group.tasks.map((task) => projected.get(task.id)!),
           })),
           truncated: page.truncated,
         },

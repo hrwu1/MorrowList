@@ -36,17 +36,12 @@ import {
   type ActorContext,
 } from "../shared/actor-context.js";
 import { recordEvent } from "../shared/event-recorder.js";
+import { assertVersion, versionConflict } from "../shared/version.js";
 import { createTagDtoMapper } from "../tags/mappers.js";
 import { groupRelationsByTask, toTaskDto } from "../tasks/mappers.js";
 import { slugify } from "../workspace/bootstrap.js";
 
-import {
-  assertVersion,
-  requireActiveProject,
-  requireProject,
-  requireWorkspace,
-  versionConflict,
-} from "./lookup.js";
+import { requireActiveProject, requireProject, requireWorkspace } from "./lookup.js";
 import { toProjectDto, toWorkflowStatusDto } from "./mappers.js";
 
 export interface ProjectServiceOptions {

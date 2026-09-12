@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { TASK_EVENTS, WORKSPACE_EVENTS } from "@morrowlist/contracts";
+import { TAG_EVENTS, TASK_EVENTS, WORKSPACE_EVENTS } from "@morrowlist/contracts";
 import { DomainError, fixedClock } from "@morrowlist/domain";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -210,6 +210,24 @@ describe("ImportService.apply", () => {
 
     // Every activity row has its outbox twin (EVT-001).
     expect(unitOfWork.data.outbox).toHaveLength(unitOfWork.data.activity.length);
+  });
+
+  it("uses the canonical tag-created payload for imported tags", async () => {
+    await imports.apply(seeded.context, workspaceId(), "trello", {
+      content: TRELLO_BOARD,
+    });
+    const events = unitOfWork.data.outbox.filter(
+      (event) => event.eventType === TAG_EVENTS.created,
+    );
+    expect(events).toHaveLength(2);
+    for (const event of events) {
+      const tag = unitOfWork.data.tags.get(event.aggregateId)!;
+      expect(event.payload).toEqual({
+        tagId: tag.id,
+        tagName: tag.name,
+        colorToken: tag.colorToken,
+      });
+    }
   });
 
   it("rolls the whole import back when the commit fails", async () => {

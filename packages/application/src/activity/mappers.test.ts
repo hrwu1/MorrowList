@@ -63,6 +63,22 @@ describe("changesOf", () => {
 });
 
 describe("toActivityEntryDto", () => {
+  it.each([{ name: "Imported label" }, { tagName: "Imported label" }])(
+    "keeps historical and canonical tag-created payloads readable: %j",
+    (name) => {
+      const payload = { tagId: "tag-1", ...name, colorToken: "blue" };
+      const dto = toActivityEntryDto({
+        ...event(payload),
+        aggregateType: "tag",
+        eventType: "tag.created",
+        summary: "Created tag Imported label",
+      });
+      expect(dto.summary).toBe("Created tag Imported label");
+      expect(dto.payload).toEqual(payload);
+      expect(dto.changes).toEqual([]);
+    },
+  );
+
   it("serialises the timestamp and keeps the safe summary and payload", () => {
     const dto = toActivityEntryDto(
       event({ taskId: "t", changes: { title: { from: "A", to: "B" } } }),

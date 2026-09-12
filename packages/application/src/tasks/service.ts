@@ -35,7 +35,6 @@ import {
   entersInProgress,
   isTerminal,
   isUuid,
-  materialChanges,
   moveTask as applyTaskMove,
   rankBetween,
   reopenTask,
@@ -67,11 +66,7 @@ import {
 } from "@morrowlist/domain";
 
 import { resolveFieldFilters } from "../fields/service.js";
-import { syncIntervals } from "../flow/intervals.js";
-import {
-  defaultReminderOffset,
-  recomputeReminder,
-} from "../notifications/scheduler.js";
+import { defaultReminderOffset } from "../notifications/scheduler.js";
 import type {
   Page,
   RankScope,
@@ -91,6 +86,7 @@ import { recordEvent } from "../shared/event-recorder.js";
 
 import { insertNewTask, type TaskOrigin } from "./create.js";
 import { loadTaskDtos, toTaskFilter } from "./mappers.js";
+import { persistTaskTransition } from "./persist.js";
 
 /**
  * Task use cases (spec 19.2). Each method is one user-visible intention: it authorises,
@@ -1289,35 +1285,17 @@ export class TaskService {
       return { task: await this.toDto(tx, workspace, previous), warnings: [] };
     }
 
-    const persisted = await tx.tasks.update(next, previous.version);
-    if (!persisted) {
-      // The row moved between the read and the write inside this transaction.
-      const current = await tx.tasks.findById(workspaceId, taskId);
-      throw new DomainError(
-        "TASK_VERSION_CONFLICT",
-        "The task changed after you loaded it.",
-        {
-          taskId,
-          expectedVersion: previous.version,
-          actualVersion: current?.version ?? null,
-        },
-      );
-    }
-
-    await syncIntervals(tx, previous, next);
-    await recordEvent(tx, context, this.clock, {
-      workspaceId,
-      aggregateType: "task",
-      aggregateId: taskId,
+    await persistTaskTransition({
+      tx,
+      context,
+      clock: this.clock,
+      workspace,
+      previous,
+      next,
       eventType: step.eventType,
       summary: step.summarize(next, previous, workspace),
-      payload: step.payload
-        ? step.payload(next, previous)
-        : { taskId, changes: materialChanges(next, previous) },
+      ...(step.payload ? { payload: step.payload(next, previous) } : {}),
     });
-    // The reminder follows the task in the same transaction: a new due instant
-    // reschedules it; completion or trashing cancels it; restore or reopen brings it back.
-    await recomputeReminder(tx, next, workspace.timezone, this.clock.now());
 
     return {
       task: await this.toDto(tx, workspace, next),
