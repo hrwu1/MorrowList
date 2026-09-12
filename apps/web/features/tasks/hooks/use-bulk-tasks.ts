@@ -1,7 +1,7 @@
 "use client";
 
 import type { TaskDto } from "@morrowlist/contracts";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   bulkVerb,
@@ -19,6 +19,7 @@ import {
 import { useUndo } from "./use-undo";
 
 import { useTaskFeedback } from "@/features/tasks/hooks/use-task-feedback";
+import { useTaskMutation } from "@/features/tasks/hooks/use-task-mutation";
 import { apiClient } from "@/lib/api-client";
 
 /**
@@ -43,7 +44,7 @@ export function useBulkTasks() {
   const { report } = useTaskFeedback();
   const { offer } = useUndo();
 
-  return useMutation({
+  return useTaskMutation({
     mutationFn: ({ action, tasks }: BulkTasksInput) =>
       apiClient.batchTasks({ operations: [...toOperations(action, tasks)] }),
     onSuccess: (result, { action, tasks }) => {

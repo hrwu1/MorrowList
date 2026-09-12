@@ -12,6 +12,7 @@ import {
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
 import { useBoardDrop } from "../../board/hooks/use-board-view";
+import { createTaskSession, type TaskSession } from "../lib/task-session";
 import type { UndoOffer } from "../lib/undo";
 
 import { useBulkTasks } from "./use-bulk-tasks";
@@ -23,6 +24,7 @@ import {
 } from "./use-tasks";
 
 let client: QueryClient;
+let session: TaskSession;
 const mocks = vi.hoisted(() => ({
   report: vi.fn(),
   offer: vi.fn(),
@@ -36,7 +38,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/api-client", () => ({ apiClient: mocks }));
 vi.mock("./use-undo", () => ({ useUndo: () => ({ offer: mocks.offer }) }));
 vi.mock("./use-task-feedback", () => ({
-  useTaskFeedback: () => ({ report: mocks.report }),
+  useTaskFeedback: () => ({ report: mocks.report, session }),
 }));
 // Exercise the real React Query mutation lifecycle without a DOM renderer. Only React's
 // hook binding is replaced; success/rollback/invalidation run through MutationObserver.
@@ -108,6 +110,8 @@ function result(): TaskCommandResult {
 }
 beforeEach(() => {
   vi.resetAllMocks();
+  session = createTaskSession();
+  session.begin("alice");
   client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: Infinity } },
   });
@@ -126,6 +130,31 @@ describe("task command feedback parity", () => {
     expect(mocks.deleteTask).toHaveBeenCalledWith(original.id, original.version);
     expect(client.getQueryData(["tasks", "detail", "current"])).toEqual(original);
   });
+  it("ignores Alice's late command after Bob starts a session", async () => {
+    let finish: ((result: TaskCommandResult) => void) | undefined;
+    mocks.reopenTask.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = useReopenTask().mutateAsync(task({ isCompleted: true }));
+    await vi.waitFor(() => expect(finish).toBeDefined());
+    session.end();
+    session.begin("bob");
+    client.clear();
+    const bob = task({ id: "bob-task", title: "Bob's work" });
+    client.setQueryData(["tasks", "detail", "current"], bob);
+    finish!(result());
+    await expect(pending).rejects.toThrow("This session has ended.");
+    expect(mocks.report).not.toHaveBeenCalled();
+    expect(mocks.offer).not.toHaveBeenCalled();
+    expect(client.getQueryData(["tasks", "detail", "current"])).toEqual(bob);
+    expect(client.getQueryState(["tasks", "detail", "current"])?.isInvalidated).toBe(
+      false,
+    );
+  });
+
   it("preserves reopening warnings for row, detail and shortcut callers", async () => {
     const response = result();
     mocks.reopenTask.mockResolvedValue(response);

@@ -8,12 +8,7 @@ import type {
   TaskCommandResult,
   UpdateTaskRequest,
 } from "@morrowlist/contracts";
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type QueryKey,
-} from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 
 import { projectKeys } from "../../projects/lib/project-keys";
 import {
@@ -33,6 +28,7 @@ import { neighboursOf, undoLabel, type UndoOffer } from "../lib/undo";
 import { useTaskFeedback } from "./use-task-feedback";
 import { useUndo } from "./use-undo";
 
+import { useTaskMutation } from "@/features/tasks/hooks/use-task-mutation";
 import { apiClient } from "@/lib/api-client";
 export {
   cachedTasks,
@@ -76,7 +72,7 @@ export function useTask(idOrKey: string | null) {
 
 export function useCreateTask() {
   const queryClient = useQueryClient();
-  return useMutation({
+  return useTaskMutation({
     mutationFn: (request: CreateTaskRequest) => apiClient.createTask(request),
     onSuccess: (created) => {
       patchTaskEverywhere(queryClient, created, { previous: null });
@@ -101,7 +97,7 @@ export function useMoveTaskToProject() {
   const { offer } = useUndo();
   const { report } = useTaskFeedback();
 
-  return useMutation({
+  return useTaskMutation({
     mutationFn: async ({ task, projectId }: MoveTaskToProjectInput) => {
       if (projectId === null) {
         const result = await apiClient.moveTask(task.id, {
@@ -162,7 +158,7 @@ export interface MoveTaskToReadyInput {
 export function useMoveTaskToReady() {
   const queryClient = useQueryClient();
   const { report } = useTaskFeedback();
-  return useMutation({
+  return useTaskMutation({
     mutationFn: async ({ taskId, projectId }: MoveTaskToReadyInput) => {
       const [task, detail] = await Promise.all([
         apiClient.getTask(taskId),
@@ -199,11 +195,12 @@ export function useMoveTaskToReady() {
  */
 export function useUpdateTask() {
   const queryClient = useQueryClient();
-  return useMutation({
+  return useTaskMutation({
     mutationFn: ({ task, patch }: { task: TaskDto; patch: UpdateTaskRequest }) =>
       apiClient.updateTask(task.id, { expectedVersion: task.version, ...patch }),
-    onMutate: async ({ task, patch }) => {
+    onMutate: async ({ task, patch }, assertCurrent) => {
       await cancelTaskProjections(queryClient);
+      assertCurrent();
       const previous = snapshotTaskProjections(queryClient);
       const optimistic: TaskDto = {
         ...task,
@@ -386,7 +383,7 @@ export interface SetTaskParentInput {
 /** Make a task a subtask of another (spec 8.3). The server enforces depth and cycles. */
 export function useSetTaskParent() {
   const queryClient = useQueryClient();
-  return useMutation({
+  return useTaskMutation({
     mutationFn: ({ task, parentTaskId }: SetTaskParentInput) =>
       apiClient.setTaskParent(task.id, { parentTaskId, expectedVersion: task.version }),
     onSuccess: (updated) => patchTaskEverywhere(queryClient, updated),
@@ -410,7 +407,7 @@ export interface ReorderTaskInput {
 /** Rank-only move between two neighbours in the task's own status (spec 24.2). */
 export function useReorderTask() {
   const queryClient = useQueryClient();
-  return useMutation({
+  return useTaskMutation({
     mutationFn: ({ task, beforeTaskId, afterTaskId }: ReorderTaskInput) =>
       apiClient.reorderTask(task.id, {
         beforeTaskId,
@@ -442,10 +439,11 @@ export function useTaskAction<V = TaskDto, R extends TaskMutationResult = TaskDt
   const queryClient = useQueryClient();
   const { offer } = useUndo();
   const { report } = useTaskFeedback();
-  return useMutation({
+  return useTaskMutation({
     mutationFn: send,
-    onMutate: async (variables: V) => {
+    onMutate: async (variables: V, assertCurrent) => {
       await cancelTaskProjections(queryClient);
+      assertCurrent();
       const previous = snapshotTaskProjections(queryClient);
       const optimistic = guess(variables, workspaceToday(queryClient));
       patchTaskEverywhere(queryClient, optimistic);

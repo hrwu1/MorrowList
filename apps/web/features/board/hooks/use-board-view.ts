@@ -1,12 +1,13 @@
 "use client";
 
 import type { BoardViewQuery, TaskDto, WipWarningDto } from "@morrowlist/contracts";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { boardViewKeys } from "../lib/board-keys";
 import type { BoardDropStep } from "../lib/board-view";
 
 import { useTaskFeedback } from "@/features/tasks/hooks/use-task-feedback";
+import { useTaskMutation } from "@/features/tasks/hooks/use-task-mutation";
 import {
   invalidateTaskProjections,
   patchTaskEverywhere,
@@ -43,7 +44,7 @@ export function useBoardDrop() {
   const queryClient = useQueryClient();
   const { report } = useTaskFeedback();
 
-  return useMutation({
+  return useTaskMutation({
     mutationFn: async ({ task, steps }: BoardDropInputs): Promise<BoardDropResult> => {
       let current = task;
       const warnings: WipWarningDto[] = [];

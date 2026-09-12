@@ -5,12 +5,12 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type Dispatch,
   type SetStateAction,
 } from "react";
-
 
 import { invalidateTaskProjections, patchTaskEverywhere } from "../lib/task-cache";
 import { tasksFromResult } from "../lib/task-command-result";
@@ -60,10 +60,21 @@ export const UndoContext = createContext<UndoStore | null>(null);
 
 /** The store the provider component owns; kept here so the provider stays declarative. */
 export function useUndoStore(): UndoStore {
+  const { session } = useTaskFeedback();
   const [stack, setStack] = useState<readonly UndoEntry[]>([]);
   const [status, setStatus] = useState<UndoState["status"]>("idle");
   const [error, setError] = useState<string | null>(null);
   const [clock, setClock] = useState(() => Date.now());
+  useEffect(
+    () =>
+      session.subscribe(() => {
+        setStack([]);
+        setStatus("idle");
+        setError(null);
+        setClock(Date.now());
+      }),
+    [session],
+  );
   return useMemo(
     () => ({ stack, setStack, status, setStatus, error, setError, clock, setClock }),
     [stack, status, error, clock],
@@ -73,21 +84,25 @@ export function useUndoStore(): UndoStore {
 export function useUndo(): UndoState {
   const store = useContext(UndoContext);
   const queryClient = useQueryClient();
-  const { report } = useTaskFeedback();
+  const { report, session } = useTaskFeedback();
 
   const offer = useCallback(
     (next: UndoOffer) => {
-      if (!store) return;
+      if (!store || !session.isCurrent(session.current())) return;
       const now = Date.now();
       store.setError(null);
       store.setStatus("idle");
       // A second mutation on the same task replaces its offer rather than queueing one.
       store.setStack((current) =>
-        pushEntry(dropEntry(current, next.id), createUndoEntry(next, now), now),
+        pushEntry(
+          dropEntry(current, next.id),
+          { ...createUndoEntry(next, now), sessionRevision: session.current() },
+          now,
+        ),
       );
       store.setClock(now);
     },
-    [store],
+    [store, session],
   );
 
   const dismiss = useCallback(() => {
@@ -100,7 +115,14 @@ export function useUndo(): UndoState {
   const entry = store ? currentEntry(store.stack, store.clock) : null;
 
   const undo = useCallback(() => {
-    if (!store || !entry || store.status === "running") return;
+    if (
+      !store ||
+      !entry ||
+      store.status === "running" ||
+      !session.isCurrent(entry.sessionRevision ?? -1)
+    )
+      return;
+    const revision = session.current();
     store.setStatus("running");
     store.setError(null);
     // The offer is consumed the moment it is used: a failed undo is reported, not retried
@@ -109,6 +131,7 @@ export function useUndo(): UndoState {
     void entry
       .compensate()
       .then((result) => {
+        if (!session.isCurrent(revision)) return;
         for (const task of tasksFromResult(result))
           patchTaskEverywhere(queryClient, task);
         report(result);
@@ -116,10 +139,11 @@ export function useUndo(): UndoState {
         store.setStatus("idle");
       })
       .catch((failure: unknown) => {
+        if (!session.isCurrent(revision)) return;
         store.setStatus("failed");
         store.setError(undoErrorMessage(failure));
       });
-  }, [entry, store, queryClient, report]);
+  }, [entry, store, queryClient, report, session]);
 
   return {
     entry,

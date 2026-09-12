@@ -19,6 +19,8 @@ import type { TaskFeedbackResult } from "./task-command-result";
 export const UNDO_WINDOW_MS = 8_000;
 
 export interface UndoEntry {
+  /** Live stores attach the session that created this offer. */
+  readonly sessionRevision?: number;
   /** The mutation this undoes; a newer mutation on the same id replaces the offer. */
   readonly id: string;
   /** Read out by the toast, so it says what would be undone, not just "Undo". */

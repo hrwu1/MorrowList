@@ -7,12 +7,13 @@ import type {
   TaskDto,
   WorkflowStatusDto,
 } from "@morrowlist/contracts";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { projectKeys, type BoardViewOptions } from "../../projects/hooks/use-projects";
 import { moveTaskInBoard, type BoardPlacement } from "../lib/board-view";
 
 import { useTaskFeedback } from "@/features/tasks/hooks/use-task-feedback";
+import { useTaskMutation } from "@/features/tasks/hooks/use-task-mutation";
 import { useUndo } from "@/features/tasks/hooks/use-undo";
 import {
   cachedTasks,
@@ -58,7 +59,7 @@ export function useMoveBoardTask(projectId: string) {
   // Every cached variant of this board (subtasks hidden or shown) moves together.
   const boardKey = projectKeys.projectBoards(projectId);
 
-  return useMutation({
+  return useTaskMutation({
     mutationFn: async (input: MoveBoardTaskInput): Promise<TaskCommandResult> => {
       const neighbours = {
         beforeTaskId: input.placement.beforeTaskId,
@@ -75,8 +76,9 @@ export function useMoveBoardTask(projectId: string) {
         ...neighbours,
       });
     },
-    onMutate: async (input) => {
+    onMutate: async (input, assertCurrent) => {
       await cancelTaskProjections(queryClient);
+      assertCurrent();
       const previous = snapshotTaskProjections(queryClient);
       // Where the card sits now, read before the optimistic patch moves it: this is the
       // position an undo has to restore.

@@ -9,6 +9,7 @@ import { sharedTaskRequest } from "../lib/share";
 
 import { useOnline } from "@/features/offline/hooks/use-online";
 import { useCaptureNames, useParsingEnabled } from "@/features/tasks/hooks/use-capture";
+import { useTaskSession } from "@/features/tasks/hooks/use-task-feedback";
 import { useCreateTask } from "@/features/tasks/hooks/use-tasks";
 import {
   captureFields,
@@ -16,7 +17,14 @@ import {
   parseQuickAdd,
 } from "@/features/tasks/lib/capture";
 
-export function CapturePage({ shared }: { readonly shared: SharedCapture }) {
+export function CapturePage({
+  shared,
+  owner,
+}: {
+  readonly shared: SharedCapture;
+  readonly owner: string;
+}) {
+  useTaskSession(owner);
   const initial = sharedTaskRequest(shared);
   const [ready, setReady] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);

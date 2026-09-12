@@ -46,5 +46,5 @@ export default async function Page({
     }
     redirect(`/sign-in?returnTo=${encodeURIComponent(returnTo)}`);
   }
-  return <CapturePage shared={shared} />;
+  return <CapturePage shared={shared} owner={user.email} />;
 }

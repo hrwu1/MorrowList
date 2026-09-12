@@ -46,6 +46,10 @@ import { QuickAdd } from "@/features/tasks/components/quick-add";
 import { TaskFeedback } from "@/features/tasks/components/task-feedback";
 import { UndoToast } from "@/features/tasks/components/undo-toast";
 import { useBackgroundTaskSync } from "@/features/tasks/hooks/use-background-task-sync";
+import {
+  useTaskFeedback,
+  useTaskSession,
+} from "@/features/tasks/hooks/use-task-feedback";
 import { useMoveTaskToProject, useTaskList } from "@/features/tasks/hooks/use-tasks";
 import {
   destinationDroppableId,
@@ -81,6 +85,8 @@ export function WorkspaceShell({
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { session: taskSession } = useTaskFeedback();
+  useTaskSession(user.email);
   const projects = useProjects();
   useSyncCacheScope();
   useWarmCurrentView();
@@ -137,6 +143,7 @@ export function WorkspaceShell({
   async function signOut() {
     // Nothing private may outlive the session on this device (spec 25.3): the worker's
     // partitioned caches, unsent drafts, and the in-memory query cache all go.
+    taskSession.end();
     stopBackgroundTaskSync();
     await queryClient.cancelQueries();
     await purgeOfflineCaches();
