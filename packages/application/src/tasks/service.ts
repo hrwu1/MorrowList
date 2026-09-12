@@ -831,9 +831,12 @@ export class TaskService {
         },
       });
 
-      // The workspace limit is one condition, not one per task: reporting it once keeps
-      // a 50-card move from stacking 50 identical warnings.
-      return { data, warnings: warnings.slice(0, 1) };
+      // Report one final snapshot, not an intermediate operation's count/tasks. Later
+      // entries may also complete work and bring the batch back under the limit.
+      return {
+        data,
+        warnings: warnings.length ? await this.workspaceWipWarnings(tx, workspace) : [],
+      };
     });
   }
 
@@ -1326,7 +1329,14 @@ export class TaskService {
       tx.statuses.findById(next.statusId),
     ]);
     if (!entersInProgress(from, to)) return [];
+    return this.workspaceWipWarnings(tx, workspace);
+  }
 
+  private async workspaceWipWarnings(
+    tx: TransactionContext,
+    workspace: Workspace,
+  ): Promise<WipWarningDto[]> {
+    if (workspace.inProgressLimit === null) return [];
     const inProgress = await tx.tasks.listInProgress(workspace.id);
     const warning = wipWarning(inProgress.length, workspace.inProgressLimit);
     if (!warning) return [];

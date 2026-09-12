@@ -2526,7 +2526,41 @@ describe("TaskService.batch (GAP-08, spec 10.4)", () => {
 
     expect(result.data).toHaveLength(3);
     expect(result.warnings).toHaveLength(1);
-    expect(result.warnings[0]?.code).toBe("IN_PROGRESS_LIMIT_EXCEEDED");
+    expect(result.warnings[0]).toMatchObject({
+      code: "IN_PROGRESS_LIMIT_EXCEEDED",
+      count: 3,
+      limit: 1,
+      message: "3 tasks are in progress across your projects; the limit is 1.",
+    });
+    expect(result.warnings[0]?.tasks.map((task) => task.id)).toEqual([
+      first!.id,
+      second!.id,
+      third!.id,
+    ]);
+  });
+
+  it("omits a transient warning when later batch entries return below the limit", async () => {
+    const inProgress = statusByCategory(seeded.statuses, "in_progress");
+    unitOfWork.data.workspaces.set(seeded.workspace.id, {
+      ...seeded.workspace,
+      inProgressLimit: 1,
+    });
+    const [first, second] = await threeInboxTasks();
+    const result = await service.batch(seeded.context, seeded.workspace.id, {
+      operations: [
+        ...[first, second].map((task) => ({
+          op: "move" as const,
+          taskId: task!.id,
+          projectId: seeded.project.id,
+          statusId: inProgress.id,
+        })),
+        { op: "complete", taskId: first!.id },
+      ],
+    });
+    expect(result.warnings).toEqual([]);
+    expect(
+      (await service.get(seeded.context, seeded.workspace.id, first!.id)).isCompleted,
+    ).toBe(true);
   });
 
   it("rejects a workspace the caller cannot reach", async () => {
