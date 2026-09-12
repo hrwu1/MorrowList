@@ -2,6 +2,7 @@ import "server-only";
 
 import { createApiApp, type ApiDependencies } from "@morrowlist/api";
 import {
+  IdempotencyService,
   CalendarFeedService,
   InboundEmailService,
   ActivityService,
@@ -153,6 +154,8 @@ export function getContainer(): Container {
   });
 
   const dependencies: ApiDependencies = {
+    idempotencyService: new IdempotencyService({ unitOfWork }),
+    idempotencySecret: cursorSecret,
     calendarFeedService: new CalendarFeedService({
       unitOfWork,
       signingSecret: cursorSecret,

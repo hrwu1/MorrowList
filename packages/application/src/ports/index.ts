@@ -66,3 +66,5 @@ export type {
 
 export * from "./calendar.js";
 export * from "./rules.js";
+
+export type { IdempotencyRecord, IdempotencyRepository } from "./idempotency.js";

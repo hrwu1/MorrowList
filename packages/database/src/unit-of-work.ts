@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import type { TransactionContext, UnitOfWork } from "@morrowlist/application";
 
 import type { Database, DatabaseHandle } from "./client.js";
@@ -9,6 +11,7 @@ import {
 } from "./repositories/events.js";
 import { createFieldDefinitionRepository } from "./repositories/fields.js";
 import { createStatusIntervalRepository } from "./repositories/flow.js";
+import { createIdempotencyRepository } from "./repositories/idempotency.js";
 import { createInboundAddressRepository } from "./repositories/inbound.js";
 import {
   createNotificationPreferenceRepository,
@@ -42,6 +45,7 @@ import { createWorkspaceRepository } from "./repositories/workspaces.js";
  */
 export function buildTransactionContext(db: Database): TransactionContext {
   return {
+    idempotency: createIdempotencyRepository(db),
     calendarFeedTokens: createCalendarFeedTokenRepository(db),
     inboundAddresses: createInboundAddressRepository(db),
     tasks: createTaskRepository(db),
@@ -67,11 +71,15 @@ export function buildTransactionContext(db: Database): TransactionContext {
 }
 
 export function createUnitOfWork(handle: DatabaseHandle): UnitOfWork {
+  const current = new AsyncLocalStorage<TransactionContext>();
   return {
     execute<T>(fn: (tx: TransactionContext) => Promise<T>): Promise<T> {
-      return handle.db.transaction(async (tx) =>
-        fn(buildTransactionContext(tx as unknown as Database)),
-      );
+      const existing = current.getStore();
+      if (existing) return fn(existing);
+      return handle.db.transaction(async (tx) => {
+        const context = buildTransactionContext(tx as unknown as Database);
+        return current.run(context, () => fn(context));
+      });
     },
   };
 }

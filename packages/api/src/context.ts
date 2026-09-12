@@ -1,4 +1,5 @@
 import type {
+  IdempotencyService,
   CalendarFeedService,
   InboundEmailService,
   ActivityService,
@@ -28,6 +29,9 @@ import type { Logger, Metrics } from "@morrowlist/observability";
  * itself. This keeps routes testable with fakes and keeps wiring in one place.
  */
 export interface ApiDependencies {
+  readonly idempotencyService: IdempotencyService;
+  /** Encrypts replay envelopes; composition uses the configured application secret. */
+  readonly idempotencySecret: string;
   readonly calendarFeedService: CalendarFeedService;
   readonly inboundEmailService: InboundEmailService;
   readonly auth: AuthPort;

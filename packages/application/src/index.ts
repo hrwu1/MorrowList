@@ -35,3 +35,5 @@ export {
 } from "./calendar/service.js";
 export { renderCalendar } from "./calendar/ics.js";
 export * from "./rules/index.js";
+
+export { IdempotencyService, IDEMPOTENCY_RETENTION_MS } from "./idempotency/service.js";

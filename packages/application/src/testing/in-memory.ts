@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import {
   addDays,
   canonicalFieldValues,
@@ -18,6 +20,7 @@ import {
 } from "@morrowlist/domain";
 
 import type {
+  IdempotencyRecord,
   CalendarFeedToken,
   CalendarFeedTokenRepository,
   InboundAddress,
@@ -78,6 +81,7 @@ import { ruleRepository } from "./rules.js";
  */
 
 export interface InMemoryData {
+  idempotency: Map<string, IdempotencyRecord>;
   calendarFeedTokens: Map<string, CalendarFeedToken>;
   inboundAddresses: Map<string, InboundAddress>;
   inboundReceipts: Map<string, string>;
@@ -117,6 +121,7 @@ export type InMemoryInterval = StatusIntervalInput & { readonly leftAt: Date | n
 
 export function emptyData(): InMemoryData {
   return {
+    idempotency: new Map(),
     inboundAddresses: new Map(),
     inboundReceipts: new Map(),
     tasks: new Map(),
@@ -1418,8 +1423,11 @@ export function createInMemoryUnitOfWork(
 ): InMemoryUnitOfWork {
   const data = seed;
   let pendingFailure: Error | null = null;
+  const current = new AsyncLocalStorage<TransactionContext>();
+  let pending: Promise<unknown> = Promise.resolve();
 
   const snapshot = (source: InMemoryData): InMemoryData => ({
+    idempotency: new Map(source.idempotency),
     inboundAddresses: new Map(source.inboundAddresses),
     inboundReceipts: new Map(source.inboundReceipts),
     tasks: new Map(source.tasks),
@@ -1450,6 +1458,7 @@ export function createInMemoryUnitOfWork(
   });
 
   const restore = (target: InMemoryData, source: InMemoryData): void => {
+    target.idempotency = source.idempotency;
     target.inboundAddresses = source.inboundAddresses;
     target.inboundReceipts = source.inboundReceipts;
     target.tasks = source.tasks;
@@ -1487,45 +1496,64 @@ export function createInMemoryUnitOfWork(
       pendingFailure = error;
     },
     async execute<T>(fn: (tx: TransactionContext) => Promise<T>): Promise<T> {
-      const before = snapshot(data);
-      const working = snapshot(data);
-      const tx: TransactionContext = {
-        inboundAddresses: inboundAddressRepository(working),
-        tasks: taskRepository(working),
-        rules: ruleRepository(working),
-        taskCounters: counterRepository(working),
-        dayPlans: dayPlanRepository(working),
-        projects: projectRepository(working),
-        statuses: statusRepository(working),
-        tags: tagRepository(working),
-        fields: fieldDefinitionRepository(working),
-        statusIntervals: statusIntervalRepository(working),
-        savedViews: savedViewRepository(working),
-        workspaces: workspaceRepository(working),
-        reminders: reminderRepository(working),
-        notifications: notificationRepository(working),
-        notificationPreferences: notificationPreferenceRepository(working),
-        pushSubscriptions: pushSubscriptionRepository(working),
-        calendarFeedTokens: calendarFeedTokenRepository(working),
-        webhookSubscriptions: webhookSubscriptionRepository(working),
-        webhookDeliveries: webhookDeliveryRepository(working),
-        activity: activityRepository(working),
-        outbox: outboxRepository(working),
-      };
+      const existing = current.getStore();
+      if (existing) return fn(existing);
+      const operation = pending.then(async () => {
+        const before = snapshot(data);
+        const working = snapshot(data);
+        const tx: TransactionContext = {
+          idempotency: {
+            async lock() {},
+            async find(scopeHash, keyHash) {
+              return working.idempotency.get(`${scopeHash}:${keyHash}`) ?? null;
+            },
+            async save(record) {
+              working.idempotency.set(`${record.scopeHash}:${record.keyHash}`, record);
+            },
+            async pruneExpired(now) {
+              for (const [key, record] of working.idempotency)
+                if (record.expiresAt <= now) working.idempotency.delete(key);
+            },
+          },
+          inboundAddresses: inboundAddressRepository(working),
+          tasks: taskRepository(working),
+          rules: ruleRepository(working),
+          taskCounters: counterRepository(working),
+          dayPlans: dayPlanRepository(working),
+          projects: projectRepository(working),
+          statuses: statusRepository(working),
+          tags: tagRepository(working),
+          fields: fieldDefinitionRepository(working),
+          statusIntervals: statusIntervalRepository(working),
+          savedViews: savedViewRepository(working),
+          workspaces: workspaceRepository(working),
+          reminders: reminderRepository(working),
+          notifications: notificationRepository(working),
+          notificationPreferences: notificationPreferenceRepository(working),
+          pushSubscriptions: pushSubscriptionRepository(working),
+          calendarFeedTokens: calendarFeedTokenRepository(working),
+          webhookSubscriptions: webhookSubscriptionRepository(working),
+          webhookDeliveries: webhookDeliveryRepository(working),
+          activity: activityRepository(working),
+          outbox: outboxRepository(working),
+        };
 
-      try {
-        const result = await fn(tx);
-        if (pendingFailure) {
-          const failure = pendingFailure;
-          pendingFailure = null;
-          throw failure;
+        try {
+          const result = await current.run(tx, () => fn(tx));
+          if (pendingFailure) {
+            const failure = pendingFailure;
+            pendingFailure = null;
+            throw failure;
+          }
+          restore(data, working);
+          return result;
+        } catch (error) {
+          restore(data, before);
+          throw error;
         }
-        restore(data, working);
-        return result;
-      } catch (error) {
-        restore(data, before);
-        throw error;
-      }
+      });
+      pending = operation.catch(() => {});
+      return operation;
     },
   };
 }

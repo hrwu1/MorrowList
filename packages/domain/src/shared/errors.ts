@@ -4,6 +4,7 @@
  * about HTTP.
  */
 export type DomainErrorCode =
+  | "IDEMPOTENCY_KEY_REUSED"
   | "VALIDATION_FAILED"
   | "RULE_NOT_FOUND"
   | "TASK_NOT_FOUND"

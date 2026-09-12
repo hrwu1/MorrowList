@@ -1,4 +1,5 @@
 import {
+  IdempotencyService,
   CalendarFeedService,
   InboundEmailService,
   ActivityService,
@@ -95,6 +96,8 @@ beforeEach(async () => {
   };
 
   deps = {
+    idempotencyService: new IdempotencyService({ unitOfWork }),
+    idempotencySecret: "test-only-replay-encryption-secret",
     calendarFeedService: new CalendarFeedService({
       unitOfWork,
       signingSecret: "test-calendar-secret",
@@ -2087,5 +2090,106 @@ describe("automation rule routes", () => {
       (await request(`/api/v1/rules/${rule.id}`, { method: "DELETE" })).status,
     ).toBe(204);
     expect((await request(`/api/v1/rules/${rule.id}/runs`)).status).toBe(404);
+  });
+});
+
+describe("transactional mutation replay", () => {
+  const create = (key: string, title = "Replay once") =>
+    request("/api/v1/tasks", {
+      method: "POST",
+      headers: { "content-type": "application/json", "idempotency-key": key },
+      body: JSON.stringify({ title }),
+    });
+
+  it("replays concurrent identical requests without repeating data or audit effects", async () => {
+    const initialEvents = unitOfWork.data.outbox.length;
+    const [first, second] = await Promise.all([create("same-key"), create("same-key")]);
+    expect([first.status, second.status]).toEqual([201, 201]);
+    expect(await second.json()).toEqual(await first.json());
+    expect(unitOfWork.data.tasks.size).toBe(1);
+    expect(unitOfWork.data.outbox).toHaveLength(initialEvents + 1);
+    expect(first.headers.get("x-request-id")).not.toBe(
+      second.headers.get("x-request-id"),
+    );
+    expect(unitOfWork.data.idempotency.size).toBe(1);
+    expect([...unitOfWork.data.idempotency.values()][0]?.response).not.toContain(
+      "Replay once",
+    );
+  });
+
+  it("rejects a changed body under the same actor, operation and key", async () => {
+    expect((await create("same-key")).status).toBe(201);
+    const conflict = await create("same-key", "Different task");
+    expect(conflict.status).toBe(409);
+    expect((await conflict.json()).error.code).toBe("IDEMPOTENCY_KEY_REUSED");
+    expect(unitOfWork.data.tasks.size).toBe(1);
+  });
+
+  it("does not replay across actor or workspace access boundaries", async () => {
+    await create("same-key");
+    const userId = uuidv7();
+    await bootstrapUser(
+      { unitOfWork },
+      { userId, email: "other@example.com", displayName: "Other", timezone: "UTC" },
+    );
+    currentUser = { id: userId, email: "other@example.com", name: "Other" };
+    expect((await create("same-key")).status).toBe(201);
+    expect(unitOfWork.data.tasks.size).toBe(2);
+    const workspaceId = unitOfWork.data.memberships.find(
+      (membership) => membership.userId === userId,
+    )!.workspaceId;
+    unitOfWork.data.memberships = [];
+    const forbidden = await request(`/api/v1/tasks?workspaceId=${workspaceId}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "idempotency-key": "same-key" },
+      body: JSON.stringify({ title: "Replay once" }),
+    });
+    expect(forbidden.status).toBe(404);
+  });
+
+  it("rolls back command, audit and replay record together on commit failure", async () => {
+    const initialEvents = unitOfWork.data.outbox.length;
+    const original = deps.taskService.create.bind(deps.taskService);
+    deps.taskService.create = async (...args) => {
+      const result = await original(...args);
+      unitOfWork.failNextCommit();
+      return result;
+    };
+    expect((await create("retry-key")).status).toBe(500);
+    expect(unitOfWork.data.tasks.size).toBe(0);
+    expect(unitOfWork.data.outbox).toHaveLength(initialEvents);
+    expect(unitOfWork.data.idempotency.size).toBe(0);
+    deps.taskService.create = original;
+    expect((await create("retry-key")).status).toBe(201);
+    expect(unitOfWork.data.tasks.size).toBe(1);
+  });
+
+  it("does not persist mapped validation failures and permits corrected retry", async () => {
+    expect((await create("validation-key", "")).status).toBe(422);
+    expect(unitOfWork.data.idempotency.size).toBe(0);
+    expect((await create("validation-key", "Corrected")).status).toBe(201);
+  });
+
+  it("encrypts one-time webhook credentials while replaying the complete response", async () => {
+    const send = () =>
+      request("/api/v1/webhooks", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "webhook-key",
+        },
+        body: JSON.stringify({
+          url: "https://example.com/hook",
+          eventTypes: ["task.created"],
+        }),
+      });
+    const first = await send();
+    expect(first.status).toBe(201);
+    const body = await first.json();
+    expect(await (await send()).json()).toEqual(body);
+    expect(JSON.stringify([...unitOfWork.data.idempotency.values()])).not.toContain(
+      body.data.secret,
+    );
+    expect(unitOfWork.data.webhookSubscriptions.size).toBe(1);
   });
 });

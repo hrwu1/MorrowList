@@ -1,3 +1,4 @@
+import type { IdempotencyRepository } from "./idempotency.js";
 import type { CalendarFeedTokenRepository } from "./calendar.js";
 import type { DayPlanRepository } from "./day-plans.js";
 import type { ActivityRepository, OutboxRepository } from "./events.js";
@@ -27,6 +28,7 @@ import type { WorkspaceRepository } from "./workspace.js";
  * activity row, and its outbox row cannot be committed separately.
  */
 export interface TransactionContext {
+  readonly idempotency: IdempotencyRepository;
   readonly calendarFeedTokens: CalendarFeedTokenRepository;
   readonly inboundAddresses: InboundAddressRepository;
   readonly tasks: TaskRepository;
@@ -54,6 +56,7 @@ export interface TransactionContext {
  * Transaction boundary port (spec 17.4). The database package implements it; the
  * application layer stays unaware of Drizzle and of connection handling.
  */
+/** Nested execute calls on the same UnitOfWork join the caller transaction. */
 export interface UnitOfWork {
   execute<T>(fn: (tx: TransactionContext) => Promise<T>): Promise<T>;
 }

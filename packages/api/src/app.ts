@@ -2,6 +2,7 @@ import { Hono } from "hono";
 
 import type { ApiDependencies, ApiEnv } from "./context.js";
 import { ApiError, toErrorBody } from "./errors.js";
+import { idempotency } from "./middleware/idempotency.js";
 import { authenticate } from "./middleware/authenticate.js";
 import { requestContext } from "./middleware/request-context.js";
 import { bodyLimit } from "./middleware/validate.js";
@@ -79,6 +80,8 @@ export function createApiApp(deps: ApiDependencies) {
   app.use("/workspaces/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/exports/*", authenticate(deps.auth, listWorkspaceIds));
   app.use("/imports/*", authenticate(deps.auth, listWorkspaceIds));
+
+  app.use("*", idempotency(deps.idempotencyService, deps.idempotencySecret));
 
   app.route("/", calendarRoutes(deps));
   app.route("/", inboundRoutes(deps));
