@@ -1,6 +1,11 @@
 "use client";
 
-import type { Priority, TaskDto, WorkflowStatusDto } from "@morrowlist/contracts";
+import type {
+  Priority,
+  TaskDto,
+  TaskCommandResult,
+  WorkflowStatusDto,
+} from "@morrowlist/contracts";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useCallback } from "react";
@@ -73,18 +78,19 @@ export function useShortcutCommands(input: CommandsInput): readonly Command[] {
   const undo = useUndo();
   // A status move is the move endpoint plus the shared optimistic machinery every other
   // task action already uses; the server still ranks the card and enforces the workflow.
-  const moveToStatus = useTaskAction<{
-    readonly task: TaskDto;
-    readonly status: WorkflowStatusDto;
-  }>(
+  const moveToStatus = useTaskAction<
+    {
+      readonly task: TaskDto;
+      readonly status: WorkflowStatusDto;
+    },
+    TaskCommandResult
+  >(
     ({ task, status }) =>
-      apiClient
-        .moveTask(task.id, {
-          projectId: status.projectId,
-          statusId: status.id,
-          expectedVersion: task.version,
-        })
-        .then((result) => result.task),
+      apiClient.moveTask(task.id, {
+        projectId: status.projectId,
+        statusId: status.id,
+        expectedVersion: task.version,
+      }),
     ({ task, status }) => ({ ...task, statusId: status.id }),
   );
 

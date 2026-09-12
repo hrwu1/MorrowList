@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import {
   createContext,
   useCallback,
@@ -10,6 +11,9 @@ import {
   type SetStateAction,
 } from "react";
 
+
+import { invalidateTaskProjections, patchTaskEverywhere } from "../lib/task-cache";
+import { tasksFromResult } from "../lib/task-command-result";
 import {
   createUndoEntry,
   currentEntry,
@@ -19,6 +23,8 @@ import {
   type UndoEntry,
   type UndoOffer,
 } from "../lib/undo";
+
+import { useTaskFeedback } from "./use-task-feedback";
 
 /**
  * The undo offer a mutation leaves behind (spec 10.3).
@@ -66,6 +72,8 @@ export function useUndoStore(): UndoStore {
 
 export function useUndo(): UndoState {
   const store = useContext(UndoContext);
+  const queryClient = useQueryClient();
+  const { report } = useTaskFeedback();
 
   const offer = useCallback(
     (next: UndoOffer) => {
@@ -100,14 +108,18 @@ export function useUndo(): UndoState {
     store.setStack((current) => dropEntry(current, entry.id));
     void entry
       .compensate()
-      .then(() => {
+      .then((result) => {
+        for (const task of tasksFromResult(result))
+          patchTaskEverywhere(queryClient, task);
+        report(result);
+        invalidateTaskProjections(queryClient);
         store.setStatus("idle");
       })
       .catch((failure: unknown) => {
         store.setStatus("failed");
         store.setError(undoErrorMessage(failure));
       });
-  }, [entry, store]);
+  }, [entry, store, queryClient, report]);
 
   return {
     entry,

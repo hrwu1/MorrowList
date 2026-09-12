@@ -18,6 +18,7 @@ import {
 } from "./use-tasks";
 import { useUndo } from "./use-undo";
 
+import { useTaskFeedback } from "@/features/tasks/hooks/use-task-feedback";
 import { apiClient } from "@/lib/api-client";
 
 /**
@@ -39,25 +40,27 @@ export interface BulkTasksInput {
 
 export function useBulkTasks() {
   const queryClient = useQueryClient();
+  const { report } = useTaskFeedback();
   const { offer } = useUndo();
 
   return useMutation({
     mutationFn: ({ action, tasks }: BulkTasksInput) =>
       apiClient.batchTasks({ operations: [...toOperations(action, tasks)] }),
     onSuccess: (result, { action, tasks }) => {
+      report(result);
       // The positions an undone move has to restore are read before the cache moves on.
       const candidates = cachedTasks(queryClient);
-      for (const item of result.data) patchTaskEverywhere(queryClient, item.data);
+      for (const item of result.data)
+        patchTaskEverywhere(queryClient, item.data, {
+          previous: tasks.find((task) => task.id === item.taskId),
+        });
 
       const inverse = inverseOperations(action, tasks, result.data, candidates);
       if (inverse.length > 0) {
         offer({
           id: `batch:${result.data.map((item) => item.taskId).join(",")}`,
           label: undoBatchLabel(bulkVerb(action), result.data.length),
-          compensate: async () => {
-            await apiClient.batchTasks({ operations: [...inverse] });
-            invalidateTaskProjections(queryClient);
-          },
+          compensate: () => apiClient.batchTasks({ operations: [...inverse] }),
         });
       }
     },

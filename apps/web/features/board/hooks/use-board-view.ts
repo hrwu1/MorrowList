@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { boardViewKeys } from "../lib/board-keys";
 import type { BoardDropStep } from "../lib/board-view";
 
+import { useTaskFeedback } from "@/features/tasks/hooks/use-task-feedback";
 import {
   invalidateTaskProjections,
   patchTaskEverywhere,
@@ -40,6 +41,7 @@ export interface BoardDropResult {
  */
 export function useBoardDrop() {
   const queryClient = useQueryClient();
+  const { report } = useTaskFeedback();
 
   return useMutation({
     mutationFn: async ({ task, steps }: BoardDropInputs): Promise<BoardDropResult> => {
@@ -98,8 +100,10 @@ export function useBoardDrop() {
 
       return { task: current, warnings };
     },
-    onSuccess: (result, { task }) =>
-      patchTaskEverywhere(queryClient, result.task, { previous: task }),
+    onSuccess: (result, { task }) => {
+      patchTaskEverywhere(queryClient, result.task, { previous: task });
+      report(result);
+    },
     onSettled: () => invalidateTaskProjections(queryClient),
   });
 }

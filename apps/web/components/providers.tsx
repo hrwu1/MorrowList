@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 
 import { OfflineStatus } from "@/features/offline/components/offline-status";
 import { ShortcutsProvider } from "@/features/shortcuts/components/shortcuts-provider";
+import { TaskFeedbackProvider } from "@/features/tasks/components/task-feedback";
 import { UndoProvider } from "@/features/tasks/components/undo-toast";
 
 /**
@@ -45,9 +46,11 @@ export function Providers({ children }: { readonly children: ReactNode }) {
       {/* The undo stack lives above every route, so the toast survives the navigation a
           compensating command may cause (spec 10.3). Shortcuts nest inside it, because
           the palette's undo command dispatches through the stack (GAP-10). */}
-      <UndoProvider>
-        <ShortcutsProvider>{children}</ShortcutsProvider>
-      </UndoProvider>
+      <TaskFeedbackProvider>
+        <UndoProvider>
+          <ShortcutsProvider>{children}</ShortcutsProvider>
+        </UndoProvider>
+      </TaskFeedbackProvider>
     </QueryClientProvider>
   );
 }

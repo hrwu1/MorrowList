@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { projectKeys, type BoardViewOptions } from "../../projects/hooks/use-projects";
 import { moveTaskInBoard, type BoardPlacement } from "../lib/board-view";
 
+import { useTaskFeedback } from "@/features/tasks/hooks/use-task-feedback";
 import { useUndo } from "@/features/tasks/hooks/use-undo";
 import {
   cachedTasks,
@@ -52,6 +53,7 @@ export interface MoveBoardTaskInput {
  */
 export function useMoveBoardTask(projectId: string) {
   const queryClient = useQueryClient();
+  const { report } = useTaskFeedback();
   const { offer } = useUndo();
   // Every cached variant of this board (subtasks hidden or shown) moves together.
   const boardKey = projectKeys.projectBoards(projectId);
@@ -96,6 +98,7 @@ export function useMoveBoardTask(projectId: string) {
       if (context) restoreTaskProjections(queryClient, context.previous);
     },
     onSuccess: (result, input, context) => {
+      report(result);
       // A card may open immediately after its move. Detail/list caches must already
       // carry the committed version, even while their background refetch is pending.
       patchTaskEverywhere(queryClient, result.task, { previous: input.task });
@@ -118,13 +121,12 @@ export function useMoveBoardTask(projectId: string) {
         id: result.task.id,
         label: undoLabel("Moved", result.task),
         compensate: async () => {
-          await apiClient.moveTask(result.task.id, {
+          return apiClient.moveTask(result.task.id, {
             projectId: input.task.projectId,
             ...(input.task.statusId ? { statusId: input.task.statusId } : {}),
             ...context.origin,
             expectedVersion: result.task.version,
           });
-          invalidateTaskProjections(queryClient);
         },
       });
     },

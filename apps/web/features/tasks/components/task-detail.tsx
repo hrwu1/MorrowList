@@ -40,6 +40,7 @@ import { allSubtasksDone, hasOpenSubtasks } from "../lib/task-projections";
 import { Markdown } from "./markdown";
 import { RecurrenceEditor } from "./recurrence-editor";
 import { SubtaskList } from "./subtask-list";
+import { TaskFeedbackOutlet } from "./task-feedback";
 import {
   DueBadge,
   DueDateInput,
@@ -283,7 +284,7 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
           task: { ...taskRef.current, version: version.current },
           projectId,
         });
-        version.current = moved.version;
+        version.current = moved.task.version;
       } catch {
         // Reported through `move.isError`; the select falls back to the server's value.
       }
@@ -326,6 +327,8 @@ function TaskDetailForm({ task, variant, reload, onClose }: TaskDetailFormProps)
           </Button>
         ) : null}
       </header>
+
+      <TaskFeedbackOutlet />
 
       {task.deletedAt !== null ? (
         <Alert tone="info" title="This task is in the Trash">

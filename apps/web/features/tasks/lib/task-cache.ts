@@ -208,7 +208,7 @@ function replaceTask(client: QueryClient, task: TaskDto): void {
 export function patchTaskEverywhere(
   client: QueryClient,
   task: TaskDto,
-  options: { readonly previous?: TaskDto | null } = {},
+  options: { readonly previous?: TaskDto | null | undefined } = {},
 ): void {
   const known = cachedTasks(client);
   const previous =

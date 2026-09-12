@@ -1,5 +1,7 @@
 import type { TaskDto } from "@morrowlist/contracts";
 
+import type { TaskFeedbackResult } from "./task-command-result";
+
 /**
  * The undo model (spec 10.3, GAP-08).
  *
@@ -22,13 +24,13 @@ export interface UndoEntry {
   /** Read out by the toast, so it says what would be undone, not just "Undo". */
   readonly label: string;
   readonly expiresAt: number;
-  readonly compensate: () => Promise<void>;
+  readonly compensate: () => Promise<TaskFeedbackResult>;
 }
 
 export interface UndoOffer {
   readonly id: string;
   readonly label: string;
-  readonly compensate: () => Promise<void>;
+  readonly compensate: () => Promise<TaskFeedbackResult>;
 }
 
 export function createUndoEntry(offer: UndoOffer, now: number): UndoEntry {

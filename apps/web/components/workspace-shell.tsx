@@ -43,6 +43,7 @@ import {
   useShortcutSurface,
 } from "@/features/shortcuts/components/shortcuts-provider";
 import { QuickAdd } from "@/features/tasks/components/quick-add";
+import { TaskFeedback } from "@/features/tasks/components/task-feedback";
 import { UndoToast } from "@/features/tasks/components/undo-toast";
 import { useBackgroundTaskSync } from "@/features/tasks/hooks/use-background-task-sync";
 import { useMoveTaskToProject, useTaskList } from "@/features/tasks/hooks/use-tasks";
@@ -421,6 +422,7 @@ export function WorkspaceShell({
             <span>Personal workspace</span>
             <span>A little progress, every day.</span>
           </div>
+          <TaskFeedback />
           {children}
         </main>
 

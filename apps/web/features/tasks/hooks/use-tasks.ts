@@ -5,6 +5,7 @@ import type {
   ListTasksQuery,
   ReorderTaskRequest,
   TaskDto,
+  TaskCommandResult,
   UpdateTaskRequest,
 } from "@morrowlist/contracts";
 import {
@@ -24,10 +25,12 @@ import {
   restoreTaskProjections,
   workspaceToday,
 } from "../lib/task-cache";
+import { taskFromResult, type TaskMutationResult } from "../lib/task-command-result";
 import { taskKeys } from "../lib/task-keys";
 import { selectInboxDestination } from "../lib/task-projections";
 import { neighboursOf, undoLabel, type UndoOffer } from "../lib/undo";
 
+import { useTaskFeedback } from "./use-task-feedback";
 import { useUndo } from "./use-undo";
 
 import { apiClient } from "@/lib/api-client";
@@ -96,6 +99,7 @@ export interface MoveTaskToProjectInput {
 export function useMoveTaskToProject() {
   const queryClient = useQueryClient();
   const { offer } = useUndo();
+  const { report } = useTaskFeedback();
 
   return useMutation({
     mutationFn: async ({ task, projectId }: MoveTaskToProjectInput) => {
@@ -104,7 +108,7 @@ export function useMoveTaskToProject() {
           projectId: null,
           expectedVersion: task.version,
         });
-        return result.task;
+        return result;
       }
 
       const detail = await queryClient.fetchQuery({
@@ -121,24 +125,23 @@ export function useMoveTaskToProject() {
         statusId: destination.id,
         expectedVersion: task.version,
       });
-      return result.task;
+      return result;
     },
-    onSuccess: (moved, { task }) => {
-      patchTaskEverywhere(queryClient, moved);
-      // Undoing a project assignment puts the task back in its old project *and* its old
-      // place in it, so the anchors are read before the move lands anywhere (spec 24.2).
+    onSuccess: (result, { task }) => {
+      const moved = result.task;
       const neighbours = neighboursOf(task, cachedTasks(queryClient));
+      patchTaskEverywhere(queryClient, moved, { previous: task });
+      report(result);
       offer({
         id: moved.id,
         label: undoLabel("Moved", moved),
         compensate: async () => {
-          await apiClient.moveTask(moved.id, {
+          return apiClient.moveTask(moved.id, {
             projectId: task.projectId,
             ...(task.statusId ? { statusId: task.statusId } : {}),
             ...neighbours,
             expectedVersion: moved.version,
           });
-          invalidateTaskProjections(queryClient);
         },
       });
     },
@@ -158,6 +161,7 @@ export interface MoveTaskToReadyInput {
  */
 export function useMoveTaskToReady() {
   const queryClient = useQueryClient();
+  const { report } = useTaskFeedback();
   return useMutation({
     mutationFn: async ({ taskId, projectId }: MoveTaskToReadyInput) => {
       const [task, detail] = await Promise.all([
@@ -177,9 +181,12 @@ export function useMoveTaskToReady() {
         statusId: ready.id,
         expectedVersion: task.version,
       });
-      return result.task;
+      return result;
     },
-    onSuccess: (moved) => patchTaskEverywhere(queryClient, moved),
+    onSuccess: (result) => {
+      patchTaskEverywhere(queryClient, result.task);
+      report(result);
+    },
     onSettled: () => invalidateTaskProjections(queryClient),
   });
 }
@@ -260,14 +267,14 @@ export function useCompleteTask() {
     (done) => ({
       id: done.id,
       label: undoLabel("Completed", done),
-      compensate: async () => void (await apiClient.reopenTask(done.id, done.version)),
+      compensate: () => apiClient.reopenTask(done.id, done.version),
     }),
   );
 }
 
 export function useReopenTask() {
-  return useTaskAction(
-    (task) => apiClient.reopenTask(task.id, task.version).then((result) => result.task),
+  return useTaskAction<TaskDto, TaskCommandResult>(
+    (task) => apiClient.reopenTask(task.id, task.version),
     (task) => ({
       ...task,
       isCompleted: false,
@@ -277,18 +284,18 @@ export function useReopenTask() {
     (open) => ({
       id: open.id,
       label: undoLabel("Reopened", open),
-      compensate: async () =>
-        void (await apiClient.completeTask(open.id, {
+      compensate: () =>
+        apiClient.completeTask(open.id, {
           expectedVersion: open.version,
           ...(open.isBlocked ? { acknowledgeBlocked: true } : {}),
-        })),
+        }),
     }),
   );
 }
 
 export function useDeleteTask() {
   return useTaskAction(
-    (task) => apiClient.deleteTask(task.id),
+    (task) => apiClient.deleteTask(task.id, task.version),
     (task) => ({
       ...task,
       deletedAt: new Date().toISOString(),
@@ -297,8 +304,7 @@ export function useDeleteTask() {
     (trashed) => ({
       id: trashed.id,
       label: undoLabel("Moved to Trash:", trashed),
-      compensate: async () =>
-        void (await apiClient.restoreTask(trashed.id, trashed.version)),
+      compensate: () => apiClient.restoreTask(trashed.id, trashed.version),
     }),
   );
 }
@@ -332,8 +338,7 @@ export function useAddToDay() {
         ? {
             id: `${planned.id}:day`,
             label: undoLabel("Added to My Day:", planned),
-            compensate: async () =>
-              void (await apiClient.removeTaskFromDay(planned.id, date)),
+            compensate: () => apiClient.removeTaskFromDay(planned.id, date),
           }
         : null;
     },
@@ -355,8 +360,7 @@ export function useRemoveFromDay() {
         ? {
             id: `${cleared.id}:day`,
             label: undoLabel("Removed from My Day:", cleared),
-            compensate: async () =>
-              void (await apiClient.addTaskToDay(cleared.id, { date })),
+            compensate: () => apiClient.addTaskToDay(cleared.id, { date }),
           }
         : null;
     },
@@ -429,14 +433,15 @@ export function useReorderTask() {
  * the detail panel all leave the same eight-second offer, and so an action that has no
  * sensible inverse simply omits it.
  */
-export function useTaskAction<V = TaskDto>(
-  send: (variables: V) => Promise<TaskDto>,
+export function useTaskAction<V = TaskDto, R extends TaskMutationResult = TaskDto>(
+  send: (variables: V) => Promise<R>,
   guess: (variables: V, today: string) => TaskDto,
   alsoInvalidate: readonly QueryKey[] = [],
   undoOf?: (result: TaskDto, variables: V) => UndoOffer | null,
 ) {
   const queryClient = useQueryClient();
   const { offer } = useUndo();
+  const { report } = useTaskFeedback();
   return useMutation({
     mutationFn: send,
     onMutate: async (variables: V) => {
@@ -449,20 +454,12 @@ export function useTaskAction<V = TaskDto>(
     onError: (_error, _variables, context) => {
       if (context) restoreTaskProjections(queryClient, context.previous);
     },
-    onSuccess: (task, variables, context) => {
+    onSuccess: (result, variables, context) => {
+      const task = taskFromResult(result);
+      report(result);
       patchTaskEverywhere(queryClient, task, { previous: context?.optimistic });
       const undo = undoOf?.(task, variables);
-      if (undo) {
-        offer({
-          ...undo,
-          compensate: async () => {
-            await undo.compensate();
-            // The compensating command answers with the task as it now stands; every
-            // projection that shows it follows, the same way the forward path does.
-            invalidateTaskProjections(queryClient);
-          },
-        });
-      }
+      if (undo) offer(undo);
     },
     onSettled: () => {
       invalidateTaskProjections(queryClient);

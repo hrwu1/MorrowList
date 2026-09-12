@@ -6,7 +6,6 @@ import {
   type BoardSwimlane,
   type BoardViewQuery,
   type TaskDto,
-  type WipWarningDto,
 } from "@morrowlist/contracts";
 import { Alert, Button, Select, Spinner } from "@morrowlist/ui";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -28,7 +27,6 @@ import {
 import { ViewBoardColumn } from "./view-board-column";
 
 import { TaskPanel } from "@/features/tasks/components/task-panel";
-import { WipWarning } from "@/features/workspace/components/wip-warning";
 
 export interface ViewBoardPageProps {
   /** The filters this board projects; Today supplies `source: "today"` instead. */
@@ -66,7 +64,6 @@ export function ViewBoardPage({
   const collapsedLanes = useCollapsedColumns(scope, "view-lanes");
   const selectedTaskKey = searchParams.get("task");
   const [announcement, setAnnouncement] = useState("");
-  const [wipWarning, setWipWarning] = useState<WipWarningDto | null>(null);
   const [mobileColumnKey, setMobileColumnKey] = useState<string | null>(null);
 
   const data = board.data?.data;
@@ -132,8 +129,7 @@ export function ViewBoardPage({
     drop.mutate(
       { task, steps: intent.steps },
       {
-        onSuccess: (result) => {
-          setWipWarning(result.warnings[0] ?? null);
+        onSuccess: () => {
           setAnnouncement(`Moved ${task.key} to ${column?.label ?? "another column"}.`);
         },
         onError: () =>
@@ -238,10 +234,6 @@ export function ViewBoardPage({
         <Alert tone="info" title="Showing the first 500 cards">
           Narrow this view before moving work that is outside the current projection.
         </Alert>
-      ) : null}
-
-      {wipWarning ? (
-        <WipWarning warning={wipWarning} onDismiss={() => setWipWarning(null)} />
       ) : null}
 
       {tasks.length === 0 ? (

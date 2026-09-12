@@ -6,7 +6,6 @@ import {
   type BoardColumnDto,
   type BoardSwimlane,
   type TaskDto,
-  type WipWarningDto,
   type WorkflowStatusDto,
 } from "@morrowlist/contracts";
 import { Alert, Button, Select, Spinner } from "@morrowlist/ui";
@@ -58,7 +57,6 @@ import {
   useSelectionKeys,
 } from "@/features/tasks/components/selection-toolbar";
 import { TaskPanel } from "@/features/tasks/components/task-panel";
-import { WipWarning } from "@/features/workspace/components/wip-warning";
 
 const SORT_LABELS: Record<BoardSort, string> = {
   manual: "Manual order",
@@ -96,7 +94,6 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
   const [announcement, setAnnouncement] = useState("");
-  const [wipWarning, setWipWarning] = useState<WipWarningDto | null>(null);
   const lastOpenTask = useRef<string | null>(selectedTaskKey);
 
   const closeTaskPanel = useCallback(() => {
@@ -255,7 +252,6 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
         placement,
       });
       // The move went through; the limit only warns (GAP-20).
-      setWipWarning(result.warnings[0] ?? null);
       setAnnouncement(
         result.warnings[0]
           ? `Moved ${task.key} to ${destination.name}. ${result.warnings[0].message}`
@@ -402,8 +398,7 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
     boardDrop.mutate(
       { task, steps: intent.steps },
       {
-        onSuccess: (result) => {
-          setWipWarning(result.warnings[0] ?? null);
+        onSuccess: () => {
           setAnnouncement(`Moved ${task.key} to ${destination.name}, ${laneLabel}.`);
         },
         onError: () =>
@@ -652,10 +647,6 @@ export function KanbanBoardPage({ projectId }: { readonly projectId: string }) {
           <Alert tone="info" title="Showing the first 500 cards">
             Narrow this board before moving work that is outside the current projection.
           </Alert>
-        ) : null}
-
-        {wipWarning ? (
-          <WipWarning warning={wipWarning} onDismiss={() => setWipWarning(null)} />
         ) : null}
 
         {moveTask.isError ? (
