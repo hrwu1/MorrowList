@@ -264,6 +264,24 @@ describe("ExportService.workspace", () => {
 });
 
 describe("ExportService.tasksCsv", () => {
+  it("binds custom-field filters to their definitions and rejects unknown keys", async () => {
+    await seedEverything();
+    const query = {
+      workspaceId: workspaceId(),
+      fields: [{ key: "effort", op: "gt" as const, value: "2", upper: null }],
+    };
+    expect(
+      parseCsv(await exports.tasksCsv(seeded.context, query))
+        .slice(1)
+        .map((row) => row[1]),
+    ).toEqual(["Draft the brief"]);
+    await expect(
+      exports.tasksCsv(seeded.context, {
+        ...query,
+        fields: [{ ...query.fields[0]!, key: "missing" }],
+      }),
+    ).rejects.toMatchObject({ code: "FIELD_NOT_FOUND" });
+  });
   it("writes the documented columns and re-imports through the CSV mapper", async () => {
     const { parent } = await seedEverything();
 

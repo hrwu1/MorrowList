@@ -8,6 +8,7 @@ import { Hono } from "hono";
 
 import type { ApiDependencies, ApiEnv } from "../context.js";
 import { parseQuery } from "../middleware/validate.js";
+import { parseTaskQuery } from "../task-query.js";
 
 import { requireWorkspace } from "./workspace.js";
 
@@ -43,7 +44,7 @@ export function exportRoutes(deps: ApiDependencies) {
 
     .get("/exports/tasks.csv", async (c) => {
       const actor = c.get("actor");
-      const query = parseQuery(c.req.query(), exportTasksCsvQuerySchema);
+      const query = parseTaskQuery(c.req.query(), exportTasksCsvQuerySchema);
       const workspaceId = requireWorkspace(
         c.req.query("workspaceId"),
         actor.workspaceIds,

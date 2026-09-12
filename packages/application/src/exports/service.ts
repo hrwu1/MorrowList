@@ -32,6 +32,7 @@ import {
   type Task,
 } from "@morrowlist/domain";
 
+import { resolveFieldFilters } from "../fields/service.js";
 import type {
   AggregateType,
   Project,
@@ -176,7 +177,8 @@ export class ExportService {
     return this.unitOfWork.execute(async (tx) => {
       const workspace = await requireWorkspace(tx, query.workspaceId);
       const today = toLocalDate(this.clock.now(), workspace.timezone);
-      const filter = toTaskFilter(query, today);
+      const fields = await resolveFieldFilters(tx, query.workspaceId, query.fields);
+      const filter = toTaskFilter(query, today, fields);
 
       // One column per definition, appended after the fixed ones, so a reader that
       // knows only `TASK_CSV_COLUMNS` still finds every column where it expects it.

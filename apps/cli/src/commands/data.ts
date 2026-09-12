@@ -1,6 +1,11 @@
 import { readFile, writeFile } from "node:fs/promises";
 
-import type { ExportActivityScope, ImportSource } from "@morrowlist/contracts";
+import {
+  TASK_CSV_COLUMNS,
+  type ExportActivityScope,
+  type ImportSource,
+} from "@morrowlist/contracts";
+import { fieldColumnName, formatCsv } from "@morrowlist/domain";
 import { Command } from "commander";
 
 import { formatImportPreview, printJson } from "../formatters/output.js";
@@ -54,6 +59,17 @@ export function exportCommand(): Command {
             ? await resolveWhere(client, options.where)
             : null;
           if (where?.error) usageFailure(where.error, json);
+          if (where?.noSuchTag) {
+            // A missing tag selects nothing. Keep the normal CSV columns without
+            // requesting an unfiltered export of the workspace's tasks.
+            const { data: fields } = await client.listFields();
+            return `${formatCsv([
+              [
+                ...TASK_CSV_COLUMNS,
+                ...fields.map((field) => fieldColumnName(field.key)),
+              ],
+            ])}\r\n`;
+          }
           return client.exportTasksCsv(where?.query ?? {});
         });
 

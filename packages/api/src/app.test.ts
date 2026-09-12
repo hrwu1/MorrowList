@@ -23,7 +23,7 @@ import {
   type WebhookSender,
 } from "@morrowlist/application";
 import type { AuthPort, AuthenticatedUser } from "@morrowlist/auth";
-import { fixedClock, uuidv7 } from "@morrowlist/domain";
+import { fixedClock, parseCsv, uuidv7 } from "@morrowlist/domain";
 import { createLogger, silentLogger } from "@morrowlist/observability";
 import {
   createInMemoryUnitOfWork,
@@ -1892,6 +1892,51 @@ describe("export and import endpoints (GAP-07)", () => {
     const filtered = await request("/api/v1/exports/tasks.csv?priority=urgent");
     expect(await filtered.text()).not.toContain("Draft the brief");
   });
+
+  it("uses the same custom-field selection for task lists and CSV downloads", async () => {
+    const defined = await jsonRequest("/api/v1/fields", "POST", {
+      name: "Effort",
+      key: "effort",
+      type: "number",
+    });
+    expect(defined.status).toBe(201);
+    for (const [title, effort] of [
+      ["Small", 1],
+      ["Large", 5],
+    ] as const) {
+      expect(
+        (
+          await jsonRequest("/api/v1/tasks", "POST", {
+            title,
+            fields: { effort },
+          })
+        ).status,
+      ).toBe(201);
+    }
+    const query = "field.effort=gt:3";
+    const listed = await (await request(`/api/v1/tasks?${query}`)).json();
+    const exported = await request(`/api/v1/exports/tasks.csv?${query}`);
+    expect(exported.status).toBe(200);
+    const [columns, ...rows] = parseCsv(await exported.text());
+    expect(rows.map((row) => row[columns!.indexOf("title")])).toEqual(
+      listed.data.map((task: { title: string }) => task.title),
+    );
+    expect(listed.data.map((task: { title: string }) => task.title)).toEqual(["Large"]);
+  });
+
+  it.each(["/tasks", "/exports/tasks.csv"])(
+    "rejects malformed and excessive custom-field filters on %s",
+    async (path) => {
+      for (const query of [
+        "field.effort=unsupported:3",
+        "field.a=empty&field.b=empty&field.c=empty&field.d=empty&field.e=empty",
+      ]) {
+        const response = await request(`/api/v1${path}?${query}`);
+        expect(response.status).toBe(422);
+        expect((await response.json()).error.code).toBe("VALIDATION_FAILED");
+      }
+    },
+  );
 
   it("previews a Trello import without writing, then applies it", async () => {
     const preview = await jsonRequest("/api/v1/imports/trello?dryRun=true", "POST", {

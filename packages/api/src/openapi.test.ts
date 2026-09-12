@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { createApiApp } from "./app.js";
+import type { ApiDependencies } from "./context.js";
 import { buildOpenApiDocument } from "./openapi.js";
 
 describe("board OpenAPI surface", () => {
@@ -118,5 +120,42 @@ describe("data portability surface (GAP-07)", () => {
     expect(document.components.schemas).toHaveProperty("WorkspaceExport");
     expect(document.components.schemas).toHaveProperty("ImportRequest");
     expect(document.components.schemas).toHaveProperty("ImportResult");
+  });
+});
+
+describe("runtime and wire documentation parity", () => {
+  it("documents every registered operation and no absent endpoints", () => {
+    const document = buildOpenApiDocument() as {
+      paths: Record<string, Record<string, unknown>>;
+    };
+    const normalize = (path: string) =>
+      path
+        .replace(/^\/api\/v1/, "")
+        .replace(/:[^/]+/g, "{}")
+        .replace(/\{[^}]+\}/g, "{}")
+        // Hono accepts the full file segment; the handler validates the .ics suffix.
+        .replace(/\/feeds\/\{\}\.ics$/, "/feeds/{}");
+    const runtime = createApiApp({} as ApiDependencies)
+      .routes.filter((route) => route.method !== "ALL")
+      .map((route) => `${route.method} ${normalize(route.path)}`);
+    const documented = Object.entries(document.paths).flatMap(([path, operations]) =>
+      Object.keys(operations)
+        .filter((method) => ["get", "post", "put", "patch", "delete"].includes(method))
+        .map((method) => `${method.toUpperCase()} ${normalize(path)}`),
+    );
+    expect(new Set(documented)).toEqual(new Set(runtime));
+  });
+
+  it("gives CSV export the same task filter wire parameters, excluding pagination", () => {
+    const document = buildOpenApiDocument() as {
+      paths: Record<string, { get: { parameters: { name: string }[] } }>;
+    };
+    const taskParameters = document.paths["/tasks"]!.get.parameters;
+    const exportParameters = document.paths["/exports/tasks.csv"]!.get.parameters;
+    expect(exportParameters).toEqual(
+      taskParameters.filter(({ name }) => name !== "cursor" && name !== "limit"),
+    );
+    expect(exportParameters.map(({ name }) => name)).toContain("field");
+    expect(exportParameters.map(({ name }) => name)).not.toContain("fields");
   });
 });

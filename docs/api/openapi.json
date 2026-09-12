@@ -18232,74 +18232,6 @@
             }
           },
           {
-            "name": "fields",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "maxItems": 4,
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "key": {
-                    "type": "string"
-                  },
-                  "op": {
-                    "type": "string",
-                    "enum": [
-                      "eq",
-                      "ne",
-                      "lt",
-                      "gt",
-                      "between",
-                      "empty"
-                    ]
-                  },
-                  "value": {
-                    "anyOf": [
-                      {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "number"
-                          }
-                        ]
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "upper": {
-                    "anyOf": [
-                      {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "number"
-                          }
-                        ]
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  }
-                },
-                "required": [
-                  "key",
-                  "op",
-                  "value",
-                  "upper"
-                ]
-              }
-            }
-          },
-          {
             "name": "includeSubtasks",
             "in": "query",
             "required": false,
@@ -18351,6 +18283,20 @@
                 "asc",
                 "desc"
               ]
+            }
+          },
+          {
+            "name": "field",
+            "in": "query",
+            "required": false,
+            "style": "form",
+            "explode": true,
+            "description": "Typed custom-field filters, sent as `field.<key>=<operator>[:<value>]`. Operators: eq, ne, lt, gt, between (low..high), empty.",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
             }
           }
         ],

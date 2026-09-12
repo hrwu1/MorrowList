@@ -352,7 +352,10 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
           summary: "Download tasks as CSV",
           description:
             "Takes the same filters as GET /tasks, without paging: every match is written. Columns: key, title, description, status, priority, dueDate, deadline, deferUntil, tags, parentKey, completed — the ones POST /imports/csv reads back.",
-          parameters: [workspaceIdParam, ...queryParameters(exportTasksCsvQuerySchema)],
+          parameters: [
+            workspaceIdParam,
+            ...taskQueryParameters(exportTasksCsvQuerySchema),
+          ],
           responses: {
             "200": {
               description: "The task CSV",
@@ -1181,13 +1184,7 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
           summary: "List tasks",
           description:
             "Typed custom fields are filtered with one parameter per field: `field.<key>=<operator>[:<value>]`, where the operator is one of eq, ne, lt, gt, between or empty and `between` takes `low..high`. For example `field.effort=gt:3`. At most four may be combined.",
-          parameters: [
-            workspaceIdParam,
-            ...queryParameters(listTasksQuerySchema).filter(
-              (parameter) => (parameter as { name: string }).name !== "fields",
-            ),
-            fieldFilterParam,
-          ],
+          parameters: [workspaceIdParam, ...taskQueryParameters(listTasksQuerySchema)],
           responses: {
             "200": { description: "A page of tasks", ...jsonContent(ref("TaskList")) },
             ...commonErrors,
@@ -1805,4 +1802,14 @@ function queryParameters(schema: z.ZodType): unknown[] {
       required: json.required?.includes(name) ?? false,
       schema: property,
     }));
+}
+
+/** Task queries share dotted field parameters across lists and downloads. */
+function taskQueryParameters(schema: z.ZodType): unknown[] {
+  return [
+    ...queryParameters(schema).filter(
+      (parameter) => (parameter as { name: string }).name !== "fields",
+    ),
+    fieldFilterParam,
+  ];
 }
