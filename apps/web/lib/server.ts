@@ -135,7 +135,10 @@ export function getContainer(): Container {
   });
 
   const dependencies: ApiDependencies = {
-    idempotencyService: new IdempotencyService({ unitOfWork }),
+    idempotencyService: new IdempotencyService({
+      unitOfWork,
+      retentionMs: env.IDEMPOTENCY_RETENTION_HOURS * 60 * 60 * 1000,
+    }),
     idempotencySecret: cursorSecret,
     calendarFeedService: new CalendarFeedService({
       unitOfWork,

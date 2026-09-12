@@ -88,7 +88,8 @@ and database-harness exceptions; it does not write fixtures into compiler source
   replay wrapper can therefore commit its response with every command write. Independent
   requests remain isolated; a callback must await all of its transaction work.
 - `Idempotency-Key` identifies one logical mutation attempt. Identical actor/workspace/
-  operation/key requests replay for 24 hours; user-owned device registrations use user
+  operation/key requests replay for `IDEMPOTENCY_RETENTION_HOURS` (24 hours by default);
+  user-owned device registrations use user
   scope instead of requiring a workspace. Changed request fingerprints return 409.
   Successful responses are encrypted using the application secret before storage, and
   failed requests leave no replay record. Client-generated keys belong to a single send;

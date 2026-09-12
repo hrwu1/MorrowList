@@ -9,7 +9,13 @@ export const IDEMPOTENCY_RETENTION_MS = 24 * 60 * 60 * 1000;
 export class IdempotencyService {
   private readonly clock: Clock;
 
-  constructor(private readonly options: { unitOfWork: UnitOfWork; clock?: Clock }) {
+  constructor(
+    private readonly options: {
+      unitOfWork: UnitOfWork;
+      clock?: Clock;
+      retentionMs?: number;
+    },
+  ) {
     this.clock = options.clock ?? systemClock;
   }
 
@@ -44,7 +50,9 @@ export class IdempotencyService {
         ...input,
         response,
         createdAt: now,
-        expiresAt: new Date(now.getTime() + IDEMPOTENCY_RETENTION_MS),
+        expiresAt: new Date(
+          now.getTime() + (this.options.retentionMs ?? IDEMPOTENCY_RETENTION_MS),
+        ),
       });
       // Refresh our own expired record before cleanup so concurrent pruners cannot
       // acquire its row lock before this request does.
