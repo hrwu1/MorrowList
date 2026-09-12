@@ -52,7 +52,16 @@ export function idempotency(
   return async (c, next) => {
     const actor = c.get("actor");
     const key = c.req.header("idempotency-key");
-    if (!actor || !key || !["POST", "PATCH", "PUT", "DELETE"].includes(c.req.method)) {
+    // A send-on-demand webhook test performs external I/O that a DB rollback cannot
+    // undo. It keeps its explicit one-send-per-request semantics outside replay.
+    const externalTest =
+      c.req.method === "POST" && /\/webhooks\/[^/]+\/test$/.test(c.req.path);
+    if (
+      !actor ||
+      key === undefined ||
+      externalTest ||
+      !["POST", "PATCH", "PUT", "DELETE"].includes(c.req.method)
+    ) {
       await next();
       return;
     }
@@ -64,10 +73,13 @@ export function idempotency(
     }
     const url = new URL(c.req.url);
     const workspacePath = url.pathname.match(/\/workspaces\/([^/]+)$/)?.[1];
-    const workspaceId = requireWorkspace(
-      workspacePath ?? url.searchParams.get("workspaceId") ?? undefined,
-      actor.workspaceIds,
-    );
+    const userScoped = url.pathname.endsWith("/me/push-subscriptions");
+    const workspaceId = userScoped
+      ? null
+      : requireWorkspace(
+          workspacePath ?? url.searchParams.get("workspaceId") ?? undefined,
+          actor.workspaceIds,
+        );
     url.searchParams.sort();
     const body = await c.req.raw.clone().text();
     const scopeHash = digest(

@@ -2,7 +2,7 @@
 export interface IdempotencyRecord {
   readonly scopeHash: string;
   readonly keyHash: string;
-  readonly workspaceId: string;
+  readonly workspaceId: string | null;
   readonly fingerprint: string;
   readonly response: string;
   readonly createdAt: Date;

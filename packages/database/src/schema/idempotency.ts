@@ -15,9 +15,9 @@ export const idempotencyRecords = pgTable(
   {
     scopeHash: varchar("scope_hash", { length: 64 }).notNull(),
     keyHash: varchar("key_hash", { length: 64 }).notNull(),
-    workspaceId: uuid("workspace_id")
-      .notNull()
-      .references(() => workspaces.id, { onDelete: "cascade" }),
+    workspaceId: uuid("workspace_id").references(() => workspaces.id, {
+      onDelete: "cascade",
+    }),
     fingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
     response: text("response_ciphertext").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),

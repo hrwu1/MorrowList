@@ -2238,3 +2238,70 @@ describe("transactional mutation replay", () => {
     expect(unitOfWork.data.webhookSubscriptions.size).toBe(1);
   });
 });
+
+describe("replay scope exceptions", () => {
+  it("replays user-owned device registration with multiple or no workspaces", async () => {
+    const extraUser = uuidv7();
+    const { workspace } = await bootstrapUser(
+      { unitOfWork },
+      {
+        userId: extraUser,
+        email: "extra@example.com",
+        displayName: "Extra",
+        timezone: "UTC",
+      },
+    );
+    unitOfWork.data.memberships.push({
+      workspaceId: workspace.id,
+      userId: currentUser!.id,
+      role: "owner",
+      joinedAt: NOW,
+    });
+    const send = () =>
+      request("/api/v1/me/push-subscriptions", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "device-key",
+        },
+        body: JSON.stringify({
+          endpoint: "https://push.example/replay-device",
+          keys: { p256dh: "p", auth: "a" },
+        }),
+      });
+    const first = await send();
+    expect(first.status).toBe(201);
+    const body = await first.json();
+    unitOfWork.data.memberships = [];
+    expect(await (await send()).json()).toEqual(body);
+    expect(unitOfWork.data.pushSubscriptions.size).toBe(1);
+    expect([...unitOfWork.data.idempotency.values()][0]?.workspaceId).toBeNull();
+    const remove = () =>
+      request(
+        "/api/v1/me/push-subscriptions?endpoint=https%3A%2F%2Fpush.example%2Freplay-device",
+        {
+          method: "DELETE",
+          headers: { "idempotency-key": "remove-device" },
+        },
+      );
+    expect((await remove()).status).toBe(204);
+    expect((await remove()).status).toBe(204);
+  });
+
+  it("keeps synchronous webhook tests send-on-demand without a replay transaction", async () => {
+    const response = await jsonRequest("/api/v1/webhooks", "POST", {
+      url: "https://example.com/hook",
+      eventTypes: ["task.created"],
+    });
+    const { data } = await response.json();
+    const send = () =>
+      request(`/api/v1/webhooks/${data.id}/test`, {
+        method: "POST",
+        headers: { "idempotency-key": "test-send" },
+      });
+    expect((await send()).status).toBe(200);
+    expect((await send()).status).toBe(200);
+    expect(webhookSender.sent).toHaveLength(2);
+    expect(unitOfWork.data.idempotency.size).toBe(0);
+  });
+});

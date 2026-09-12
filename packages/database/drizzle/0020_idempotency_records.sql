@@ -3,7 +3,7 @@
 CREATE TABLE idempotency_records (
   scope_hash varchar(64) NOT NULL,
   key_hash varchar(64) NOT NULL,
-  workspace_id uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  workspace_id uuid REFERENCES workspaces(id) ON DELETE CASCADE,
   request_fingerprint varchar(64) NOT NULL,
   response_ciphertext text NOT NULL,
   created_at timestamptz NOT NULL,

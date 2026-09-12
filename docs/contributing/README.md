@@ -88,11 +88,13 @@ and database-harness exceptions; it does not write fixtures into compiler source
   replay wrapper can therefore commit its response with every command write. Independent
   requests remain isolated; a callback must await all of its transaction work.
 - `Idempotency-Key` identifies one logical mutation attempt. Identical actor/workspace/
-  operation/key requests replay for 24 hours; changed request fingerprints return 409.
+  operation/key requests replay for 24 hours; user-owned device registrations use user
+  scope instead of requiring a workspace. Changed request fingerprints return 409.
   Successful responses are encrypted using the application secret before storage, and
   failed requests leave no replay record. Client-generated keys belong to a single send;
-  retrying after uncertain delivery must retain that key. External test deliveries cannot
-  be rolled back by a database transaction and retain their existing delivery semantics.
+  retrying after uncertain delivery must retain that key. Synchronous webhook test
+  deliveries are explicitly excluded: they send once per request because an external
+  HTTP effect cannot be rolled back with the database.
 - Keep database-enforced invariants explicit in ports: a transaction alone does not
   serialize count-then-create operations. Test limits/claims with concurrent PostgreSQL
   callers, not only sequential in-memory doubles.

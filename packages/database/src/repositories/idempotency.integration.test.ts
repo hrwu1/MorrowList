@@ -85,6 +85,45 @@ it("serializes duplicate requests across independent UnitOfWork instances", asyn
   expect(rows[0]).toEqual({ tasks: 1, activity: 1, outbox: 1, replay: 1 });
 });
 
+it("replays a user-scoped mutation without any workspace membership", async () => {
+  await handle.pool.query("delete from workspace_members where user_id = $1", [
+    context.actorId,
+  ]);
+  const actor: ActorContext = { ...context, workspaceIds: [] };
+  const request = { ...input("user-key"), workspaceId: null };
+  const endpoint = "https://push.example/user-device";
+  let executions = 0;
+  const run = ({ replay, unitOfWork }: ReturnType<typeof executor>) =>
+    replay.execute(actor, request, async () => {
+      executions++;
+      await unitOfWork.execute((tx) =>
+        tx.pushSubscriptions.upsert({
+          userId: actor.actorId,
+          endpoint,
+          keys: { p256dh: "test-public-key", auth: "test-auth-key" },
+          createdAt: NOW,
+        }),
+      );
+      // Encryption belongs to the HTTP adapter; the application stores an opaque value.
+      return "opaque-user-response";
+    });
+
+  const results = await Promise.all([run(executor()), run(executor())]);
+  expect(results).toEqual(["opaque-user-response", "opaque-user-response"]);
+  expect(executions).toBe(1);
+  const { rows } = await handle.pool.query(`select
+    (select count(*)::int from workspace_members) as memberships,
+    (select count(*)::int from push_subscriptions) as registrations,
+    (select count(*)::int from idempotency_records) as replay,
+    (select workspace_id from idempotency_records) as workspace`);
+  expect(rows[0]).toEqual({
+    memberships: 0,
+    registrations: 1,
+    replay: 1,
+    workspace: null,
+  });
+});
+
 it("rolls back nested task and event writes if saving replay fails", async () => {
   const { replay, tasks } = executor();
   // Oversized scope forces the replay insert to fail after the task was written.

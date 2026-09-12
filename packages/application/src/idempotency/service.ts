@@ -16,14 +16,16 @@ export class IdempotencyService {
   async execute(
     context: ActorContext,
     input: {
-      workspaceId: string;
+      workspaceId: string | null;
       scopeHash: string;
       keyHash: string;
       fingerprint: string;
     },
     operation: () => Promise<string>,
   ): Promise<string> {
-    assertWorkspaceAccess(context, input.workspaceId);
+    if (input.workspaceId !== null) assertWorkspaceAccess(context, input.workspaceId);
+    else if (!context.userId)
+      throw new DomainError("AUTH_FORBIDDEN", "A user is required for this operation.");
     return this.options.unitOfWork.execute(async (tx) => {
       await tx.idempotency.lock(input.scopeHash, input.keyHash);
       const now = this.clock.now();
@@ -38,13 +40,15 @@ export class IdempotencyService {
         return previous.response;
       }
       const response = await operation();
-      await tx.idempotency.pruneExpired(now);
       await tx.idempotency.save({
         ...input,
         response,
         createdAt: now,
         expiresAt: new Date(now.getTime() + IDEMPOTENCY_RETENTION_MS),
       });
+      // Refresh our own expired record before cleanup so concurrent pruners cannot
+      // acquire its row lock before this request does.
+      await tx.idempotency.pruneExpired(now);
       return response;
     });
   }
