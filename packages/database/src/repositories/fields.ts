@@ -11,6 +11,11 @@ export function createFieldDefinitionRepository(
   db: Database,
 ): FieldDefinitionRepository {
   return {
+    async lock(workspaceId) {
+      await db.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`fields:` + workspaceId}, 0))`,
+      );
+    },
     async findById(workspaceId, fieldId) {
       const [row] = await db
         .select()

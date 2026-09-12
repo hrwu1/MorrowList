@@ -5,6 +5,8 @@ import type { FieldDefinition } from "@morrowlist/domain";
  * `@morrowlist/database`.
  */
 export interface FieldDefinitionRepository {
+  /** Serialize definition creation within a workspace until the transaction ends. */
+  lock(workspaceId: string): Promise<void>;
   findById(workspaceId: string, fieldId: string): Promise<FieldDefinition | null>;
   findByKey(workspaceId: string, key: string): Promise<FieldDefinition | null>;
   /** Every definition in the workspace, in rank order then id. */

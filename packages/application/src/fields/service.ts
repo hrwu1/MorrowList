@@ -42,7 +42,7 @@ export interface FieldServiceOptions {
  * Typed custom-field use cases (GAP-24).
  *
  * The cap of ten is the product decision this service exists to hold: it is counted
- * inside the transaction that would create the eleventh, so two concurrent creates cannot
+ * after acquiring the workspace definition lock, so two concurrent creates cannot
  * slip past it together. Deleting a definition clears its key from every task in the same
  * transaction and records how many tasks lost a value, because a value with no definition
  * would be invisible data.
@@ -85,6 +85,7 @@ export class FieldService {
 
     return this.unitOfWork.execute(async (tx) => {
       await this.requireWorkspace(tx, workspaceId);
+      await tx.fields.lock(workspaceId);
       const existing = await tx.fields.listByWorkspace(workspaceId);
       if (existing.length >= MAX_FIELDS_PER_WORKSPACE) {
         throw new DomainError(

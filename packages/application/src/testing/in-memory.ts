@@ -748,6 +748,8 @@ function fieldDefinitionRepository(data: InMemoryData): FieldDefinitionRepositor
       .sort(compareFields);
 
   return {
+    // The double exercises sequential policies; SQL integration proves lock contention.
+    async lock() {},
     async findById(workspaceId, fieldId) {
       const definition = data.fields.get(fieldId);
       return definition && definition.workspaceId === workspaceId ? definition : null;

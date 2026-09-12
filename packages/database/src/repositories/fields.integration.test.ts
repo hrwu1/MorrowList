@@ -108,6 +108,35 @@ describe("field definitions in PostgreSQL", () => {
     ).rejects.toThrow(/field_definitions_type_check/);
   });
 
+  it("allows only one concurrent create when nine fields already exist", async () => {
+    for (let index = 0; index < 9; index++) {
+      await fields.create(context, workspaceId, {
+        name: `Existing ${index}`,
+        type: "text",
+      });
+    }
+    const results = await Promise.allSettled(
+      Array.from({ length: 4 }, (_, index) =>
+        fields.create(context, workspaceId, {
+          name: `Concurrent ${index}`,
+          type: "text",
+        }),
+      ),
+    );
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const failures = results.filter((result) => result.status === "rejected");
+    expect(failures).toHaveLength(3);
+    for (const failure of failures) {
+      expect(failure.reason).toMatchObject({ code: "FIELD_LIMIT_REACHED" });
+    }
+    expect((await fields.list(context, workspaceId)).data).toHaveLength(10);
+    const events = await handle.pool.query<{ count: number }>(
+      "select count(*)::int as count from outbox_events where workspace_id = $1 and event_type = 'field.created'",
+      [workspaceId],
+    );
+    expect(events.rows[0]?.count).toBe(10);
+  });
+
   it("stores values on the task row itself and reads them back typed", async () => {
     await fields.create(context, workspaceId, { name: "Effort", type: "number" });
     await fields.create(context, workspaceId, {
