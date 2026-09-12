@@ -87,7 +87,7 @@ export function usageText(root: Command): string {
     ),
     "",
     "Configuration (flags beat env, env beats the profile)",
-    "  MORROW_BASE_URL  MORROW_API_KEY  MORROW_WORKSPACE  MORROW_PROFILE",
+    "  MORROW_BASE_URL  MORROW_API_KEY  MORROW_WORKSPACE_ID  MORROW_PROFILE",
   ].join("\n");
 }
 
@@ -115,7 +115,7 @@ export function usageData(root: Command) {
     environment: [
       "MORROW_BASE_URL",
       "MORROW_API_KEY",
-      "MORROW_WORKSPACE",
+      "MORROW_WORKSPACE_ID",
       "MORROW_PROFILE",
     ],
   };

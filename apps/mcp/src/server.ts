@@ -6,7 +6,7 @@ import { TOOLS } from "./tools.js";
 /**
  * The MorrowList MCP server (GAP-18).
  *
- * Stateless by design (`docs/adr/pending-mcp-server.md`): one tool call in, one REST call
+ * Stateless by design (`docs/adr/018-mcp-server.md`): one tool call in, one REST call
  * out, one result back. It holds no session, runs no background work, and calls no model.
  */
 

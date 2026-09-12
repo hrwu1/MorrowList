@@ -2,6 +2,11 @@ import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
+import {
+  DEFAULT_API_BASE_URL as DEFAULT_BASE_URL,
+  resolveClientEnvironment,
+} from "@morrowlist/api-client";
+
 /**
  * CLI configuration and profiles (AUTH-007, spec 21.2).
  *
@@ -24,7 +29,7 @@ export interface ConfigFile {
   readonly profiles: Record<string, Profile>;
 }
 
-export const DEFAULT_BASE_URL = "http://localhost:3200/api/v1";
+export { DEFAULT_BASE_URL };
 
 export function configPath(): string {
   const override = process.env.MORROW_CONFIG;
@@ -76,14 +81,13 @@ export function resolveProfile(
   const name = options.profile ?? env.MORROW_PROFILE ?? config.defaultProfile;
   const stored = config.profiles[name] ?? { baseUrl: DEFAULT_BASE_URL };
 
-  const apiKey = options.apiKey ?? env.MORROW_API_KEY ?? stored.apiKey;
-  const workspaceId =
-    options.workspaceId ?? env.MORROW_WORKSPACE_ID ?? stored.workspaceId;
+  const connection = resolveClientEnvironment(env, stored);
+  const apiKey = options.apiKey ?? connection.apiKey;
+  const workspaceId = options.workspaceId ?? connection.workspaceId;
 
   return {
     name,
-    baseUrl:
-      options.baseUrl ?? env.MORROW_BASE_URL ?? stored.baseUrl ?? DEFAULT_BASE_URL,
+    baseUrl: options.baseUrl ?? connection.baseUrl,
     ...(apiKey ? { apiKey } : {}),
     ...(workspaceId ? { workspaceId } : {}),
   };

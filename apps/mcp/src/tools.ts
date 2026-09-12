@@ -3,7 +3,7 @@ import type { TaskDto } from "@morrowlist/contracts";
 import { z } from "zod";
 
 /**
- * The MCP tool surface (GAP-18, `docs/adr/pending-mcp-server.md`).
+ * The MCP tool surface (GAP-18, `docs/adr/018-mcp-server.md`).
  *
  * Seven tools, deliberately. Every one of them is a call to the same public REST API the
  * web app and the CLI use, so an agent is subject to the same validation, authorization,

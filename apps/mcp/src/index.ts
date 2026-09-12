@@ -1,19 +1,18 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { resolveClientEnvironment } from "@morrowlist/api-client";
 
 import { createMorrowMcpServer } from "./server.js";
 
 /**
  * `morrow-mcp` (GAP-18): stdio entry point for Claude Desktop, Claude Code, and any other
- * MCP client. Configuration comes from the same environment variables the CLI reads
- * (spec 21.2), so a working `morrow` profile is a working MCP server.
+ * MCP client. Connection environment variables and defaults match the CLI (spec 21.2).
+ * Stored CLI profiles are not read by this environment-configured entry point.
  *
  * stdout is the protocol channel: nothing but MCP frames may be written to it, which is
  * why every diagnostic below goes to stderr.
  */
 
-const baseUrl = process.env.MORROW_BASE_URL ?? "http://localhost:3000/api/v1";
-const apiKey = process.env.MORROW_API_KEY;
-const workspaceId = process.env.MORROW_WORKSPACE;
+const { baseUrl, apiKey, workspaceId } = resolveClientEnvironment(process.env);
 
 if (!apiKey) {
   process.stderr.write(

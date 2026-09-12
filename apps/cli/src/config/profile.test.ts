@@ -1,3 +1,4 @@
+import { resolveClientEnvironment } from "@morrowlist/api-client";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -20,6 +21,24 @@ const config: ConfigFile = {
 };
 
 describe("resolveProfile", () => {
+  it.each([
+    {},
+    { MORROW_API_KEY: "key", MORROW_WORKSPACE_ID: "canonical" },
+    { MORROW_BASE_URL: "https://env.test/api/v1", MORROW_WORKSPACE: "legacy" },
+  ])(
+    "matches the MCP connection resolver with environment-only configuration: %o",
+    (env) => {
+      const { name: _name, ...cli } = resolveProfile(
+        { defaultProfile: "default", profiles: {} },
+        {},
+        env,
+      );
+      const connection = resolveClientEnvironment(env);
+      expect(cli.baseUrl).toBe(connection.baseUrl);
+      expect(cli.apiKey).toBe(connection.apiKey);
+      expect(cli.workspaceId).toBe(connection.workspaceId);
+    },
+  );
   it("uses the default profile when nothing is specified", () => {
     const resolved = resolveProfile(config, {}, {});
 

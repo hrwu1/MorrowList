@@ -8,7 +8,7 @@ as you are. Every change it makes appears in the task's history, attributed to t
 it used.
 
 It runs on your machine, carries no model of its own, and does nothing between calls.
-See `docs/adr/pending-mcp-server.md` for why the surface is deliberately small.
+See `docs/adr/018-mcp-server.md` for why the surface is deliberately small.
 
 ## Tools
 
@@ -23,7 +23,7 @@ See `docs/adr/pending-mcp-server.md` for why the surface is deliberately small.
 | `search`        | Full-text search with the `is:` / `due:` / `tag:` operator grammar   |
 
 `list_tasks`, `get_task` and `search` are marked read-only, so a client can auto-approve
-them and prompt only for the three that write.
+them and prompt only for the four that write.
 
 ## Setup
 
@@ -44,7 +44,7 @@ Or, from a checkout of this repository:
 ```bash
 pnpm --filter @morrowlist/mcp build
 claude mcp add morrowlist \
-  --env MORROW_BASE_URL=http://localhost:3000/api/v1 \
+  --env MORROW_BASE_URL=http://localhost:3200/api/v1 \
   --env MORROW_API_KEY=your-key \
   -- node /absolute/path/to/apps/mcp/dist/index.js
 ```
@@ -71,14 +71,15 @@ Add this to `claude_desktop_config.json` (macOS:
 
 ## Configuration
 
-| Variable           | Meaning                                                    |
-| ------------------ | ---------------------------------------------------------- |
-| `MORROW_BASE_URL`  | API base URL. Default `http://localhost:3000/api/v1`       |
-| `MORROW_API_KEY`   | Required. The server exits with code 3 without one         |
-| `MORROW_WORKSPACE` | Workspace id. Only needed if the key reaches more than one |
+| Variable              | Meaning                                                    |
+| --------------------- | ---------------------------------------------------------- |
+| `MORROW_BASE_URL`     | API base URL. Default `http://localhost:3200/api/v1`       |
+| `MORROW_API_KEY`      | Required. The server exits with code 3 without one         |
+| `MORROW_WORKSPACE_ID` | Workspace id. Only needed if the key reaches more than one |
 
-These are the same variables `morrow` reads (spec 21.2), so a working CLI profile is a
-working MCP server.
+These connection variables and defaults match `morrow` (spec 21.2). The older
+`MORROW_WORKSPACE` name remains a fallback when `MORROW_WORKSPACE_ID` is unset. MCP
+reads its environment; it does not read stored CLI profiles.
 
 ## Notes
 
