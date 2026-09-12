@@ -1,88 +1,166 @@
-# Project handoff
+# Structure standardization handoff — 2026-09-12
 
-Current architecture and contribution rules live in [the contributing guide](README.md).
-The implemented roadmap, active standardization plan, and verification evidence live in
-[the maintained roadmap](../../.claude/plans/roadmap.md). The root README describes the
-current application/package layout; OpenAPI and the CLI usage command describe the
-current interfaces.
+## Stop point
 
-The project uses one canonical task model, application use cases, repository ports and
-adapters, shared transport contracts, and feature-based web hooks/components. Recent
-standardization closes cross-path differences in replay, cache projections, warning
-results, export filtering, concurrency, and CLI/MCP configuration.
+The user asked: “Stop when you complete the current stage, and write the remaining work
+as a handoff file.” The implementation/integration and terminal-check stage is the stop
+point. Production build, browser validation, final merge, and cleanup remain pending.
+Do not resume those stages until the user asks. Nothing has been pushed.
 
-## Environment
+Work is preserved on `codex/standardize-structure` in
+`/private/tmp/morrowlist-standardize`. Main at
+`.` remains at `9b40b25`; it has not received these
+changes. Use the integration checkout for all continuation work. Read
+[the existing guideline](../../.claude/plans/roadmap.md#structure-standardization-guideline-2026-09-12)
+and [the contribution patterns](README.md) before editing. Keep the guideline current;
+do not create another plan for the same work.
 
-- Node 24.20.0, pnpm 10.15.0 via corepack, PostgreSQL 18.6 via Homebrew (running as a
-  LaunchAgent). No Docker on this machine.
-- `psql` needs `export PATH="/opt/homebrew/opt/postgresql@18/bin:$PATH"`.
-- Repository commands load the root `.env` through `loadRootEnv`; explicit environment
-  variables take precedence. Use separate databases for integration and browser tests.
-- Databases: `morrowlist` (dev), `morrowlist_test` (integration harness),
-  `morrowlist_e2e` (Playwright). Each suite refuses to run unless its own URL is set and
-  differs from `DATABASE_URL`.
-- Dev server: `pnpm --filter @morrowlist/web dev` → http://localhost:3200
-- Test account: `robin@example.com` / `correct-horse-battery-staple`
+## Implemented
 
-## Gotchas that will cost you an hour each
+- API lists, exports, and OpenAPI share task-query conversion; CLI exports preserve an
+  empty tag selection. Task deletion carries an expected version. CLI/MCP share API
+  connection defaults and workspace environment precedence; malformed local JSON has the
+  same usage-error classification.
+- Web task projections share extraction, patching, snapshots, rollback, cancellation,
+  invalidation, and background refresh. Resource query keys have one canonical source.
+  Task commands, bulk actions, shortcuts, and undo preserve warnings and authoritative
+  results. The cache regression covers parent/subtask counts after optimistic updates.
+- Imports use canonical tag events and task transitions; Today/Upcoming use shared task
+  projections. Custom-field count-then-create locks the workspace, preserving the cap
+  under concurrent PostgreSQL requests.
+- Concrete delivery adapters and shared embedded/external worker wiring now live in
+  `@morrowlist/transports`. Application ports remain in `application`. Notification
+  dispatch is separated from its public service facade. Invalid VAPID configuration no
+  longer marks healthy push registrations as permanently gone.
+- Server idempotency joins nested UnitOfWork calls and commits replay with command writes.
+  Advisory locks serialize duplicates. Replay responses are encrypted and retained for
+  24 hours; changed fingerprints return 409 and failed transactions leave no record.
+  Device registration uses user scope with nullable workspace ownership. Synchronous
+  webhook tests are explicitly excluded because their external send cannot roll back.
+  Refreshing an expired record precedes bounded cleanup to avoid opposing row locks.
+- ESLint and executable virtual fixtures share a dependency matrix, enforce public
+  package entry points, and cover relative/alias/dynamic/re-export/require escapes plus
+  ambient fetch and narrow tooling exceptions. Next includes the new transport package
+  in transpilation, and Docker copies its package manifest.
 
-1. **Rank columns must stay `COLLATE "C"`** (migration `0001_rank_collation.sql`). Drizzle
-   does not model column collation, so a regenerated migration will not include it. Under
-   the default `en_US.UTF-8` collation PostgreSQL sorts `aa` before `aZ` and adjacent
-   tasks silently swap. An integration test guards this — do not "fix" it by deleting it.
-2. **`pnpm db:generate` builds first**, because drizzle-kit bundles as CommonJS and cannot
-   resolve the `.js` specifiers in the TypeScript source. It reads `dist/schema/index.js`.
-3. **`exactOptionalPropertyTypes` is on.** Optional component props must be declared
-   `?: T | undefined`, or passing an explicit `undefined` fails to typecheck.
-4. **PATCH distinguishes omitted from null.** An absent key leaves a field unchanged; an
-   explicit `null` clears it. Do not collapse these — there are tests for it.
-5. **`apps/web` may not import `@morrowlist/database`.** The single exception is
-   `apps/web/lib/server.ts`, the composition root, which is excluded in the boundary rule.
-6. **Do not redeclare a root CLI flag on a subcommand.** Commander lets the root
-   definition win wherever the flag appears, silently discarding the subcommand's value.
-7. **The specification `.md` is Prettier-ignored.** It is a source document; do not
-   reformat it.
-8. **Regenerate OpenAPI when contracts change**: `pnpm openapi:generate`, then commit.
-   CI fails on drift.
-9. Vitest in `apps/web` excludes `e2e/`; Playwright owns that directory.
-10. **Workspace packages are consumed from `dist/`.** `next dev` transpiles the built
-    output, not the TypeScript source, so a change under `packages/` needs a build and a
-    dev-server restart before the browser sees it. An hour was lost to a "broken" filter
-    that was only a stale module.
-11. **Do not render Markdown through an HTML string.** `features/tasks/lib/markdown.ts`
-    parses to a tree and the renderer emits React elements, so raw HTML in a description
-    cannot execute. Swapping in a Markdown library that returns HTML would silently
-    delete that property (spec 8.1).
-12. **The task detail serialises its saves.** Two field edits in quick succession are both
-    dispatched before React re-renders, so the version to send comes from save responses
-    (`version` ref), not from the rendered task. Removing the queue reintroduces a race
-    that loses an edit with no error shown.
+The final checkpoint also includes session isolation for task feedback and undo; see the
+commit log and terminal results below. Preserve this guard when changing mutation hooks.
 
-## Conventions
+## Verification at the checkpoint
 
-- Update `.claude/plans/<task-slug>.md` before coding and commit it with the code.
-- One coherent, tested change per commit. Explain _why_ in the body.
-- Commit trailers:
-  `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`
-  `Claude-Session: https://claude.ai/code/session_01GxZf3aH2z4qujvS7Dqn7ev`
-- Never push unless explicitly requested; verify current Git state rather than relying
-  on historical branch or remote notes.
-- Match the test to what can break: unit for pure policy, integration for anything
-  depending on SQL semantics, E2E only for journeys that must never break.
-- Report what was verified and what was not. State unverified work explicitly.
+Implementation head: `ac4fd8a` (the documentation checkpoint follows it). All current
+implementation slices are committed. The final combined terminal run passed:
 
-## Known debt
+- **1,628 unit tests**, including 393 web, 349 application, 159 CLI, and 100 API tests.
+- **15 package/app typechecks**; the combined Turbo run completed all 42 tasks.
+- ESLint plus **188 architecture checks**, full formatting, and OpenAPI freshness.
 
-- **IDEM-001 is a real correctness gap**: the CLI sends `Idempotency-Key` on every
-  mutation and the server ignores it, so a retry after a timeout duplicates a task.
-- AUTH-005: CLI authenticates with session tokens; scoped API keys not built.
-- AUTH-006: timezone hardcoded to UTC at sign-up; no onboarding screen.
-- VIEW-008: no undo.
-- `DELETE /tasks/{id}/permanent` is not implemented, so Trash offers restore only, and
-  the scheduled purge date spec 9.7 asks for has nowhere to come from.
-- The list endpoint cannot sort by `completedAt`, so Completed falls back to
-  `updatedAt desc` (spec 9.6 asks for completion time).
-- `GET /tasks/{idOrKey}` 404s on a soft-deleted task, so `/tasks/{key}` cannot open one
-  and Trash rows are not links to detail.
-- The development database still holds nine `E2E Tester` workspaces left by earlier runs.
-  Playwright no longer writes there, but the existing rows have not been cleaned out.
+The maintained roadmap records the same checkpoint. The database evidence has a
+narrower scope:
+
+- Full PostgreSQL integration: **144 tests across 19 files passed** before the final
+  nullable replay-schema change. This includes concurrent field-limit enforcement.
+- Final focused replay PostgreSQL suite: **4 tests passed** using
+  `morrowlist_standardize_backend_test`, with the final nullable migration applied fresh.
+  It covers independent concurrent callers, nested rollback, conflicting key reuse, and
+  user-scoped registration without workspace membership.
+- API replay/route/OpenAPI unit suite: **100 tests passed** after the replay fixes.
+- No production Next build or Playwright journey was run for this integrated checkpoint.
+  Passing unit tests do not establish browser behavior or live-provider delivery.
+
+Logs are local scratch artifacts under `/private/tmp/`:
+
+- `morrowlist-standardize-stage-checks.log`: final combined typecheck/unit result.
+- `morrowlist-standardize-stage-lint.log`: ESLint and boundary fixtures.
+- `morrowlist-standardize-stage-format.log`: formatting result.
+- `morrowlist-standardize-stage-openapi.log`: OpenAPI freshness.
+- `morrowlist-standardize-integration.log`: the earlier 144-test PostgreSQL run.
+- `morrowlist-standardize-replay-final-unit.log`: the final 100-test API run.
+
+Older `combined-*` and `final-checks.log` files include superseded attempts: a sandboxed
+CLI listener was denied, and a middleware integration typo failed typecheck/lint before
+it was fixed. Use the final `stage-*` results, not those earlier failures.
+
+## Remaining work when resumed
+
+1. Verify the integration branch/worktree and clean status against this handoff. Check
+   current main before any merge; preserve unrelated user edits. Review the final diff,
+   especially the session guard and replay exceptions. Do not broaden the refactor.
+2. Run the complete PostgreSQL suite against an empty task-specific database using the
+   final migration. `morrowlist_standardize_test` contains an earlier NOT NULL version of
+   the new `0020` migration; recreate **only that disposable task database**, or choose a
+   fresh task database. Do not alter the development database or reuse its URL for tests.
+3. Build the full production workspace. Check packaging of `@morrowlist/transports`, the
+   web bundle/service worker, and the external worker entry point. TypeScript dependency
+   builds from unit checks are not a production Next build. Docker-image validation is
+   separate and remains unverified.
+4. Run focused production Chromium journeys: `task-command-feedback.spec.ts`,
+   `wip.spec.ts`, `undo-bulk.spec.ts`, and `background-sync.spec.ts`; cover shortcuts,
+   capture/capture-channels, and offline-scope after the session guard; then the full suite
+   with retries disabled. Inspect contextual warnings on desktop and mobile, optimistic
+   subtask counts/rollback, bulk remedies, undo, shortcuts, and account/signout isolation.
+   Capture and inspect screenshots where useful. Fix regressions and rerun affected
+   checks; do not report browser success from unit tests.
+5. Refresh terminal checks only for subsequent changes or unresolved concerns. Record
+   precise results and remaining platform/provider gaps in this handoff/guideline.
+6. After all required checks pass, merge cleanly into local main according to the user’s
+   resume instructions, preserving existing changes. Do not push. Apply migrations to
+   development/deployed environments only as an explicit rollout step, not as a test.
+7. Remove this task’s four worktrees and temporary databases after successful integration.
+   Stop only task-owned listeners. Leave unrelated historical/prunable worktrees alone.
+
+## Environment and continuation commands
+
+Node 24 and pnpm 10.15.0 are available. Each worktree has its own workspace dependency
+links. The downloaded pnpm store was relocated out of main to
+`/private/tmp/morrowlist-standardize-pnpm-store`; main is clean. If reinstalling, use:
+
+```sh
+cd /private/tmp/morrowlist-standardize
+pnpm install --offline --frozen-lockfile --ignore-scripts --store-dir /private/tmp/morrowlist-standardize-pnpm-store
+```
+
+PostgreSQL 18 tools are under `/opt/homebrew/opt/postgresql@18/bin`; the local database
+role is `hrwu`. Task databases retained for continuation are:
+
+- `morrowlist_standardize_test` — earlier migration; recreate before final full run.
+- `morrowlist_standardize_backend_test` — final nullable migration, focused suite passed.
+- `morrowlist_standardize_e2e` — reserved for browser tests, no browser suite run yet.
+
+After preparing a fresh test database, the remaining checks can use:
+
+```sh
+DATABASE_URL=postgresql://postgres@127.0.0.1:5432/morrowlist TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/morrowlist_standardize_test pnpm test:integration
+WORKER_MODE=external DATABASE_URL=postgresql://postgres@127.0.0.1:5432/morrowlist_standardize_e2e AUTH_SECRET=standardization-local-test-secret-at-least-32-characters APP_URL=http://127.0.0.1:3280 pnpm build
+CI=1 E2E_PORT=3280 DATABASE_URL=postgresql://postgres@127.0.0.1:5432/morrowlist E2E_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/morrowlist_standardize_e2e AUTH_SECRET=standardization-local-test-secret-at-least-32-characters pnpm --filter @morrowlist/web test:e2e task-command-feedback.spec.ts wip.spec.ts undo-bulk.spec.ts background-sync.spec.ts --retries=0
+```
+
+For the full browser suite, retain that environment and omit the four filenames. Verify
+port 3280 is free first; Playwright starts its own production server and refuses reuse.
+The `DATABASE_URL` pointing at dev in test commands is only a safety comparison; the
+harness selects `TEST_DATABASE_URL`/`E2E_DATABASE_URL`. Never run migration/seed commands
+with that dev URL. Socket/network tests and Git metadata mutations required sandbox
+escalation in this session; request tool approval if the same restrictions recur.
+
+Retained worktrees/branches:
+
+| Worktree                                         | Branch                         |
+| ------------------------------------------------ | ------------------------------ |
+| `/private/tmp/morrowlist-standardize`            | `codex/standardize-structure`  |
+| `/private/tmp/morrowlist-standardize-interfaces` | `codex/standardize-interfaces` |
+| `/private/tmp/morrowlist-standardize-backend`    | `codex/standardize-backend`    |
+| `/private/tmp/morrowlist-standardize-web`        | `codex/standardize-web`        |
+
+Agent commits have already been cherry-picked into the integration branch. Do not merge
+those branches again. Inspect `git log 9b40b25..HEAD` for the coherent implementation
+steps. The earlier detailed review remains at
+`/private/tmp/morrowlist-structure-review-2026-09-12.md`.
+
+## Durable project constraints
+
+Keep rank columns `COLLATE "C"`; Drizzle does not express this collation. Preserve omitted
+versus null semantics and expected-version checks. Keep canonical task DTOs and stable
+public package interfaces; do not replace feature-specific policies with generic CRUD
+inheritance. Package source changes require rebuilt `dist` before the browser consumes
+them. API and CLI documentation must agree with executable behavior. Use generated test
+accounts in disposable databases, never historical credentials from old handoffs.
