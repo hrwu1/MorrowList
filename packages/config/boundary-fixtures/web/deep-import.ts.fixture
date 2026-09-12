@@ -1,5 +1,0 @@
-// INVALID ON PURPOSE. See ../README.md.
-// Cross-package imports use public entry points, never another package's internals.
-import { rankBetween } from "@morrowlist/domain/src/shared/rank.js";
-
-export const rank = rankBetween;

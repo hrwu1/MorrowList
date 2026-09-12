@@ -62,19 +62,50 @@ section 16.2 of the specification.
   workspace package. It is the innermost layer.
 - `application` imports `domain` and `contracts` and defines ports. It does not import
   Next.js, Hono, Drizzle, or Better Auth.
-- `database` and `auth` implement application ports. They are adapters.
+- `database`, `auth`, and `transports` implement application ports. They are adapters.
+  Concrete HTTP delivery, VAPID signing, and sender configuration live in `transports`.
 - `api` validates input, builds an `ActorContext`, and calls exactly one use case. It
   contains no business rules.
 - `web` never imports Drizzle schema or repositories. The single exception is
   `apps/web/lib/server.ts`, the composition root, which wires the adapters together.
-- `cli` talks to the public API through `api-client`. It never reaches PostgreSQL.
+- `cli` and `mcp` talk to the public API through `api-client`. Neither reaches application
+  services, the server API implementation, or PostgreSQL directly.
 - Cross-package imports use public entry points. No deep imports into another package's
   internals.
 
-`packages/config/boundary-fixtures/` holds deliberately invalid files, and
-`scripts/check-boundaries.mjs` fails the build if any of them lints clean. A rule that has
-silently stopped matching is worse than no rule: it looks like enforcement while enforcing
-nothing.
+`packages/config/eslint/boundaries.js` owns the allowed dependency matrix. Lint resolves
+workspace ownership for public package imports, relative paths, aliases, re-exports,
+dynamic imports, and literal `require` calls. `scripts/check-boundaries.mjs` checks both
+allowed and forbidden imports with virtual files, including the narrow composition-root
+and database-harness exceptions; it does not write fixtures into compiler source trees.
+
+## Patterns for equivalent responsibilities
+
+- Application services authorize, open a UnitOfWork, apply domain policy, persist,
+  record material activity/outbox events, and map the result. Reuse the transaction-aware
+  creation/transition helpers for imports, recurrence, rules, and ordinary commands.
+- Nested `execute` calls on the same UnitOfWork join the current transaction. A shared
+  replay wrapper can therefore commit its response with every command write. Independent
+  requests remain isolated; a callback must await all of its transaction work.
+- `Idempotency-Key` identifies one logical mutation attempt. Identical actor/workspace/
+  operation/key requests replay for 24 hours; changed request fingerprints return 409.
+  Successful responses are encrypted using the application secret before storage, and
+  failed requests leave no replay record. Client-generated keys belong to a single send;
+  retrying after uncertain delivery must retain that key. External test deliveries cannot
+  be rolled back by a database transaction and retain their existing delivery semantics.
+- Keep database-enforced invariants explicit in ports: a transaction alone does not
+  serialize count-then-create operations. Test limits/claims with concurrent PostgreSQL
+  callers, not only sequential in-memory doubles.
+- Shared task-query wire conversion serves lists, exports, and OpenAPI declarations.
+  Treat a resolved empty selection as empty; never drop it and query a broader set.
+- Web feature hooks compose canonical resource keys and shared task cache policies.
+  Every task projection must support the same read/patch/snapshot/cancel/refresh lifecycle.
+  Preserve full command results (including warnings), expected versions, and undo feedback.
+- Keep views as projections of canonical task DTOs. Bulk actions can deliberately wait
+  for atomic server results; notification read state and capability endpoints have their
+  documented exceptions. Similar responsibility, not identical syntax, is the criterion.
+- Prefer small internal command/query/delivery helpers behind stable service facades.
+  Do not create generic CRUD inheritance or duplicate query registries per page.
 
 ## Database changes
 

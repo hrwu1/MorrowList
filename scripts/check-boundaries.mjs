@@ -1,100 +1,119 @@
 #!/usr/bin/env node
-/**
- * Negative test for the dependency-boundary rules (FND-003).
- *
- * Each fixture is a deliberate violation. It is copied to the repository path the rule
- * targets, linted there, and removed again. The check fails if a fixture lints clean,
- * because a boundary rule that has silently stopped matching looks like enforcement while
- * enforcing nothing.
- */
-import { execFile } from "node:child_process";
-import { mkdir, copyFile, rm } from "node:fs/promises";
+/** Prove the matrix using virtual files: no compiler-visible fixtures or write races. */
+import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 
-const run = promisify(execFile);
+import { ESLint } from "eslint";
+
+import { allowedDependencies } from "../packages/config/eslint/boundaries.js";
+
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const fixtureRoot = join(root, "packages", "config", "boundary-fixtures");
-
-/** Each fixture, the path it must be linted at, and the rule text expected to fire. */
-const CASES = [
-  {
-    fixture: "domain/framework-import.ts.fixture",
-    target: "packages/domain/src/__boundary_fixture__.ts",
-    expect: "framework-free",
-  },
-  {
-    fixture: "domain/database-import.ts.fixture",
-    target: "packages/domain/src/__boundary_fixture__.ts",
-    expect: "innermost layer",
-  },
-  {
-    fixture: "web/database-import.ts.fixture",
-    target: "apps/web/__boundary_fixture__.ts",
-    expect: "never import Drizzle",
-  },
-  {
-    fixture: "mcp/application-import.ts.fixture",
-    target: "apps/mcp/src/__boundary_fixture__.ts",
-    expect: "api-client only",
-  },
-  {
-    fixture: "web/deep-import.ts.fixture",
-    target: "apps/web/__boundary_fixture__.ts",
-    expect: "public entry point",
-  },
-];
-
-async function lint(path) {
-  try {
-    const { stdout } = await run(
-      "node",
-      ["node_modules/eslint/bin/eslint.js", "--format", "json", "--no-ignore", path],
-      { cwd: root, maxBuffer: 10 * 1024 * 1024 },
-    );
-    return JSON.parse(stdout);
-  } catch (error) {
-    // ESLint exits non-zero when it reports errors, which is the expected path here.
-    if (error.stdout) return JSON.parse(error.stdout);
-    throw error;
-  }
-}
-
-let failures = 0;
-
-for (const testCase of CASES) {
-  const target = join(root, testCase.target);
-  await mkdir(dirname(target), { recursive: true });
-  await copyFile(join(fixtureRoot, testCase.fixture), target);
-
-  try {
-    const results = await lint(target);
-    const messages = results.flatMap((result) => result.messages);
-    const matched = messages.some((message) =>
-      (message.message ?? "").includes(testCase.expect),
-    );
-
-    if (matched) {
-      console.log(`  ok   ${testCase.fixture}`);
-    } else {
-      failures += 1;
-      console.error(
-        `  FAIL ${testCase.fixture}\n` +
-          `       expected a message containing ${JSON.stringify(testCase.expect)}\n` +
-          `       got: ${messages.map((m) => m.message).join(" | ") || "(no messages)"}`,
-      );
+const eslint = new ESLint({ cwd: root });
+const packages = Object.keys(allowedDependencies).filter(
+  (name) => !["web", "cli", "mcp"].includes(name),
+);
+const sourcePath = (area) =>
+  ["web", "cli", "mcp"].includes(area)
+    ? `apps/${area}/src/boundary-check.ts`
+    : `packages/${area}/src/boundary-check.ts`;
+const cases = [];
+for (const [source, allowed] of Object.entries(allowedDependencies)) {
+  for (const target of packages) {
+    if (target === source) continue;
+    // New adapter packages may not exist in older checkouts; only check installed manifests.
+    try {
+      await readFile(join(root, "packages", target, "package.json"));
+    } catch {
+      continue;
     }
-  } finally {
-    await rm(target, { force: true });
+    cases.push({
+      path: sourcePath(source),
+      source: `import * as dep from "@morrowlist/${target}";\nexport { dep };`,
+      blocked: !allowed.includes(target),
+      name: `${source} → ${target}`,
+    });
   }
 }
-
-if (failures > 0) {
-  console.error(
-    `\n${failures} boundary rule(s) did not fire. The architecture is not being enforced.`,
+const probes = [
+  [
+    "domain",
+    'import { createDatabase } from "../../database/src/index.js";\nexport { createDatabase };',
+    true,
+    "relative escape",
+  ],
+  ["web", 'export * from "@morrowlist/application";', true, "re-export escape"],
+  [
+    "cli",
+    'export const load = () => import("@morrowlist/api");',
+    true,
+    "dynamic import escape",
+  ],
+  [
+    "domain",
+    'export const load = () => require("@morrowlist/database");',
+    true,
+    "require escape",
+  ],
+  [
+    "web",
+    'export * from "@/../../packages/database/src/index.js";',
+    true,
+    "alias escape",
+  ],
+  [
+    "domain",
+    'import * as dep from "react/jsx-runtime";\nexport { dep };',
+    true,
+    "framework subpath",
+  ],
+  ["domain", 'export * from "node:fs";', true, "domain I/O"],
+  [
+    "web",
+    'export * from "@morrowlist/contracts/src/task.js";',
+    true,
+    "private subpath",
+  ],
+  ["web", 'export * from "@morrowlist/config/env";', false, "public subpath"],
+];
+for (const [area, source, blocked, name] of probes)
+  cases.push({ path: sourcePath(area), source, blocked, name });
+for (const [path, target, blocked] of [
+  ["apps/web/lib/server.ts", "database", false],
+  ["apps/web/e2e/global-setup.ts", "database", false],
+  ["apps/web/e2e/workflow.spec.ts", "database", true],
+  ["packages/api/src/app.test.ts", "testkit", false],
+  ["packages/api/src/app.test.ts", "database", false],
+  ["packages/application/vitest.config.ts", "config", false],
+])
+  cases.push({
+    path,
+    source: `export * from "@morrowlist/${target}";`,
+    blocked,
+    name: path,
+  });
+let failures = 0;
+for (const test of cases) {
+  const [result] = await eslint.lintText(test.source, {
+    filePath: join(root, test.path),
+  });
+  const messages = result.messages.filter(
+    (message) => message.ruleId === "architecture/dependencies",
   );
+  if (
+    messages.length > 0 !== test.blocked ||
+    result.messages.some((message) => message.fatal)
+  ) {
+    failures++;
+    process.stderr.write(
+      `FAIL ${test.name}: ${messages.map((message) => message.message).join(" | ") || "no boundary error"}\n`,
+    );
+  }
+}
+if (failures) {
+  process.stderr.write(`${failures} architecture checks failed.\n`);
   process.exit(1);
 }
-
-console.log(`\nAll ${CASES.length} boundary rules fired as expected.`);
+process.stdout.write(
+  `All ${cases.length} architecture checks passed (allowed and forbidden imports).\n`,
+);

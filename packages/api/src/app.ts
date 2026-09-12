@@ -2,8 +2,8 @@ import { Hono } from "hono";
 
 import type { ApiDependencies, ApiEnv } from "./context.js";
 import { ApiError, toErrorBody } from "./errors.js";
-import { idempotency } from "./middleware/idempotency.js";
 import { authenticate } from "./middleware/authenticate.js";
+import { idempotency } from "./middleware/idempotency.js";
 import { requestContext } from "./middleware/request-context.js";
 import { bodyLimit } from "./middleware/validate.js";
 import { calendarRoutes } from "./routes/calendar.js";

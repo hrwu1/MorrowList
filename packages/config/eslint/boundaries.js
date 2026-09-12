@@ -1,183 +1,159 @@
-/**
- * Dependency-boundary rules from spec section 16.2.
- *
- * Each entry lists the workspace packages a given source area is forbidden to import.
- * The rules are deliberately expressed as a deny-list of concrete package names and
- * framework modules so a violation fails lint with an explanatory message rather than
- * relying on reviewer memory.
- */
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const FRAMEWORK_MODULES = [
-  "next",
-  "next/*",
-  "react",
-  "react-dom",
-  "hono",
-  "hono/*",
-  "drizzle-orm",
-  "drizzle-orm/*",
-  "better-auth",
-  "better-auth/*",
-  "pg",
-];
+/** The allowed dependency matrix, shared by lint and its executable fixtures. */
+export const allowedDependencies = {
+  domain: [],
+  contracts: [],
+  application: ["domain", "contracts", "observability"],
+  database: ["application", "domain", "config"],
+  auth: ["application", "database", "domain", "observability", "config"],
+  api: ["application", "auth", "contracts", "domain", "observability"],
+  "api-client": ["contracts"],
+  transports: ["application", "contracts", "domain", "observability"],
+  ui: [],
+  observability: [],
+  testkit: ["application", "domain"],
+  config: [],
+  web: ["api-client", "contracts", "domain", "ui", "config"],
+  cli: ["api-client", "contracts", "domain"],
+  mcp: ["api-client", "contracts"],
+};
 
-/**
- * @type {{
- *   area: string,
- *   files: string[],
- *   exclude?: string[],
- *   forbid: { group: string[], message: string }[],
- * }[]}
- */
-export const boundaries = [
-  {
-    area: "domain",
-    files: ["packages/domain/src/**/*.ts"],
-    forbid: [
-      {
-        group: FRAMEWORK_MODULES,
-        message:
-          "packages/domain must stay framework-free: no HTTP, database, auth-provider, or UI imports (spec 16.2).",
-      },
-      {
-        group: ["@morrowlist/*"],
-        message:
-          "packages/domain is the innermost layer and must not import other workspace packages (spec 16.2).",
-      },
-    ],
-  },
-  {
-    area: "application",
-    files: ["packages/application/src/**/*.ts"],
-    forbid: [
-      {
-        group: FRAMEWORK_MODULES,
-        message:
-          "packages/application defines ports only: it must not import Next.js, Hono, Drizzle, or Better Auth (spec 16.2).",
-      },
-      {
-        group: [
-          "@morrowlist/database",
-          "@morrowlist/database/*",
-          "@morrowlist/api",
-          "@morrowlist/api/*",
-          "@morrowlist/auth",
-          "@morrowlist/auth/*",
-          "@morrowlist/ui",
-          "@morrowlist/ui/*",
-          "@morrowlist/api-client",
-        ],
-        message:
-          "packages/application may import @morrowlist/domain, @morrowlist/contracts and @morrowlist/observability only; adapters implement its ports (spec 16.2).",
-      },
-    ],
-  },
-  {
-    area: "contracts",
-    files: ["packages/contracts/src/**/*.ts"],
-    forbid: [
-      {
-        group: FRAMEWORK_MODULES,
-        message:
-          "packages/contracts holds transport schemas only and must not depend on a framework (spec 16.2).",
-      },
-      {
-        group: ["@morrowlist/*"],
-        message:
-          "packages/contracts must not import other workspace packages; it is a leaf schema package (spec 16.2).",
-      },
-    ],
-  },
-  {
-    area: "web",
-    // `lib/server.ts` is the composition root (spec 16.1): it is the single file allowed
-    // to construct the database adapter and wire it into the application layer. Every
-    // other file in the app reaches data through the API.
-    //
-    // `e2e/global-setup.ts` is harness code, not application code: it migrates and
-    // truncates the database the browser suite drives, before Next.js starts.
-    files: ["apps/web/**/*.ts", "apps/web/**/*.tsx"],
-    exclude: ["apps/web/lib/server.ts", "apps/web/e2e/global-setup.ts"],
-    forbid: [
-      {
-        group: [
-          "@morrowlist/database",
-          "@morrowlist/database/*",
-          "drizzle-orm",
-          "drizzle-orm/*",
-          "pg",
-        ],
-        message:
-          "apps/web must never import Drizzle schema or repositories; go through the API (spec 16.2).",
-      },
-    ],
-  },
-  {
-    area: "cli",
-    files: ["apps/cli/src/**/*.ts"],
-    forbid: [
-      {
-        group: [
-          "@morrowlist/database",
-          "@morrowlist/database/*",
-          "@morrowlist/application",
-          "@morrowlist/application/*",
-          "drizzle-orm",
-          "drizzle-orm/*",
-          "pg",
-        ],
-        message:
-          "apps/cli communicates through @morrowlist/api-client only; it must not reach PostgreSQL or the application layer directly (spec 16.2).",
-      },
-    ],
-  },
-  {
-    // apps/mcp is a transport adapter like the CLI (ADR-005, docs/adr/pending-mcp-server.md):
-    // it speaks the public REST API and nothing else, so an agent is subject to the same
-    // rules as a person.
-    area: "mcp",
-    files: ["apps/mcp/src/**/*.ts"],
-    forbid: [
-      {
-        group: [
-          "@morrowlist/database",
-          "@morrowlist/database/*",
-          "@morrowlist/application",
-          "@morrowlist/application/*",
-          "@morrowlist/api",
-          "@morrowlist/api/*",
-          "drizzle-orm",
-          "drizzle-orm/*",
-          "pg",
-        ],
-        message:
-          "apps/mcp communicates through @morrowlist/api-client only; it must not reach PostgreSQL, the application layer, or the API package directly (spec 16.2).",
-      },
-    ],
-  },
-  {
-    area: "ui",
-    files: ["packages/ui/src/**/*.ts", "packages/ui/src/**/*.tsx"],
-    forbid: [
-      {
-        group: [
-          "@morrowlist/database",
-          "@morrowlist/database/*",
-          "@morrowlist/application",
-          "@morrowlist/application/*",
-          "@morrowlist/api",
-          "@morrowlist/api/*",
-        ],
-        message:
-          "packages/ui is presentation only and must not import server-side layers (spec 16.2).",
-      },
-    ],
-  },
-];
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+const publicExports = new Map();
+for (const name of readdirSync(resolve(root, "packages"))) {
+  const manifest = JSON.parse(
+    readFileSync(resolve(root, "packages", name, "package.json"), "utf8"),
+  );
+  publicExports.set(name, new Set(Object.keys(manifest.exports ?? { ".": true })));
+}
 
-/** Deep imports into another package's internals are forbidden everywhere (spec 16.2). */
-export const noDeepImports = {
-  group: ["@morrowlist/*/src/**", "@morrowlist/*/dist/**"],
-  message:
-    "Import a package's public entry point; deep imports into another package's internals are forbidden (spec 16.2).",
+const framework = /^(next|react|react-dom|hono|drizzle-orm|better-auth|pg)(\/|$)/;
+const serverFramework = /^(next|hono|drizzle-orm|better-auth|pg)(\/|$)/;
+const ioModule = /^(node:)?(fs|http|https|http2|net|tls|dns|dgram|child_process)(\/|$)/;
+const ownerOf = (path) => /^(?:apps|packages)\/([^/]+)(?:\/|$)/.exec(path)?.[1];
+const normalize = (path) => path.replaceAll("\\", "/");
+const specifierOf = (node) =>
+  typeof node?.value === "string"
+    ? node.value
+    : node?.type === "TemplateLiteral" && node.expressions.length === 0
+      ? node.quasis[0].value.cooked
+      : null;
+
+export const architecturePlugin = {
+  rules: {
+    dependencies: {
+      meta: {
+        type: "problem",
+        schema: [],
+        messages: {
+          forbidden:
+            "{{source}} cannot import {{target}}; use its declared ports or public client (architecture dependency matrix).",
+          private:
+            "Cross-package imports must use a declared public entry point; relative paths and private subpaths bypass the architecture.",
+          framework: "{{source}} must stay framework-free and keep I/O in adapters.",
+        },
+      },
+      create(context) {
+        const filename = context.filename;
+        const path = normalize(relative(root, filename));
+        const source = ownerOf(path);
+        const allowed = allowedDependencies[source];
+        if (!allowed) return {};
+        const isTest =
+          /\.(test|spec)\.[cm]?[jt]sx?$/.test(path) || path.includes("/testing/");
+        const isConfig =
+          /(?:^|\/)[^/]*config\.[cm]?[jt]s$/.test(path) || path.includes("/vitest/");
+        const isComposition = path === "apps/web/lib/server.ts";
+        const isDatabaseHarness = path === "apps/web/e2e/global-setup.ts";
+
+        function check(node, value) {
+          if (!value) return;
+          let target;
+          let crossPath = false;
+          if (value.startsWith("@morrowlist/")) {
+            const [, name, ...subpath] = value.split("/");
+            target = name;
+            const entry = subpath.length ? `./${subpath.join("/")}` : ".";
+            if (!publicExports.get(name)?.has(entry)) {
+              context.report({ node, messageId: "private" });
+              return;
+            }
+          } else if (
+            value.startsWith(".") ||
+            isAbsolute(value) ||
+            value.startsWith("@/")
+          ) {
+            const absolute = value.startsWith("@/")
+              ? resolve(root, "apps/web", value.slice(2))
+              : resolve(dirname(filename), value);
+            target = ownerOf(normalize(relative(root, absolute)));
+            crossPath = target !== undefined && target !== source;
+          }
+          if (crossPath) {
+            context.report({ node, messageId: "private" });
+            return;
+          }
+          if (target && target !== source) {
+            const testDependency =
+              isTest &&
+              target === "testkit" &&
+              !["domain", "contracts", "config", "observability"].includes(source);
+            const configDependency = isConfig && target === "config";
+            const harnessDependency =
+              (isDatabaseHarness || (isTest && source === "api")) &&
+              target === "database";
+            if (
+              !isComposition &&
+              !allowed.includes(target) &&
+              !testDependency &&
+              !configDependency &&
+              !harnessDependency
+            ) {
+              context.report({
+                node,
+                messageId: "forbidden",
+                data: { source, target },
+              });
+            }
+          }
+          const pure = ["domain", "contracts", "application", "observability"].includes(
+            source,
+          );
+          const client = ["cli", "mcp", "api-client", "ui"].includes(source);
+          if (
+            !isComposition &&
+            ((pure && framework.test(value)) ||
+              (pure && !isTest && ioModule.test(value)) ||
+              (client && serverFramework.test(value)) ||
+              (source === "web" &&
+                !isDatabaseHarness &&
+                /^(drizzle-orm|pg)(\/|$)/.test(value)))
+          ) {
+            context.report({ node, messageId: "framework", data: { source } });
+          }
+        }
+        return {
+          ImportDeclaration: (node) => check(node.source, specifierOf(node.source)),
+          ExportNamedDeclaration: (node) =>
+            check(node.source, specifierOf(node.source)),
+          ExportAllDeclaration: (node) => check(node.source, specifierOf(node.source)),
+          ImportExpression: (node) => check(node.source, specifierOf(node.source)),
+          CallExpression: (node) => {
+            if (node.callee.type === "Identifier" && node.callee.name === "require")
+              check(node, specifierOf(node.arguments[0]));
+            if (
+              source === "application" &&
+              !isTest &&
+              node.callee.type === "Identifier" &&
+              node.callee.name === "fetch"
+            )
+              context.report({ node, messageId: "framework", data: { source } });
+          },
+        };
+      },
+    },
+  },
 };

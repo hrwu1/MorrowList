@@ -1,40 +1,23 @@
 # Project handoff
 
-State of the repository as of the end of Milestone M0, one vertical slice, and Step 0
-(surface the model). Written so a contributor with no prior context can continue without
-re-deriving decisions.
+Current architecture and contribution rules live in [the contributing guide](README.md).
+The implemented roadmap, active standardization plan, and verification evidence live in
+[the maintained roadmap](../../.claude/plans/roadmap.md). The root README describes the
+current application/package layout; OpenAPI and the CLI usage command describe the
+current interfaces.
 
-## What exists
-
-M0 complete, plus a slice through every layer: sign up → capture into the Inbox → list →
-complete → reopen, working from both the browser and the `morrow` CLI. On top of that,
-Step 0 surfaced the model in the UI: task detail with autosave and conflict handling
-(panel plus `/tasks/{idOrKey}`), priority and dates on capture and in row actions,
-Completed and Trash views, and filter/sort controls whose state lives in the URL.
-
-```
-domain → application → {database, auth, api} → {web, cli}
-```
-
-`packages/domain` imports no framework and no other workspace package. Boundaries are
-enforced by ESLint, by `scripts/check-boundaries.mjs` (which proves the lint rules still
-fire), and by pnpm's strict `node_modules` layout.
-
-Implemented endpoints: `GET /health`, `/ready`, `/me`, `GET|POST /tasks`,
-`GET /tasks/{idOrKey}`, `PATCH /tasks/{id}`, `POST /tasks/{id}/complete|reopen|restore`,
-`DELETE /tasks/{id}`. `GET /tasks?deleted=true` returns the Trash.
-
-Not implemented despite appearing in the spec: projects/statuses endpoints, Today/Upcoming
-/board/search/export projections, tags, relations, subtask endpoints,
-`GET /tasks/{id}/activity`, `DELETE /tasks/{id}/permanent`, idempotency middleware,
-API keys.
+The project uses one canonical task model, application use cases, repository ports and
+adapters, shared transport contracts, and feature-based web hooks/components. Recent
+standardization closes cross-path differences in replay, cache projections, warning
+results, export filtering, concurrency, and CLI/MCP configuration.
 
 ## Environment
 
 - Node 24.20.0, pnpm 10.15.0 via corepack, PostgreSQL 18.6 via Homebrew (running as a
   LaunchAgent). No Docker on this machine.
 - `psql` needs `export PATH="/opt/homebrew/opt/postgresql@18/bin:$PATH"`.
-- Load env before running anything: `set -a && source ./.env && set +a`.
+- Repository commands load the root `.env` through `loadRootEnv`; explicit environment
+  variables take precedence. Use separate databases for integration and browser tests.
 - Databases: `morrowlist` (dev), `morrowlist_test` (integration harness),
   `morrowlist_e2e` (Playwright). Each suite refuses to run unless its own URL is set and
   differs from `DATABASE_URL`.
@@ -82,7 +65,8 @@ API keys.
 - Commit trailers:
   `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`
   `Claude-Session: https://claude.ai/code/session_01GxZf3aH2z4qujvS7Dqn7ev`
-- Never push; no remote is configured.
+- Never push unless explicitly requested; verify current Git state rather than relying
+  on historical branch or remote notes.
 - Match the test to what can break: unit for pure policy, integration for anything
   depending on SQL semantics, E2E only for journeys that must never break.
 - Report what was verified and what was not. State unverified work explicitly.

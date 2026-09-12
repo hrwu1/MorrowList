@@ -1,9 +1,9 @@
-import type { IdempotencyRepository } from "./idempotency.js";
 import type { CalendarFeedTokenRepository } from "./calendar.js";
 import type { DayPlanRepository } from "./day-plans.js";
 import type { ActivityRepository, OutboxRepository } from "./events.js";
 import type { FieldDefinitionRepository } from "./fields.js";
 import type { StatusIntervalRepository } from "./flow.js";
+import type { IdempotencyRepository } from "./idempotency.js";
 import type { InboundAddressRepository } from "./inbound-email.js";
 import type {
   NotificationPreferenceRepository,
