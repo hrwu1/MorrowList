@@ -1,166 +1,117 @@
-# Structure standardization handoff — 2026-09-12
+# Structure standardization — completed 2026-09-12
 
-## Stop point
+The user resumed the paused checkpoint with “Please continue”. The reviewed
+standardization is now merged into local `main`, ending at implementation commit
+`ff59252`; this documentation commit follows it. No changes were pushed.
 
-The user asked: “Stop when you complete the current stage, and write the remaining work
-as a handoff file.” The implementation/integration and terminal-check stage is the stop
-point. Production build, browser validation, final merge, and cleanup remain pending.
-Do not resume those stages until the user asks. Nothing has been pushed.
+The existing guideline is in
+[the maintained roadmap](../../.claude/plans/roadmap.md#structure-standardization-guideline-2026-09-12).
+[The contribution guide](README.md#patterns-for-equivalent-responsibilities) documents
+the patterns to maintain. There is no pending implementation stage for this review.
 
-Work is preserved on `codex/standardize-structure` in
-`/private/tmp/morrowlist-standardize`. Main at
-`.` remains at `9b40b25`; it has not received these
-changes. Use the integration checkout for all continuation work. Read
-[the existing guideline](../../.claude/plans/roadmap.md#structure-standardization-guideline-2026-09-12)
-and [the contribution patterns](README.md) before editing. Keep the guideline current;
-do not create another plan for the same work.
+## What is standardized
 
-## Implemented
+The project keeps its modular monolith and ports/adapters architecture. Equivalent
+responsibilities now share concrete policies rather than generic CRUD inheritance:
 
-- API lists, exports, and OpenAPI share task-query conversion; CLI exports preserve an
-  empty tag selection. Task deletion carries an expected version. CLI/MCP share API
-  connection defaults and workspace environment precedence; malformed local JSON has the
-  same usage-error classification.
-- Web task projections share extraction, patching, snapshots, rollback, cancellation,
-  invalidation, and background refresh. Resource query keys have one canonical source.
-  Task commands, bulk actions, shortcuts, and undo preserve warnings and authoritative
-  results. The cache regression covers parent/subtask counts after optimistic updates.
-- Imports use canonical tag events and task transitions; Today/Upcoming use shared task
-  projections. Custom-field count-then-create locks the workspace, preserving the cap
-  under concurrent PostgreSQL requests.
-- Concrete delivery adapters and shared embedded/external worker wiring now live in
-  `@morrowlist/transports`. Application ports remain in `application`. Notification
-  dispatch is separated from its public service facade. Invalid VAPID configuration no
-  longer marks healthy push registrations as permanently gone.
-- Server idempotency joins nested UnitOfWork calls and commits replay with command writes.
-  Advisory locks serialize duplicates. Replay responses are encrypted and retained for
-  24 hours; changed fingerprints return 409 and failed transactions leave no record.
-  Device registration uses user scope with nullable workspace ownership. Synchronous
-  webhook tests are explicitly excluded because their external send cannot roll back.
-  Refreshing an expired record precedes bounded cleanup to avoid opposing row locks.
-- ESLint and executable virtual fixtures share a dependency matrix, enforce public
-  package entry points, and cover relative/alias/dynamic/re-export/require escapes plus
-  ambient fetch and narrow tooling exceptions. Next includes the new transport package
-  in transpilation, and Docker copies its package manifest.
+- Application commands reuse task persistence, transitions, projections and event
+  recording. Imports emit canonical tag events while historical events remain readable.
+- API lists, exports and OpenAPI share query conversion. Empty CLI tag selections stay
+  empty; task deletion preserves expected versions; CLI/MCP share connection defaults
+  and workspace environment precedence. Local JSON validation has consistent errors.
+- Task caches share projection extraction, patching, snapshots, rollback, cancellation,
+  invalidation and refresh. Feature query keys are canonical. Commands, shortcuts,
+  bulk actions and undo preserve authoritative results and warnings.
+- Feedback and undo are scoped to the current authenticated session. Late mutation/undo
+  results cannot repopulate the next session, including the standalone capture route.
+- Replay shares the command transaction, serializes duplicates with advisory locks,
+  encrypts stored responses, and honors `IDEMPOTENCY_RETENTION_HOURS` (24 by default).
+  User-owned push registrations do not require a workspace. Synchronous webhook tests
+  remain explicitly outside replay because their external send cannot roll back.
+- Custom-field limits serialize count-then-create in PostgreSQL. Batch WIP warnings
+  describe the final committed state, including batches that return below the limit.
+- Concrete HTTP/push delivery adapters and common embedded/external worker composition
+  live in `@morrowlist/transports`; application ports remain in `application`.
+  Notification dispatch has its own responsibility boundary. VAPID configuration errors
+  do not delete healthy device registrations.
+- ESLint and virtual boundary fixtures share the dependency matrix, public-entry-point
+  rules and narrow exceptions, covering common import and ambient-fetch escape paths.
 
-The final checkpoint also includes session isolation for task feedback and undo; see the
-commit log and terminal results below. Preserve this guard when changing mutation hooks.
+## Final verification
 
-## Verification at the checkpoint
+| Check                            | Result                                                                         |
+| -------------------------------- | ------------------------------------------------------------------------------ |
+| Unit tests                       | 1,630 passed                                                                   |
+| Typechecks                       | All 15 package/app checks passed                                               |
+| Full production build            | Passed; combined build/test/typecheck run completed 45/45 tasks                |
+| PostgreSQL integration           | 145 passed across 19 files, with the final migration                           |
+| Chromium production E2E          | 96 passed, retries disabled, including mobile viewports                        |
+| Focused warning E2E              | 5 passed after the batch-warning correction                                    |
+| ESLint and boundaries            | Passed, including 188 architecture checks                                      |
+| Formatting and OpenAPI freshness | Passed                                                                         |
+| External worker entry point      | Started, ticked and shut down cleanly against a disposable database            |
+| Local main after update          | Health returned OK; fresh browser reached sign-in controls with no page errors |
 
-Implementation head: `ac4fd8a` (the documentation checkpoint follows it). All current
-implementation slices are committed. The final combined terminal run passed:
+The first focused browser run exposed an intermediate batch warning (two tasks when
+three were committed). Regression tests failed before the fix and passed afterward;
+the full final browser suite includes that scenario. Final review also connected the
+existing replay-retention setting and tested both default and configured expiry edges.
+Desktop WIP feedback and mobile capture screenshots were visually inspected.
 
-- **1,628 unit tests**, including 393 web, 349 application, 159 CLI, and 100 API tests.
-- **15 package/app typechecks**; the combined Turbo run completed all 42 tasks.
-- ESLint plus **188 architecture checks**, full formatting, and OpenAPI freshness.
+Docker image execution was not tested: the CLI exists but the local Docker engine was
+unavailable. Firefox/WebKit and real external email/push providers were not tested.
+These limits are distinct from the passing local production build and Chromium suite.
 
-The maintained roadmap records the same checkpoint. The database evidence has a
-narrower scope:
+## Local rollout and cleanup
 
-- Full PostgreSQL integration: **144 tests across 19 files passed** before the final
-  nullable replay-schema change. This includes concurrent field-limit enforcement.
-- Final focused replay PostgreSQL suite: **4 tests passed** using
-  `morrowlist_standardize_backend_test`, with the final nullable migration applied fresh.
-  It covers independent concurrent callers, nested rollback, conflicting key reuse, and
-  user-scoped registration without workspace membership.
-- API replay/route/OpenAPI unit suite: **100 tests passed** after the replay fixes.
-- No production Next build or Playwright journey was run for this integrated checkpoint.
-  Passing unit tests do not establish browser behavior or live-provider delivery.
+- Main was fast-forwarded from `9b40b25`, preserving the clean checkout.
+- Main dependencies use the normal `the pnpm store`; all package builds
+  were refreshed and the new transport package resolves within the main checkout.
+- Applied only `0020_idempotency_records.sql` to the local `morrowlist` database: the
+  replay table and expiry index are additive. The prior 20 migrations were already
+  present. Verification used disposable databases; no test accounts/tasks were added to
+  development data.
+- Restarted the existing development server at `http://localhost:3200` on the merged
+  source. The direct migration CLI required an explicit `DATABASE_URL`; the normal
+  `pnpm setup:dev` workflow manages local setup separately.
+- Removed the four `morrowlist-standardize*` worktrees and all four task databases
+  (`morrowlist_standardize_test`, `morrowlist_standardize_backend_test`,
+  `morrowlist_standardize_e2e`, and `morrowlist_standardize_verify`). Original slice
+  branches remain as history; their changes are already integrated. Unrelated historical
+  worktrees were left alone.
+- Removed the task’s temporary pnpm store. Verification logs and selected screenshots
+  remain under `/private/tmp/` for inspection.
 
-Logs are local scratch artifacts under `/private/tmp/`:
+Future environments must apply migration 0020 through the normal migration/deployment
+workflow. This task did not publish or deploy an external environment.
 
-- `morrowlist-standardize-stage-checks.log`: final combined typecheck/unit result.
-- `morrowlist-standardize-stage-lint.log`: ESLint and boundary fixtures.
-- `morrowlist-standardize-stage-format.log`: formatting result.
-- `morrowlist-standardize-stage-openapi.log`: OpenAPI freshness.
-- `morrowlist-standardize-integration.log`: the earlier 144-test PostgreSQL run.
-- `morrowlist-standardize-replay-final-unit.log`: the final 100-test API run.
+## Evidence locations
 
-Older `combined-*` and `final-checks.log` files include superseded attempts: a sandboxed
-CLI listener was denied, and a middleware integration typo failed typecheck/lint before
-it was fixed. Use the final `stage-*` results, not those earlier failures.
+All paths below are local scratch artifacts, not repository dependencies:
 
-## Remaining work when resumed
+- `/private/tmp/morrowlist-standardize-resume-final-terminal.log`
+- `/private/tmp/morrowlist-standardize-resume-final-integration.log`
+- `/private/tmp/morrowlist-standardize-resume-full-e2e.log`
+- `/private/tmp/morrowlist-standardize-resume-feedback-e2e.log`
+- `/private/tmp/morrowlist-standardize-resume-lint.log`
+- `/private/tmp/morrowlist-standardize-resume-format.log`
+- `/private/tmp/morrowlist-standardize-resume-openapi.log`
+- `/private/tmp/morrowlist-standardize-resume-worker.log`
+- `/private/tmp/morrowlist-standardize-main-migrate.log`
+- `/private/tmp/morrowlist-standardize-main-dev.log`
+- `/private/tmp/morrowlist-standardize-evidence/wip-warning.png`
+- `/private/tmp/morrowlist-standardize-evidence/capture-mobile.png`
 
-1. Verify the integration branch/worktree and clean status against this handoff. Check
-   current main before any merge; preserve unrelated user edits. Review the final diff,
-   especially the session guard and replay exceptions. Do not broaden the refactor.
-2. Run the complete PostgreSQL suite against an empty task-specific database using the
-   final migration. `morrowlist_standardize_test` contains an earlier NOT NULL version of
-   the new `0020` migration; recreate **only that disposable task database**, or choose a
-   fresh task database. Do not alter the development database or reuse its URL for tests.
-3. Build the full production workspace. Check packaging of `@morrowlist/transports`, the
-   web bundle/service worker, and the external worker entry point. TypeScript dependency
-   builds from unit checks are not a production Next build. Docker-image validation is
-   separate and remains unverified.
-4. Run focused production Chromium journeys: `task-command-feedback.spec.ts`,
-   `wip.spec.ts`, `undo-bulk.spec.ts`, and `background-sync.spec.ts`; cover shortcuts,
-   capture/capture-channels, and offline-scope after the session guard; then the full suite
-   with retries disabled. Inspect contextual warnings on desktop and mobile, optimistic
-   subtask counts/rollback, bulk remedies, undo, shortcuts, and account/signout isolation.
-   Capture and inspect screenshots where useful. Fix regressions and rerun affected
-   checks; do not report browser success from unit tests.
-5. Refresh terminal checks only for subsequent changes or unresolved concerns. Record
-   precise results and remaining platform/provider gaps in this handoff/guideline.
-6. After all required checks pass, merge cleanly into local main according to the user’s
-   resume instructions, preserving existing changes. Do not push. Apply migrations to
-   development/deployed environments only as an explicit rollout step, not as a test.
-7. Remove this task’s four worktrees and temporary databases after successful integration.
-   Stop only task-owned listeners. Leave unrelated historical/prunable worktrees alone.
+The earlier review remains at
+`/private/tmp/morrowlist-structure-review-2026-09-12.md`. Commit `263c907` preserves the
+paused handoff if historical stage details are needed. Use the final results above;
+earlier logs include the diagnosed, corrected failures.
 
-## Environment and continuation commands
+## Conventions to preserve
 
-Node 24 and pnpm 10.15.0 are available. Each worktree has its own workspace dependency
-links. The downloaded pnpm store was relocated out of main to
-`/private/tmp/morrowlist-standardize-pnpm-store`; main is clean. If reinstalling, use:
-
-```sh
-cd /private/tmp/morrowlist-standardize
-pnpm install --offline --frozen-lockfile --ignore-scripts --store-dir /private/tmp/morrowlist-standardize-pnpm-store
-```
-
-PostgreSQL 18 tools are under `/opt/homebrew/opt/postgresql@18/bin`; the local database
-role is `hrwu`. Task databases retained for continuation are:
-
-- `morrowlist_standardize_test` — earlier migration; recreate before final full run.
-- `morrowlist_standardize_backend_test` — final nullable migration, focused suite passed.
-- `morrowlist_standardize_e2e` — reserved for browser tests, no browser suite run yet.
-
-After preparing a fresh test database, the remaining checks can use:
-
-```sh
-DATABASE_URL=postgresql://postgres@127.0.0.1:5432/morrowlist TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/morrowlist_standardize_test pnpm test:integration
-WORKER_MODE=external DATABASE_URL=postgresql://postgres@127.0.0.1:5432/morrowlist_standardize_e2e AUTH_SECRET=standardization-local-test-secret-at-least-32-characters APP_URL=http://127.0.0.1:3280 pnpm build
-CI=1 E2E_PORT=3280 DATABASE_URL=postgresql://postgres@127.0.0.1:5432/morrowlist E2E_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/morrowlist_standardize_e2e AUTH_SECRET=standardization-local-test-secret-at-least-32-characters pnpm --filter @morrowlist/web test:e2e task-command-feedback.spec.ts wip.spec.ts undo-bulk.spec.ts background-sync.spec.ts --retries=0
-```
-
-For the full browser suite, retain that environment and omit the four filenames. Verify
-port 3280 is free first; Playwright starts its own production server and refuses reuse.
-The `DATABASE_URL` pointing at dev in test commands is only a safety comparison; the
-harness selects `TEST_DATABASE_URL`/`E2E_DATABASE_URL`. Never run migration/seed commands
-with that dev URL. Socket/network tests and Git metadata mutations required sandbox
-escalation in this session; request tool approval if the same restrictions recur.
-
-Retained worktrees/branches:
-
-| Worktree                                         | Branch                         |
-| ------------------------------------------------ | ------------------------------ |
-| `/private/tmp/morrowlist-standardize`            | `codex/standardize-structure`  |
-| `/private/tmp/morrowlist-standardize-interfaces` | `codex/standardize-interfaces` |
-| `/private/tmp/morrowlist-standardize-backend`    | `codex/standardize-backend`    |
-| `/private/tmp/morrowlist-standardize-web`        | `codex/standardize-web`        |
-
-Agent commits have already been cherry-picked into the integration branch. Do not merge
-those branches again. Inspect `git log 9b40b25..HEAD` for the coherent implementation
-steps. The earlier detailed review remains at
-`/private/tmp/morrowlist-structure-review-2026-09-12.md`.
-
-## Durable project constraints
-
-Keep rank columns `COLLATE "C"`; Drizzle does not express this collation. Preserve omitted
-versus null semantics and expected-version checks. Keep canonical task DTOs and stable
-public package interfaces; do not replace feature-specific policies with generic CRUD
-inheritance. Package source changes require rebuilt `dist` before the browser consumes
-them. API and CLI documentation must agree with executable behavior. Use generated test
-accounts in disposable databases, never historical credentials from old handoffs.
+Keep rank columns `COLLATE "C"`, omitted/null semantics, expected-version checks and
+transactional activity/outbox writes. Use canonical task DTOs and public package entry
+points. Rebuild package `dist` after source changes before validating browser behavior.
+Keep intentional bulk, import, capability-feed and notification-state differences;
+matching responsibilities does not require identical syntax. Keep live provider and
+container verification claims separate from local tests. Never push without a request.
