@@ -172,9 +172,7 @@ export function formatBulkResult(
 export function parseJsonArgument<T>(
   raw: string,
   schema: {
-    safeParse(
-      value: unknown,
-    ):
+    safeParse(value: unknown):
       | { success: true; data: T }
       | {
           success: false;

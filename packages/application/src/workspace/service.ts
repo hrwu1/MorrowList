@@ -13,7 +13,6 @@ import {
 } from "@morrowlist/domain";
 
 import type { TransactionContext, UnitOfWork, Workspace } from "../ports/index.js";
-import { assertVersion, versionConflict } from "../shared/version.js";
 import {
   SCOPES,
   assertScope,
@@ -21,6 +20,7 @@ import {
   type ActorContext,
 } from "../shared/actor-context.js";
 import { recordEvent } from "../shared/event-recorder.js";
+import { assertVersion, versionConflict } from "../shared/version.js";
 
 export interface WorkspaceServiceOptions {
   readonly unitOfWork: UnitOfWork;

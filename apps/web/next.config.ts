@@ -29,6 +29,7 @@ const config: NextConfig = {
     "@morrowlist/api",
     "@morrowlist/api-client",
     "@morrowlist/application",
+    "@morrowlist/transports",
     "@morrowlist/auth",
     "@morrowlist/config",
     "@morrowlist/contracts",
