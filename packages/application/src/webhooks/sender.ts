@@ -31,9 +31,6 @@ export interface WebhookSender {
   send(request: WebhookRequest): Promise<WebhookResponse>;
 }
 
-/** Give up on an unresponsive endpoint rather than holding the tick open. */
-export const WEBHOOK_TIMEOUT_MS = 10_000;
-
 export function webhookHeaders(request: WebhookRequest): Record<string, string> {
   return {
     "content-type": "application/json",
@@ -49,54 +46,6 @@ export function webhookHeaders(request: WebhookRequest): Record<string, string> 
     [WEBHOOK_HEADERS.attempt]: String(request.attempt),
     ...(request.eventId ? { [WEBHOOK_HEADERS.event]: request.eventId } : {}),
   };
-}
-
-export function createFetchWebhookSender(
-  doFetch: typeof globalThis.fetch = globalThis.fetch,
-  timeoutMs: number = WEBHOOK_TIMEOUT_MS,
-): WebhookSender {
-  return {
-    async send(request) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const response = await doFetch(request.url, {
-          method: "POST",
-          headers: webhookHeaders(request),
-          body: request.body,
-          signal: controller.signal,
-          redirect: "error",
-        });
-        return {
-          status: response.status,
-          error: response.ok ? null : `endpoint responded ${response.status}`,
-        };
-      } catch (error) {
-        // A transport failure has no status; the message is the operator's only clue,
-        // and it never contains the signature because the header map is not echoed.
-        return { status: null, error: describeTransportFailure(error) };
-      } finally {
-        clearTimeout(timer);
-      }
-    },
-  };
-}
-
-/**
- * Node's fetch reports every transport failure as the word "fetch failed" and hides the
- * reason in `cause`. Unwrapping it is the difference between a delivery log that says
- * nothing and one that says the endpoint refused the connection.
- */
-export function describeTransportFailure(error: unknown): string {
-  if (!(error instanceof Error)) return String(error);
-  const cause = (error as { cause?: unknown }).cause;
-  const detail = cause instanceof Error ? cause.message : null;
-  if (error.name === "AbortError" || error.name === "TimeoutError") {
-    return `no response within ${WEBHOOK_TIMEOUT_MS / 1000} seconds`;
-  }
-  return detail && detail !== error.message
-    ? `${error.message}: ${detail}`
-    : error.message;
 }
 
 /** Build the spec 19.6 envelope a subscriber receives. */

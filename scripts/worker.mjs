@@ -23,8 +23,8 @@ const [{ loadRootEnv }, { parseServerEnv }] = await Promise.all([
 loadRootEnv();
 const env = parseServerEnv();
 
-const [application, auth, database, observability] = await Promise.all([
-  load("@morrowlist/application"),
+const [transports, auth, database, observability] = await Promise.all([
+  load("@morrowlist/transports"),
   load("@morrowlist/auth"),
   load("@morrowlist/database"),
   load("@morrowlist/observability"),
@@ -50,26 +50,18 @@ const vapidKeys =
         subject: env.VAPID_SUBJECT,
       }
     : null;
-const service = new application.NotificationService({
-  unitOfWork,
-  cursorSecret: env.AUTH_SECRET ?? "development-only-cursor-secret",
-  emailSender: application.createConsoleEmailSender(logger),
-  pushSender: vapidKeys
-    ? application.createWebPushSender({ keys: vapidKeys, logger })
-    : application.createConsolePushSender(logger),
-  userDirectory: auth.createUserDirectory(handle.db),
-  appUrl: env.APP_URL,
-  logger,
-});
-// Webhook delivery rides the same tick rather than opening a second loop (GAP-18).
-const webhookDispatcher = new application.WebhookDispatcher({
-  unitOfWork,
-  sender: application.createFetchWebhookSender(),
-  logger,
-});
-const ruleEngine = new application.RuleEngine({ unitOfWork });
-const worker = application.startNotificationWorker({
-  service,
+const { notificationService, webhookDispatcher, ruleEngine } =
+  transports.createWorkerServices({
+    unitOfWork,
+    cursorSecret: env.AUTH_SECRET ?? "development-only-cursor-secret",
+    userDirectory: auth.createUserDirectory(handle.db),
+    appUrl: env.APP_URL,
+    emailProvider: env.EMAIL_PROVIDER,
+    vapidKeys,
+    logger,
+  });
+const worker = transports.startBackgroundWorker({
+  service: notificationService,
   logger,
   pollIntervalMs: env.WORKER_POLL_SECONDS * 1000,
   webhookDispatcher,

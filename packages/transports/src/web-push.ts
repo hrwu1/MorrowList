@@ -7,23 +7,23 @@ import {
   createCipheriv,
 } from "node:crypto";
 
-import type { Logger } from "@morrowlist/observability";
-
-import type { PushSubscription } from "../ports/index.js";
-
 import {
   endpointOrigin,
   type PushMessage,
+  type PushSubscription,
   type PushResult,
   type PushSender,
-} from "./push.js";
+} from "@morrowlist/application";
+import { systemClock, type Clock } from "@morrowlist/domain";
+import type { Logger } from "@morrowlist/observability";
+
+import { HTTP_TIMEOUT_MS, post, type HttpTransportOptions } from "./http.js";
 
 /**
  * Real Web Push delivery (GAP-13 step 7).
  *
  * Two standards meet here and nothing else in the codebase needs either, so both are
- * implemented against `node:crypto` rather than pulled in as a dependency — this package
- * has no third-party runtime dependency and already signs webhook deliveries the same way.
+ * implemented against `node:crypto` in this outbound adapter.
  *
  * - RFC 8291 encrypts the payload to the browser's own key pair, so the push service that
  *   relays it cannot read the task's title. One record, `aes128gcm` (RFC 8188).
@@ -43,7 +43,8 @@ export interface VapidKeys {
   readonly subject: string;
 }
 
-export interface WebPushSenderOptions {
+export interface WebPushSenderOptions extends HttpTransportOptions {
+  readonly clock?: Clock;
   readonly keys: VapidKeys;
   readonly logger?: Logger;
   /** How long the push service should hold an undelivered message. */
@@ -51,7 +52,7 @@ export interface WebPushSenderOptions {
 }
 
 /** Give up on an unresponsive push service rather than holding the delivery loop open. */
-export const PUSH_TIMEOUT_MS = 10_000;
+export const PUSH_TIMEOUT_MS = HTTP_TIMEOUT_MS;
 
 /** A reminder is worth nothing tomorrow; four hours is long enough for a closed laptop. */
 export const DEFAULT_PUSH_TTL_SECONDS = 4 * 60 * 60;
@@ -61,36 +62,47 @@ const JWT_LIFETIME_SECONDS = 12 * 60 * 60;
 
 export function createWebPushSender(options: WebPushSenderOptions): PushSender {
   const ttl = options.ttlSeconds ?? DEFAULT_PUSH_TTL_SECONDS;
+  const clock = options.clock ?? systemClock;
 
   return {
     async send(message: PushMessage): Promise<PushResult> {
       let body: Buffer;
       let authorization: string;
       try {
-        body = encryptPushPayload(message.subscription, pushPayload(message));
         authorization = vapidAuthorization(
           endpointOrigin(message.subscription.endpoint),
           options.keys,
+          clock,
         );
       } catch (error) {
-        // A subscription whose keys cannot be read will never work again; treating it as
-        // gone stops it being retried on every reminder forever.
+        // A server configuration failure must never revoke healthy browser registrations.
+        return {
+          ok: false,
+          error: `Web Push configuration is invalid: ${reason(error)}`,
+        };
+      }
+      try {
+        body = encryptPushPayload(message.subscription, pushPayload(message));
+      } catch (error) {
         return { ok: false, gone: true, error: reason(error) };
       }
 
       try {
-        const response = await fetch(message.subscription.endpoint, {
-          method: "POST",
-          headers: {
-            authorization,
-            "content-encoding": "aes128gcm",
-            "content-type": "application/octet-stream",
-            ttl: String(ttl),
-            urgency: "normal",
+        const response = await post(
+          message.subscription.endpoint,
+          {
+            method: "POST",
+            headers: {
+              authorization,
+              "content-encoding": "aes128gcm",
+              "content-type": "application/octet-stream",
+              ttl: String(ttl),
+              urgency: "normal",
+            },
+            body: new Uint8Array(body),
           },
-          body: new Uint8Array(body),
-          signal: AbortSignal.timeout(PUSH_TIMEOUT_MS),
-        });
+          options,
+        );
         if (response.ok) return { ok: true };
         // 404 and 410 are the two the standard defines as "this endpoint is finished".
         if (response.status === 404 || response.status === 410) {
@@ -183,8 +195,12 @@ export function encryptPushPayload(
 /* --------------------------------------------------------------- RFC 8292 */
 
 /** `vapid t=<jwt>, k=<public key>`: who we are, and for which push origin. */
-export function vapidAuthorization(audience: string, keys: VapidKeys): string {
-  const now = Math.floor(Date.now() / 1000);
+export function vapidAuthorization(
+  audience: string,
+  keys: VapidKeys,
+  clock: Clock = systemClock,
+): string {
+  const now = Math.floor(clock.now().getTime() / 1000);
   const header = encodeBase64Url(
     Buffer.from(JSON.stringify({ typ: "JWT", alg: "ES256" })),
   );
@@ -215,6 +231,13 @@ function vapidPrivateKey(keys: VapidKeys) {
   if (point.length !== 65 || point[0] !== 4) {
     throw new Error("VAPID public key is not an uncompressed P-256 point");
   }
+  const scalar = decodeBase64Url(keys.privateKey);
+  if (scalar.length !== 32)
+    throw new Error("VAPID private key must be a 32-byte P-256 scalar");
+  const pair = createECDH("prime256v1");
+  pair.setPrivateKey(scalar);
+  if (!pair.getPublicKey().equals(point))
+    throw new Error("VAPID public and private keys do not match");
   return createPrivateKey({
     format: "jwk",
     key: {

@@ -14,9 +14,6 @@ export {
   toWebhookSubscriptionDto,
 } from "./mappers.js";
 export {
-  WEBHOOK_TIMEOUT_MS,
-  createFetchWebhookSender,
-  describeTransportFailure,
   toEnvelope,
   webhookHeaders,
   type WebhookRequest,

@@ -10,26 +10,17 @@ import {
   ExportService,
   FlowService,
   ImportService,
-  NotificationService,
   ProjectService,
   SavedViewService,
   SearchService,
   TagService,
   TaskService,
   RuleService,
-  RuleEngine,
   ViewService,
-  WebhookDispatcher,
   WebhookService,
   WorkflowService,
   WorkspaceService,
   bootstrapUser,
-  createConsoleEmailSender,
-  createConsolePushSender,
-  createWebPushSender,
-  createFetchWebhookSender,
-  startNotificationWorker,
-  type NotificationWorker,
 } from "@morrowlist/application";
 import {
   createAuth,
@@ -45,6 +36,11 @@ import {
   type DatabaseHandle,
 } from "@morrowlist/database";
 import { createLogger, type Logger } from "@morrowlist/observability";
+import {
+  createWorkerServices,
+  startBackgroundWorker,
+  type BackgroundWorker,
+} from "@morrowlist/transports";
 
 /**
  * Composition root (spec 16.1). Every dependency is constructed exactly once here and
@@ -62,7 +58,7 @@ export interface Container {
   readonly api: ReturnType<typeof createApiApp>;
   readonly handleAuthRequest: (request: Request) => Promise<Response>;
   /** The embedded reminder worker, when `WORKER_MODE=embedded` (GAP-13). */
-  readonly worker: NotificationWorker | null;
+  readonly worker: BackgroundWorker | null;
 }
 
 const CONTAINER_KEY = Symbol.for("morrowlist.container");
@@ -108,14 +104,6 @@ export function getContainer(): Container {
   // Cursors are signed with the application secret so a client cannot forge a page
   // position (spec 20.6).
   const cursorSecret = env.AUTH_SECRET ?? "development-only-cursor-secret";
-  // Only the console transport exists so far; `smtp` is accepted by the schema for the
-  // day a transport lands, and until then falls back loudly rather than failing to start.
-  if (env.EMAIL_PROVIDER === "smtp") {
-    logger.warn("EMAIL_PROVIDER=smtp has no transport yet; using the console sender");
-  }
-  // Push needs a VAPID pair; without one the console adapter logs what would have been
-  // sent, exactly as the email adapter does, and `GET /me/push-config` reports it off so
-  // the settings page never offers a control that cannot work.
   const vapidKeys =
     env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY && env.VAPID_SUBJECT
       ? {
@@ -124,33 +112,26 @@ export function getContainer(): Container {
           subject: env.VAPID_SUBJECT,
         }
       : null;
-  if (!vapidKeys) {
-    logger.info("web push is not configured; set VAPID_* to enable it");
-  }
-  const notificationService = new NotificationService({
+  const {
+    notificationService,
+    webhookSender,
+    webhookDispatcher,
+    ruleEngine,
+    pushPublicKey,
+  } = createWorkerServices({
     unitOfWork,
-    cursorSecret,
-    emailSender: createConsoleEmailSender(logger),
-    pushSender: vapidKeys
-      ? createWebPushSender({ keys: vapidKeys, logger })
-      : createConsolePushSender(logger),
     userDirectory: createUserDirectory(database.db),
-    appUrl: env.APP_URL,
     logger,
+    cursorSecret,
+    appUrl: env.APP_URL,
+    emailProvider: env.EMAIL_PROVIDER,
+    vapidKeys,
   });
-  // One sender for the synchronous test delivery and the dispatcher alike (GAP-18).
   const ruleService = new RuleService({ unitOfWork });
-  const ruleEngine = new RuleEngine({ unitOfWork });
-  const webhookSender = createFetchWebhookSender();
   const webhookService = new WebhookService({
     unitOfWork,
     sender: webhookSender,
     cursorSecret,
-  });
-  const webhookDispatcher = new WebhookDispatcher({
-    unitOfWork,
-    sender: webhookSender,
-    logger: logger.child({ component: "webhook-dispatcher" }),
   });
 
   const dependencies: ApiDependencies = {
@@ -169,7 +150,7 @@ export function getContainer(): Container {
     }),
     auth,
     unitOfWork,
-    pushPublicKey: vapidKeys?.publicKey ?? null,
+    pushPublicKey,
     workspaceService: new WorkspaceService({ unitOfWork }),
     projectService: new ProjectService({ unitOfWork }),
     workflowService: new WorkflowService({ unitOfWork }),
@@ -194,7 +175,7 @@ export function getContainer(): Container {
   // delivery — inside the web process; `external` leaves it to `pnpm worker`.
   const worker =
     env.WORKER_MODE === "embedded"
-      ? startNotificationWorker({
+      ? startBackgroundWorker({
           service: notificationService,
           logger: logger.child({ component: "notification-worker" }),
           pollIntervalMs: env.WORKER_POLL_SECONDS * 1000,

@@ -26,6 +26,7 @@
     "@morrowlist/database": "workspace:*",
     "@morrowlist/domain": "workspace:*",
     "@morrowlist/observability": "workspace:*",
+    "@morrowlist/transports": "workspace:*",
     "@morrowlist/ui": "workspace:*",
     "@tanstack/react-query": "5.85.5",
     "better-auth": "1.3.7",

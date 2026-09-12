@@ -34,6 +34,7 @@ COPY packages/contracts/package.json packages/contracts/
 COPY packages/database/package.json packages/database/
 COPY packages/domain/package.json packages/domain/
 COPY packages/observability/package.json packages/observability/
+COPY packages/transports/package.json packages/transports/
 COPY packages/testkit/package.json packages/testkit/
 COPY packages/ui/package.json packages/ui/
 RUN pnpm install --frozen-lockfile

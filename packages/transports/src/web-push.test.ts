@@ -196,106 +196,105 @@ describe("createWebPushSender", () => {
     },
   });
 
-  it("posts an encrypted, authorised body to the endpoint", async () => {
+  it("posts an encrypted body with the injected clock and HTTP policy", async () => {
     const keys = vapidKeys();
     const { device, message: push } = message("https://push.example/device-1");
     const calls: { url: string; init: RequestInit }[] = [];
-    const sender = createWebPushSender({ keys });
-
-    const result = await withFetch(
-      async (url, init) => {
-        calls.push({ url, init });
+    const now = new Date("2026-09-12T10:00:00Z");
+    const sender = createWebPushSender({
+      keys,
+      clock: { now: () => now },
+      fetch: async (url, init = {}) => {
+        calls.push({ url: String(url), init });
         return new Response(null, { status: 201 });
       },
-      () => sender.send(push),
-    );
-
-    expect(result).toEqual({ ok: true });
+    });
+    expect(await sender.send(push)).toEqual({ ok: true });
     expect(calls).toHaveLength(1);
-    const [call] = calls;
-    expect(call!.url).toBe("https://push.example/device-1");
-    const headers = call!.init.headers as Record<string, string>;
+    const call = calls[0]!;
+    expect(call.url).toBe("https://push.example/device-1");
+    expect(call.init.redirect).toBe("error");
+    expect(call.init.signal).toBeInstanceOf(AbortSignal);
+    const headers = call.init.headers as Record<string, string>;
     expect(headers["content-encoding"]).toBe("aes128gcm");
     expect(headers["content-type"]).toBe("application/octet-stream");
     expect(headers.ttl).toBe("14400");
-    expect(headers.authorization).toMatch(/^vapid t=.+, k=/);
-
-    // The push service relays this body without being able to read it; the browser can.
-    const decrypted = JSON.parse(
-      decrypt(Buffer.from(call!.init.body as Uint8Array), device),
+    const jwt = headers.authorization!.split("t=")[1]!.split(",")[0]!;
+    expect(JSON.parse(decodeBase64Url(jwt.split(".")[1]!).toString()).exp).toBe(
+      now.getTime() / 1000 + 12 * 60 * 60,
     );
-    expect(decrypted).toEqual({
-      title: push.title,
-      body: push.body,
-      url: push.url,
-      tag: push.tag,
+    expect(
+      JSON.parse(decrypt(Buffer.from(call.init.body as Uint8Array), device)),
+    ).toEqual({ title: push.title, body: push.body, url: push.url, tag: push.tag });
+  });
+
+  it("reports 404 and 410 as gone, and other failures as transient", async () => {
+    for (const status of [404, 410, 500]) {
+      const sender = createWebPushSender({
+        keys: vapidKeys(),
+        fetch: async () => new Response(null, { status }),
+      });
+      const result = await sender.send(
+        message(`https://push.example/${status}`).message,
+      );
+      expect(result).toMatchObject(
+        status === 500
+          ? { ok: false, error: "push service answered 500" }
+          : { ok: false, gone: true },
+      );
+      if (status === 500) expect(result).not.toHaveProperty("gone", true);
+    }
+    const sender = createWebPushSender({
+      keys: vapidKeys(),
+      fetch: async () => {
+        throw new Error("connect ECONNREFUSED");
+      },
+    });
+    expect(await sender.send(message("https://push.example/offline").message)).toEqual({
+      ok: false,
+      error: "connect ECONNREFUSED",
     });
   });
 
-  it("reports 404 and 410 as gone, and every other failure as transient", async () => {
-    const sender = createWebPushSender({ keys: vapidKeys() });
-
-    for (const status of [404, 410]) {
-      const result = await withFetch(
-        async () => new Response(null, { status }),
-        () => sender.send(message(`https://push.example/${status}`).message),
-      );
-      expect(result).toMatchObject({ ok: false, gone: true });
-    }
-
-    const transient = await withFetch(
-      async () => new Response(null, { status: 500 }),
-      () => sender.send(message("https://push.example/500").message),
-    );
-    expect(transient).toEqual({ ok: false, error: "push service answered 500" });
-
-    const offline = await withFetch(
-      () => Promise.reject(new Error("connect ECONNREFUSED")),
-      () => sender.send(message("https://push.example/offline").message),
-    );
-    expect(offline).toEqual({ ok: false, error: "connect ECONNREFUSED" });
-  });
-
-  it("treats a subscription with unusable keys as gone rather than retrying it forever", async () => {
-    const sender = createWebPushSender({ keys: vapidKeys() });
+  it("treats unusable recipient keys as gone without sending", async () => {
     let called = false;
-
-    const result = await withFetch(
-      async () => {
+    const sender = createWebPushSender({
+      keys: vapidKeys(),
+      fetch: async () => {
         called = true;
         return new Response(null, { status: 201 });
       },
-      () =>
-        sender.send({
-          subscription: {
-            userId: "01a04e0f-0000-7000-8000-000000000001",
-            endpoint: "https://push.example/broken",
-            keys: { p256dh: "not-a-key", auth: "AAAA" },
-            createdAt: new Date(),
-          },
-          title: "t",
-          body: "b",
-          url: "https://morrow.example",
-          tag: "reminder",
-        }),
-    );
-
+    });
+    const push = message("https://push.example/broken").message;
+    const result = await sender.send({
+      ...push,
+      subscription: {
+        ...push.subscription,
+        keys: { p256dh: "not-a-key", auth: "AAAA" },
+      },
+    });
     expect(result).toMatchObject({ ok: false, gone: true });
     expect(called).toBe(false);
   });
-});
 
-/** Swap `fetch` for the duration of one call, restoring it even when the call throws. */
-async function withFetch<T>(
-  stub: (url: string, init: RequestInit) => Promise<Response>,
-  run: () => Promise<T>,
-): Promise<T> {
-  const original = globalThis.fetch;
-  globalThis.fetch = ((input: RequestInfo | URL, init: RequestInit = {}) =>
-    stub(String(input), init)) as typeof fetch;
-  try {
-    return await run();
-  } finally {
-    globalThis.fetch = original;
-  }
-}
+  it.each(["publicKey", "privateKey"] as const)(
+    "keeps healthy subscriptions when server %s is invalid",
+    async (field) => {
+      let called = false;
+      const sender = createWebPushSender({
+        keys: { ...vapidKeys(), [field]: "invalid" },
+        fetch: async () => {
+          called = true;
+          return new Response(null, { status: 201 });
+        },
+      });
+      const result = await sender.send(message("https://push.example/healthy").message);
+      expect(result).toMatchObject({
+        ok: false,
+        error: expect.stringContaining("Web Push configuration is invalid:"),
+      });
+      expect(result).not.toHaveProperty("gone", true);
+      expect(called).toBe(false);
+    },
+  );
+});

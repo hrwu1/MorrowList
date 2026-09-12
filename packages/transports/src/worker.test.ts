@@ -1,11 +1,7 @@
 import { silentLogger } from "@morrowlist/observability";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { RuleEngine } from "../rules/engine.js";
-import type { WebhookDispatcher } from "../webhooks/dispatcher.js";
-
-import type { NotificationService } from "./service.js";
-import { startNotificationWorker } from "./worker.js";
+import { startBackgroundWorker } from "./worker.js";
 
 /** The polling loop: ticks on its interval, survives a failing tick, and stops cleanly. */
 
@@ -24,11 +20,11 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("startNotificationWorker", () => {
+describe("startBackgroundWorker", () => {
   it("delivers on start and again every interval, then stops", async () => {
     const service = fakeService();
-    const worker = startNotificationWorker({
-      service: service as unknown as NotificationService,
+    const worker = startBackgroundWorker({
+      service: service,
       logger: silentLogger,
       pollIntervalMs: 1000,
     });
@@ -55,8 +51,8 @@ describe("startNotificationWorker", () => {
             release = () => resolve(1);
           }),
       );
-    const worker = startNotificationWorker({
-      service: service as unknown as NotificationService,
+    const worker = startBackgroundWorker({
+      service: service,
       logger: silentLogger,
       pollIntervalMs: 1000,
     });
@@ -85,8 +81,8 @@ describe("startNotificationWorker", () => {
       order.push("deliver");
       return 0;
     });
-    const worker = startNotificationWorker({
-      service: service as unknown as NotificationService,
+    const worker = startBackgroundWorker({
+      service: service,
       logger: silentLogger,
       pollIntervalMs: 60_000,
     });
@@ -108,12 +104,12 @@ it("continues automation and webhook consumers when notifications fail", async (
     }),
   };
   const webhooks = { tick: vi.fn(async () => ({ delivered: 1 })) };
-  const worker = startNotificationWorker({
-    service: service as unknown as NotificationService,
+  const worker = startBackgroundWorker({
+    service: service,
     logger: silentLogger,
     pollIntervalMs: 1000,
-    ruleEngine: rules as unknown as RuleEngine,
-    webhookDispatcher: webhooks as unknown as WebhookDispatcher,
+    ruleEngine: rules,
+    webhookDispatcher: webhooks,
   });
   await vi.advanceTimersByTimeAsync(0);
   expect(rules.tick).toHaveBeenCalledTimes(1);

@@ -1,5 +1,3 @@
-import type { Logger } from "@morrowlist/observability";
-
 import type { PushSubscription } from "../ports/index.js";
 
 /**
@@ -38,22 +36,6 @@ export type PushResult =
 
 export interface PushSender {
   send(message: PushMessage): Promise<PushResult>;
-}
-
-/** The `console` provider: development and self-hosters without VAPID keys configured. */
-export function createConsolePushSender(logger: Logger): PushSender {
-  return {
-    async send(message) {
-      // The endpoint is a device credential, so only its origin is logged (spec 27.1).
-      logger.info("push", {
-        endpoint: endpointOrigin(message.subscription.endpoint),
-        title: message.title,
-        body: message.body,
-        url: message.url,
-      });
-      return { ok: true };
-    },
-  };
 }
 
 /** Test double that records what would have been sent. */

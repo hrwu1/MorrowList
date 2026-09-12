@@ -1,5 +1,3 @@
-import type { Logger } from "@morrowlist/observability";
-
 /**
  * Outbound email port (spec 31.3 `EMAIL_PROVIDER`). The application composes plain-text
  * messages; an adapter delivers them. Delivery happens after the transaction that decided
@@ -14,19 +12,6 @@ export interface EmailMessage {
 
 export interface EmailSender {
   send(message: EmailMessage): Promise<void>;
-}
-
-/** The `console` provider: development and self-hosters without a mail server. */
-export function createConsoleEmailSender(logger: Logger): EmailSender {
-  return {
-    async send(message) {
-      logger.info("email", {
-        to: message.to,
-        subject: message.subject,
-        text: message.text,
-      });
-    },
-  };
 }
 
 /** Test double that records what would have been sent. */

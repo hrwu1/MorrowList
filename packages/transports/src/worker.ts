@@ -1,10 +1,5 @@
 import type { Logger } from "@morrowlist/observability";
 
-import type { RuleEngine } from "../rules/engine.js";
-import type { WebhookDispatcher } from "../webhooks/dispatcher.js";
-
-import type { NotificationService } from "./service.js";
-
 /**
  * The background worker (GAP-13, extended by GAP-18): a polling loop, not a queue. Every
  * tick delivers the reminders that have come due, any digests whose time has passed, and
@@ -16,14 +11,19 @@ import type { NotificationService } from "./service.js";
  * claims already prevent overlap, and a second timer would double the idle polling cost.
  */
 
-export interface NotificationWorkerOptions {
-  readonly service: NotificationService;
+export interface BackgroundWorkerOptions {
+  readonly service: {
+    deliverDue(now: Date): Promise<number>;
+    digest(now: Date): Promise<number>;
+  };
   readonly logger: Logger;
   readonly pollIntervalMs: number;
   readonly now?: () => Date;
   /** Webhook delivery (GAP-18). Omitted, the tick does reminders and digests only. */
-  readonly ruleEngine?: RuleEngine | undefined;
-  readonly webhookDispatcher?: WebhookDispatcher | undefined;
+  readonly ruleEngine?: { tick(now: Date): Promise<number> } | undefined;
+  readonly webhookDispatcher?:
+    | { tick(now: Date): Promise<{ delivered: number }> }
+    | undefined;
 }
 
 export interface WorkerTickResult {
@@ -33,16 +33,16 @@ export interface WorkerTickResult {
   readonly webhooks: number;
 }
 
-export interface NotificationWorker {
+export interface BackgroundWorker {
   /** Run one tick now, independently of the timer. Concurrent ticks are serialised. */
   tick(): Promise<WorkerTickResult>;
   /** Stop the timer and wait for an in-flight tick to finish. */
   stop(): Promise<void>;
 }
 
-export function startNotificationWorker(
-  options: NotificationWorkerOptions,
-): NotificationWorker {
+export function startBackgroundWorker(
+  options: BackgroundWorkerOptions,
+): BackgroundWorker {
   const { service, logger } = options;
   const now = options.now ?? (() => new Date());
   let stopped = false;
