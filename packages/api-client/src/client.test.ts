@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ApiClient } from "./client.js";
 
@@ -390,5 +390,65 @@ describe("rule requests", () => {
     ).toBe(true);
     expect(new URL(requests[2]!.url).pathname).toBe(`/api/v1/rules/${TASK_ID}/test`);
     expect(await requests[2]!.json()).toEqual({ taskId: PROJECT_ID });
+  });
+});
+
+describe("mutation request guarantees", () => {
+  it("generates a secure mutation key when HTTP contexts lack randomUUID", async () => {
+    const getRandomValues = globalThis.crypto.getRandomValues.bind(globalThis.crypto);
+    vi.stubGlobal("crypto", { getRandomValues });
+    try {
+      const { client, requests } = recordingClient({ data: { id: TASK_ID } });
+      await client.createTask({ title: "HTTP self-hosting" });
+      expect(requests[0]!.headers.get("idempotency-key")).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("preserves delete versions and request options, including the legacy call shape", async () => {
+    const task = { id: TASK_ID };
+    const { client, requests } = recordingClient({ data: task });
+    await client.deleteTask(TASK_ID, 7, { idempotencyKey: "delete-versioned" });
+    await client.deleteTask(TASK_ID, { idempotencyKey: "delete-legacy" });
+    expect(new URL(requests[0]!.url).searchParams.get("expectedVersion")).toBe("7");
+    expect(requests[0]!.headers.get("idempotency-key")).toBe("delete-versioned");
+    expect(new URL(requests[1]!.url).searchParams.has("expectedVersion")).toBe(false);
+    expect(requests[1]!.headers.get("idempotency-key")).toBe("delete-legacy");
+  });
+
+  it("adds independent mutation keys automatically and preserves a logical retry key", async () => {
+    const { client, requests } = recordingClient({ data: { id: TASK_ID } });
+    await client.createTask({ title: "First" });
+    await client.updateTask(TASK_ID, { title: "Changed" });
+    await client.deleteTask(TASK_ID, 2);
+    const retryOptions = { idempotencyKey: "same-logical-create" };
+    await client.createTask({ title: "Retryable" }, retryOptions);
+    await client.createTask({ title: "Retryable" }, retryOptions);
+    await client.getTask(TASK_ID);
+    const generated = requests
+      .slice(0, 3)
+      .map((request) => request.headers.get("idempotency-key"));
+    expect(generated.every((key) => /^[0-9a-f-]{36}$/.test(key ?? ""))).toBe(true);
+    expect(new Set(generated).size).toBe(3);
+    expect(requests[3]!.headers.get("idempotency-key")).toBe("same-logical-create");
+    expect(requests[4]!.headers.get("idempotency-key")).toBe("same-logical-create");
+    expect(requests[5]!.headers.has("idempotency-key")).toBe(false);
+  });
+});
+
+describe("task filter transport parity", () => {
+  it("serializes identical field and regular filters for list and CSV requests", async () => {
+    const { client, requests } = recordingClient({ data: [] });
+    const query = {
+      priority: "high" as const,
+      fields: [{ key: "effort", op: "gt" as const, value: 3, upper: null }],
+    };
+    await client.listTasks(query);
+    await client.exportTasksCsv(query);
+    expect(new URL(requests[0]!.url).search).toBe(new URL(requests[1]!.url).search);
+    expect(new URL(requests[0]!.url).searchParams.get("field.effort")).toBe("gt:3");
   });
 });

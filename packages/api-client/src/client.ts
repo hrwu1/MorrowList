@@ -130,7 +130,7 @@ export interface ApiClientOptions {
 
 export interface RequestOptions {
   readonly signal?: AbortSignal;
-  /** Sent on mutating requests so a retry cannot duplicate the effect (spec 20.1). */
+  /** Reuse for retries of one logical mutation; a new send generates a key when omitted. */
   readonly idempotencyKey?: string;
   readonly workspaceId?: string;
 }
@@ -615,12 +615,27 @@ export class ApiClient {
     return response.data;
   }
 
-  async deleteTask(id: string, options: RequestOptions = {}): Promise<TaskDto> {
+  async deleteTask(id: string, options?: RequestOptions): Promise<TaskDto>;
+  async deleteTask(
+    id: string,
+    expectedVersion?: number,
+    options?: RequestOptions,
+  ): Promise<TaskDto>;
+  async deleteTask(
+    id: string,
+    versionOrOptions?: number | RequestOptions,
+    options: RequestOptions = {},
+  ): Promise<TaskDto> {
+    // Keep the former (id, options) call shape for existing API-client consumers.
+    const requestOptions =
+      typeof versionOrOptions === "object" ? versionOrOptions : options;
+    const expectedVersion =
+      typeof versionOrOptions === "number" ? versionOrOptions : undefined;
     const response = await this.send<{ data: TaskDto }>(
       "DELETE",
-      `/tasks/${encodeURIComponent(id)}${this.queryString({}, options)}`,
+      `/tasks/${encodeURIComponent(id)}${this.queryString({ expectedVersion }, requestOptions)}`,
       undefined,
-      options,
+      requestOptions,
     );
     return response.data;
   }
@@ -1283,8 +1298,10 @@ export class ApiClient {
       headers.set("authorization", `Bearer ${this.options.apiKey}`);
     }
     if (this.options.requestId) headers.set("x-request-id", this.options.requestId);
-    if (options.idempotencyKey) {
-      headers.set("idempotency-key", options.idempotencyKey);
+    if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+      // Generated once for this send, before I/O. Callers retrying a logical mutation
+      // across sends supply its original key explicitly.
+      headers.set("idempotency-key", options.idempotencyKey ?? newIdempotencyKey());
     }
 
     const response = await this.doFetch(`${this.baseUrl}${path}`, {
@@ -1351,4 +1368,14 @@ function fieldFilterValue(filter: FieldFilterDto): string {
   if (filter.op === "empty") return "empty";
   if (filter.op === "between") return `between:${filter.value}..${filter.upper}`;
   return `${filter.op}:${filter.value}`;
+}
+
+/** randomUUID needs a secure browser context; getRandomValues also supports HTTP self-hosting. */
+function newIdempotencyKey(): string {
+  if (globalThis.crypto.randomUUID) return globalThis.crypto.randomUUID();
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }

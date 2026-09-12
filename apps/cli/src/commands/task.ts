@@ -632,6 +632,7 @@ export function taskCommand(): Command {
     .command("delete")
     .description("Move a task to Trash, or every task matching --where")
     .argument("[idOrKey]")
+    .option("--expected-version <n>", "fail unless the task is still at this version")
     .option("--where <query>", BULK_WHERE_HELP)
     .option("--yes", "confirm a --where bulk change")
     .option("--dry-run", "list what --where would change and stop")
@@ -654,7 +655,11 @@ export function taskCommand(): Command {
 
         const deleted = await withClient(globals, async (client) => {
           const current = await client.getTask(idOrKey);
-          return client.deleteTask(current.id, idempotency());
+          return client.deleteTask(
+            current.id,
+            options.expectedVersion ? Number(options.expectedVersion) : current.version,
+            idempotency(),
+          );
         });
 
         if (json) printJson({ ok: true, data: deleted });
