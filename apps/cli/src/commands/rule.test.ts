@@ -27,6 +27,26 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 describe("rule CLI argv", () => {
+  it.each(["not json", "{}", '{"name":"Bad","trigger":{"type":"unknown"}}'])(
+    "reports invalid local definitions as usage errors: %s",
+    async (definition) => {
+      const output = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+      const exit = vi.spyOn(process, "exit").mockImplementation(() => {
+        throw new Error("exit");
+      });
+      await expect(
+        createProgram().parseAsync(["--json", "rule", "create", definition], {
+          from: "user",
+        }),
+      ).rejects.toThrow("exit");
+      expect(JSON.parse(String(output.mock.calls[0]?.[0]))).toMatchObject({
+        ok: false,
+        error: { code: "USAGE" },
+      });
+      expect(exit).toHaveBeenCalledWith(2);
+      expect(client.createRule).not.toHaveBeenCalled();
+    },
+  );
   it("parses typed creation, defaults optional fields and prints a JSON envelope", async () => {
     const output = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     await createProgram().parseAsync(

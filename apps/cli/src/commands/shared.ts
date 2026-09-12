@@ -41,7 +41,7 @@ export async function withClient<T>(
   return fn(client);
 }
 
-/** Every mutating command carries an idempotency key so a retry cannot duplicate it. */
+/** One key per logical mutation; reuse this options object for a transport retry. */
 export function idempotency() {
   return { idempotencyKey: randomUUID() };
 }
@@ -166,4 +166,42 @@ export function formatBulkResult(
     ...items.map((item) => `${item.data.key}  ${verb}`),
     `${items.length} task${items.length === 1 ? "" : "s"} ${verb}.`,
   ].join("\n");
+}
+
+/** Validate JSON command arguments locally; malformed input is a usage failure. */
+export function parseJsonArgument<T>(
+  raw: string,
+  schema: {
+    safeParse(
+      value: unknown,
+    ):
+      | { success: true; data: T }
+      | {
+          success: false;
+          error: {
+            issues: readonly { path: readonly PropertyKey[]; message: string }[];
+          };
+        };
+  },
+  json: boolean,
+): T {
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    usageFailure("Expected valid JSON for this argument.", json);
+  }
+  const result = schema.safeParse(value);
+  if (!result.success) {
+    usageFailure(
+      result.error.issues
+        .map(
+          (issue) =>
+            `${issue.path.map(String).join(".") || "argument"}: ${issue.message}`,
+        )
+        .join("; "),
+      json,
+    );
+  }
+  return result.data;
 }

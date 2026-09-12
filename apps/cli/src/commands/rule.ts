@@ -6,7 +6,13 @@ import { Command } from "commander";
 
 import { printJson } from "../formatters/output.js";
 
-import { fail, globalsOf, idempotency, withClient } from "./shared.js";
+import {
+  fail,
+  globalsOf,
+  idempotency,
+  parseJsonArgument,
+  withClient,
+} from "./shared.js";
 
 /** Typed JSON is accepted at the scripting interface; no expression or code evaluation. */
 export function ruleCommand(): Command {
@@ -41,7 +47,11 @@ export function ruleCommand(): Command {
     .action(async (definition: string, _options, command: Command) => {
       const globals = globalsOf(command);
       try {
-        const body = createRuleRequestSchema.parse(JSON.parse(definition));
+        const body = parseJsonArgument(
+          definition,
+          createRuleRequestSchema,
+          Boolean(globals.json),
+        );
         const result = await withClient(globals, (client) =>
           client.createRule(body, idempotency()),
         );
@@ -59,7 +69,11 @@ export function ruleCommand(): Command {
     .action(async (id: string, changes: string, _options, command: Command) => {
       const globals = globalsOf(command);
       try {
-        const body = updateRuleRequestSchema.parse(JSON.parse(changes));
+        const body = parseJsonArgument(
+          changes,
+          updateRuleRequestSchema,
+          Boolean(globals.json),
+        );
         const result = await withClient(globals, (client) =>
           client.updateRule(id, body, idempotency()),
         );
