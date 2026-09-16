@@ -21,6 +21,8 @@ import {
 
 import type {
   IdempotencyRecord,
+  CalDavObject,
+  CalDavObjectRepository,
   CalendarFeedToken,
   CalendarFeedTokenRepository,
   InboundAddress,
@@ -83,6 +85,8 @@ import { ruleRepository } from "./rules.js";
 export interface InMemoryData {
   idempotency: Map<string, IdempotencyRecord>;
   calendarFeedTokens: Map<string, CalendarFeedToken>;
+  /** Keyed by `${workspaceId}:${taskId}:${resource}`. */
+  caldavObjects: Map<string, CalDavObject>;
   inboundAddresses: Map<string, InboundAddress>;
   inboundReceipts: Map<string, string>;
   tasks: Map<string, Task>;
@@ -147,6 +151,7 @@ export function emptyData(): InMemoryData {
     outbox: [],
     published: new Map(),
     calendarFeedTokens: new Map(),
+    caldavObjects: new Map(),
     webhookSubscriptions: new Map(),
     webhookDeliveries: new Map(),
   };
@@ -419,6 +424,34 @@ function taskRepository(data: InMemoryData): TaskRepository {
         hasMore: items.length > limit,
         truncated: items.length > limit,
       };
+    },
+    async listChangedSince(workspaceId, since, limit) {
+      const bounded = Math.max(1, Math.min(limit, 10000));
+      const items = [...data.tasks.values()]
+        .filter(
+          (task) =>
+            task.workspaceId === workspaceId &&
+            (since === null || task.updatedAt.getTime() >= since.getTime()),
+        )
+        .sort(
+          (a, b) =>
+            a.updatedAt.getTime() - b.updatedAt.getTime() || a.id.localeCompare(b.id),
+        );
+      return {
+        items: items.slice(0, bounded),
+        hasMore: items.length > bounded,
+        truncated: items.length > bounded,
+      };
+    },
+    async syncStamp(workspaceId) {
+      const items = [...data.tasks.values()].filter(
+        (t) => t.workspaceId === workspaceId,
+      );
+      const latest = items.reduce<Date | null>(
+        (acc, t) => (acc === null || t.updatedAt > acc ? t.updatedAt : acc),
+        null,
+      );
+      return { latest, count: items.length };
     },
     async listUpcoming(query) {
       const limit = Math.max(
@@ -1455,6 +1488,7 @@ export function createInMemoryUnitOfWork(
     outbox: [...source.outbox],
     published: new Map(source.published),
     calendarFeedTokens: new Map(source.calendarFeedTokens),
+    caldavObjects: new Map(source.caldavObjects),
     webhookSubscriptions: new Map(source.webhookSubscriptions),
     webhookDeliveries: new Map(source.webhookDeliveries),
   });
@@ -1486,6 +1520,7 @@ export function createInMemoryUnitOfWork(
     target.outbox = source.outbox;
     target.published = source.published;
     target.calendarFeedTokens = source.calendarFeedTokens;
+    target.caldavObjects = source.caldavObjects;
     target.webhookSubscriptions = source.webhookSubscriptions;
     target.webhookDeliveries = source.webhookDeliveries;
   };
@@ -1534,6 +1569,7 @@ export function createInMemoryUnitOfWork(
           notificationPreferences: notificationPreferenceRepository(working),
           pushSubscriptions: pushSubscriptionRepository(working),
           calendarFeedTokens: calendarFeedTokenRepository(working),
+          caldavObjects: caldavObjectRepository(working),
           webhookSubscriptions: webhookSubscriptionRepository(working),
           webhookDeliveries: webhookDeliveryRepository(working),
           activity: activityRepository(working),
@@ -1556,6 +1592,33 @@ export function createInMemoryUnitOfWork(
       });
       pending = operation.catch(() => {});
       return operation;
+    },
+  };
+}
+
+function caldavObjectRepository(data: InMemoryData): CalDavObjectRepository {
+  const key = (o: Pick<CalDavObject, "workspaceId" | "taskId" | "resource">) =>
+    `${o.workspaceId}:${o.taskId}:${o.resource}`;
+  const inWorkspace = (workspaceId: string) =>
+    [...data.caldavObjects.values()].filter((o) => o.workspaceId === workspaceId);
+  return {
+    async findByPath(workspaceId, path) {
+      return inWorkspace(workspaceId).find((o) => o.path === path) ?? null;
+    },
+    async findByUid(workspaceId, uid) {
+      return inWorkspace(workspaceId).find((o) => o.uid === uid) ?? null;
+    },
+    async listByWorkspace(workspaceId) {
+      return inWorkspace(workspaceId);
+    },
+    async listByTask(workspaceId, taskId) {
+      return inWorkspace(workspaceId).filter((o) => o.taskId === taskId);
+    },
+    async upsert(object) {
+      data.caldavObjects.set(key(object), object);
+    },
+    async delete(workspaceId, taskId, resource) {
+      data.caldavObjects.delete(key({ workspaceId, taskId, resource }));
     },
   };
 }

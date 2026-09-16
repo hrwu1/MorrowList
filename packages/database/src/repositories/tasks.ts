@@ -23,17 +23,19 @@ import {
 import {
   and,
   asc,
+  count,
   desc,
   eq,
   exists,
-  gt,
   getTableColumns,
+  gt,
   gte,
   inArray,
   isNotNull,
   isNull,
   lt,
   lte,
+  max,
   or,
   sql,
   type SQL,
@@ -461,6 +463,31 @@ export function createTaskRepository(db: Database): TaskRepository {
         .limit(limit + 1);
       const hasMore = rows.length > limit;
       return { items: rows.slice(0, limit).map(toTask), hasMore, truncated: hasMore };
+    },
+
+    async listChangedSince(workspaceId, since, limit): Promise<BoardTaskPage> {
+      const bounded = Math.max(1, Math.min(limit, 10000));
+      const rows = await db
+        .select()
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.workspaceId, workspaceId),
+            since ? gte(tasks.updatedAt, since) : undefined,
+          ),
+        )
+        .orderBy(asc(tasks.updatedAt), asc(tasks.id))
+        .limit(bounded + 1);
+      const hasMore = rows.length > bounded;
+      return { items: rows.slice(0, bounded).map(toTask), hasMore, truncated: hasMore };
+    },
+
+    async syncStamp(workspaceId) {
+      const [row] = await db
+        .select({ latest: max(tasks.updatedAt), count: count() })
+        .from(tasks)
+        .where(eq(tasks.workspaceId, workspaceId));
+      return { latest: row?.latest ?? null, count: Number(row?.count ?? 0) };
     },
 
     async listUpcoming(query): Promise<BoardTaskPage> {

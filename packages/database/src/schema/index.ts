@@ -12,6 +12,7 @@ export * from "./saved-view.js";
 export * from "./webhook.js";
 
 export * from "./calendar.js";
+export * from "./caldav.js";
 export * from "./rule.js";
 
 export * from "./idempotency.js";

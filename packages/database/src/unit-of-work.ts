@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import type { TransactionContext, UnitOfWork } from "@morrowlist/application";
 
 import type { Database, DatabaseHandle } from "./client.js";
+import { createCalDavObjectRepository } from "./repositories/caldav.js";
 import { createCalendarFeedTokenRepository } from "./repositories/calendar.js";
 import { createDayPlanRepository } from "./repositories/day-plans.js";
 import {
@@ -47,6 +48,7 @@ export function buildTransactionContext(db: Database): TransactionContext {
   return {
     idempotency: createIdempotencyRepository(db),
     calendarFeedTokens: createCalendarFeedTokenRepository(db),
+    caldavObjects: createCalDavObjectRepository(db),
     inboundAddresses: createInboundAddressRepository(db),
     tasks: createTaskRepository(db),
     rules: createRuleRepository(db),

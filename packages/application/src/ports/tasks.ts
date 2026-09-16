@@ -155,8 +155,25 @@ export interface CalendarTaskQuery {
   readonly limit?: number;
 }
 
+/** The change position of a workspace's tasks, for CalDAV ctag and sync tokens (GAP-25). */
+export interface TaskSyncStamp {
+  /** Newest `updatedAt` across every task, trashed and completed included; null when none. */
+  readonly latest: Date | null;
+  readonly count: number;
+}
+
 export interface TaskRepository {
   listCalendar(query: CalendarTaskQuery): Promise<BoardTaskPage>;
+  /**
+   * Every task, trashed and completed included, with `updatedAt` at or after `since`
+   * (all tasks when null), oldest change first. Backs CalDAV sync-collection.
+   */
+  listChangedSince(
+    workspaceId: string,
+    since: Date | null,
+    limit: number,
+  ): Promise<BoardTaskPage>;
+  syncStamp(workspaceId: string): Promise<TaskSyncStamp>;
   findById(workspaceId: string, taskId: string): Promise<Task | null>;
   findByNumber(workspaceId: string, taskNumber: number): Promise<Task | null>;
   list(filter: TaskFilter, cursor: Cursor): Promise<Page<Task>>;

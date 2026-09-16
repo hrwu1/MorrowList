@@ -108,6 +108,8 @@ export const tasks = pgTable(
     ),
     index("tasks_board_idx").on(table.projectId, table.statusId, table.rank),
     index("tasks_due_idx").on(table.workspaceId, table.dueDate),
+    // CalDAV sync-collection walks every change since a token, trashed tasks included.
+    index("tasks_workspace_updated_idx").on(table.workspaceId, table.updatedAt),
     index("tasks_parent_idx").on(table.parentTaskId),
     index("tasks_series_idx").on(table.workspaceId, table.seriesId),
     // Live, open rows with a defer date or a deadline: what the deferred and deadline

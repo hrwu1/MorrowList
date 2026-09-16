@@ -1,3 +1,4 @@
+import type { CalDavObjectRepository } from "./caldav.js";
 import type { CalendarFeedTokenRepository } from "./calendar.js";
 import type { DayPlanRepository } from "./day-plans.js";
 import type { ActivityRepository, OutboxRepository } from "./events.js";
@@ -30,6 +31,7 @@ import type { WorkspaceRepository } from "./workspace.js";
 export interface TransactionContext {
   readonly idempotency: IdempotencyRepository;
   readonly calendarFeedTokens: CalendarFeedTokenRepository;
+  readonly caldavObjects: CalDavObjectRepository;
   readonly inboundAddresses: InboundAddressRepository;
   readonly tasks: TaskRepository;
   readonly rules: RuleRepository;
