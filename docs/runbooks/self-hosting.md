@@ -113,6 +113,10 @@ Terminate TLS at the proxy, forward to `MORROWLIST_PORT`, and set `APP_URL` and
 `AUTH_TRUSTED_ORIGINS` to the public `https://` origin. Sign-in is rejected from any
 origin not on that list, which is the single most common misconfiguration.
 
+Calendar subscription URLs are built from `APP_URL`, and Apple Calendar refuses feeds
+that are not served over HTTPS with a trusted certificate, so a plain-HTTP instance
+cannot be subscribed from macOS or iOS Calendar.
+
 ## Upgrading
 
 ```bash

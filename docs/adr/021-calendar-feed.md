@@ -50,5 +50,9 @@ an actual deadline, including when task and workspace timezones differ.
   untrusted IP headers and stores no per-client secrets. A multi-instance deployment needs
   an upstream shared rate limit for a deployment-wide ceiling.
 - `ical.js` is a test-only parser dependency. Production rendering adds no dependency.
-- Google Calendar and Apple Calendar subscription display remains an external acceptance
-  check, recorded separately from parser, PostgreSQL, API, and Chromium verification.
+- Apple Calendar (macOS 26.5) was checked on 2026-09-16: date-only, timed, and deadline
+  entries land on the right day and local time. Apple Calendar only fetches feeds over
+  HTTPS with a certificate the Mac trusts: it retries a `webcal://` or `http://` URL over
+  TLS after its "Insecure Connection" prompt and fails silently on an untrusted
+  certificate. A deployment must serve `APP_URL` over HTTPS for Apple subscriptions.
+  Google Calendar display remains an external acceptance check.

@@ -43,6 +43,7 @@ export function CalendarSettingsPage() {
       <p>
         Subscribe by URL in your calendar app. The feed includes planned dates,
         deadlines, and timed reminders. Calendar apps choose how often they refresh.
+        Apple Calendar only accepts feeds served over HTTPS.
       </p>
       <p>
         Anyone holding this private URL can read your scheduled tasks. Save it when
