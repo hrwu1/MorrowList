@@ -115,6 +115,7 @@ beforeEach(async () => {
   const auth: AuthPort = {
     resolveUser: async (headers) =>
       headers.get("authorization") === "Bearer secret" ? user : null,
+    issueToken: async () => null,
     handleRequest: async () => new Response("not used", { status: 404 }),
   };
   taskService = new TaskService({

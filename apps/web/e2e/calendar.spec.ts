@@ -98,6 +98,27 @@ test("month/week, dated capture, drag and keyboard reschedule, subscription revo
     page.getByText("No calendar feed is active.", { exact: true }),
   ).toBeVisible();
   expect((await page.request.get(url)).status()).toBe(404);
+  // CalDAV account details and a personal API token minted against the password (GAP-25).
+  const caldav = page.getByRole("region", { name: "CalDAV account" });
+  await expect(caldav.getByText("Server address", { exact: true })).toBeVisible();
+  await expect(caldav.locator("code").first()).toHaveText(/\/dav\/$/);
+  await caldav.getByLabel("Account password").fill("wrong-password-value");
+  await caldav.getByRole("button", { name: "Create API token" }).click();
+  await expect(caldav.getByText("API token could not be created")).toBeVisible();
+  await caldav.getByLabel("Account password").fill("correct-horse-battery-staple");
+  await caldav.getByRole("button", { name: "Create API token" }).click();
+  const token = await caldav.getByRole("textbox", { name: "API token" }).inputValue();
+  expect(token.length).toBeGreaterThan(20);
+  const davUrl = await caldav.locator("code").first().textContent();
+  const basic = Buffer.from(
+    `${await caldav.locator("code").nth(1).textContent()}:${token}`,
+  ).toString("base64");
+  const propfind = await page.request.fetch(`${davUrl}calendars/`, {
+    method: "PROPFIND",
+    headers: { Authorization: `Basic ${basic}`, Depth: "1" },
+  });
+  expect(propfind.status()).toBe(207);
+  expect(await propfind.text()).toContain("<C:calendar/>");
 });
 
 test("calendar fits a narrow screen and day selection remains usable", async ({

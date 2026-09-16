@@ -7,8 +7,8 @@ The web app, the `morrow` CLI, and any third-party client are peers: they all sp
 same versioned REST API, so anything you can do by clicking you can do from a script.
 
 > Status: the roadmap features are implemented, including projects/workflows, task views,
-> tags/relations/custom fields, imports/exports, reminders, capture channels, rules, and
-> CLI/MCP interfaces. Current verification and implementation work are recorded in
+> tags/relations/custom fields, imports/exports, reminders, capture channels, rules,
+> CLI/MCP interfaces, and calendar apps (an ICS feed and a two-way CalDAV account). Current verification and implementation work are recorded in
 > [`.claude/plans/roadmap.md`](.claude/plans/roadmap.md).
 
 ## Quick start

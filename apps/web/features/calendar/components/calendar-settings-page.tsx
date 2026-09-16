@@ -2,8 +2,9 @@
 import { Alert, Button, Spinner } from "@morrowlist/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
+import { useMe } from "@/features/workspace/hooks/use-workspace";
 import { apiClient } from "@/lib/api-client";
 import "./calendar.css";
 
@@ -30,6 +31,23 @@ export function CalendarSettingsPage() {
   });
   const error = create.error ?? revoke.error ?? status.error;
   const busy = create.isPending || revoke.isPending;
+  const me = useMe();
+  const [origin, setOrigin] = useState("");
+  useEffect(() => setOrigin(window.location.origin), []);
+  const [password, setPassword] = useState("");
+  const [token, setToken] = useState<string | null>(null);
+  const mint = useMutation({
+    mutationFn: (accountPassword: string) =>
+      apiClient.createApiToken({ password: accountPassword }),
+    onSuccess: (issued) => {
+      setToken(issued.token);
+      setPassword("");
+    },
+  });
+  const submitToken = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (password) mint.mutate(password);
+  };
   return (
     <div className="stack">
       <header className="page-header">
@@ -92,6 +110,63 @@ export function CalendarSettingsPage() {
           />
         </label>
       ) : null}
+      <section className="stack" aria-labelledby="caldav-heading">
+        <h2 id="caldav-heading">CalDAV account</h2>
+        <p>
+          Add MorrowList as a CalDAV account in Apple Calendar or another CalDAV app to
+          edit tasks from the calendar. Moving, renaming, creating, or deleting an event
+          there changes the task here, and a stale edit is refused rather than
+          overwriting a newer one. Repeating events and invitations cannot be synced.
+        </p>
+        <dl className="caldav-details">
+          <dt>Server address</dt>
+          <dd>
+            <code>{origin ? `${origin}/dav/` : "…/dav/"}</code>
+          </dd>
+          <dt>Username</dt>
+          <dd>
+            <code>{me.data?.user.email ?? "your account email"}</code>
+          </dd>
+          <dt>Password</dt>
+          <dd>An API token, created below.</dd>
+        </dl>
+        <form className="calendar-controls" onSubmit={submitToken}>
+          <label className="stack">
+            Account password
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+          <Button type="submit" disabled={mint.isPending || !password}>
+            {mint.isPending ? "Creating…" : "Create API token"}
+          </Button>
+        </form>
+        {mint.error ? (
+          <Alert tone="error" title="API token could not be created">
+            {mint.error.message}
+          </Alert>
+        ) : null}
+        {token ? (
+          <label className="stack">
+            API token (shown once)
+            <input
+              className="calendar-feed-url"
+              aria-label="API token"
+              value={token}
+              readOnly
+              onFocus={(event) => event.target.select()}
+            />
+          </label>
+        ) : null}
+        <p>
+          A token is also the key for the <code>morrow</code> CLI. It stays valid while
+          it is used and expires after 30 days without use. Apple Calendar requires the
+          server address to use HTTPS.
+        </p>
+      </section>
     </div>
   );
 }

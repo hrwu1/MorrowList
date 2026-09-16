@@ -117,6 +117,16 @@ Calendar subscription URLs are built from `APP_URL`, and Apple Calendar refuses 
 that are not served over HTTPS with a trusted certificate, so a plain-HTTP instance
 cannot be subscribed from macOS or iOS Calendar.
 
+### CalDAV accounts
+
+`/dav/` is a CalDAV server: calendar apps add it as an account with the user's email and
+an API token (Settings → Calendar → "Create API token") and get two-way sync of open,
+dated tasks. The proxy must pass the WebDAV methods through unchanged — `PROPFIND`,
+`PROPPATCH`, and `REPORT` as well as `PUT` and `DELETE` — and must forward
+`/.well-known/caldav`, which redirects to `/dav/`. Request bodies are small XML documents
+and single events; the 1 MB body limit is enough. Tokens are sessions: they expire after
+30 days without use, and changing the account password invalidates them.
+
 ## Upgrading
 
 ```bash

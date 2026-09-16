@@ -1,7 +1,9 @@
 import type {
   CalendarViewQuery,
   CalendarViewResponse,
+  ApiTokenDto,
   CalendarFeedDto,
+  CreateApiTokenRequest,
   CalendarFeedStatus,
   InboundAddressDto,
   CreateRuleRequest,
@@ -730,6 +732,20 @@ export class ApiClient {
       "GET",
       `/me/calendar-feed${this.queryString({}, options)}`,
       undefined,
+      options,
+    );
+    return result.data;
+  }
+
+  /** Mint a personal API token (CLI key or CalDAV password); shown once (GAP-25). */
+  async createApiToken(
+    body: CreateApiTokenRequest,
+    options: RequestOptions = {},
+  ): Promise<ApiTokenDto> {
+    const result = await this.send<{ data: ApiTokenDto }>(
+      "POST",
+      "/me/tokens",
+      body,
       options,
     );
     return result.data;

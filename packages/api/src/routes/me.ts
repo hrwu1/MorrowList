@@ -1,4 +1,5 @@
 import {
+  createApiTokenRequestSchema,
   pushSubscriptionRequestSchema,
   updateNotificationPreferencesRequestSchema,
 } from "@morrowlist/contracts";
@@ -57,6 +58,18 @@ export function meRoutes(deps: ApiDependencies) {
       }
       await deps.notificationService.removePushSubscription(c.get("actor"), endpoint);
       return c.body(null, 204);
+    })
+
+    .post("/me/tokens", async (c) => {
+      // A token is a credential in its own right (the CLI's key, a CalDAV password), so
+      // holding a session is not enough to mint one: the account password is re-checked.
+      const user = await deps.auth.resolveUser(c.req.raw.headers);
+      if (!user) throw new ApiError("AUTH_REQUIRED", "Sign in to continue.");
+      const body = await parseJsonBody(c, createApiTokenRequestSchema);
+      const issued = await deps.auth.issueToken(user.email, body.password);
+      if (!issued) throw new ApiError("AUTH_FORBIDDEN", "The password did not match.");
+      c.header("Cache-Control", "no-store");
+      return c.json({ data: issued }, 201);
     })
 
     .get("/me/push-config", (c) => {

@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * Scopes and the presets a credential can be created with (spec 22.3, 22.4).
  *
@@ -86,3 +88,21 @@ export const SCOPE_PRESETS = {
 } as const satisfies Record<string, readonly Scope[]>;
 
 export type ScopePreset = keyof typeof SCOPE_PRESETS;
+
+/**
+ * A personal API token (GAP-25): a bearer credential for the CLI and the password of a
+ * CalDAV account. Minting one re-checks the account password so a stolen browser session
+ * cannot turn itself into a long-lived credential.
+ */
+export const createApiTokenRequestSchema = z.object({
+  password: z.string().min(1).max(200),
+});
+export type CreateApiTokenRequest = z.infer<typeof createApiTokenRequestSchema>;
+
+export const apiTokenResponseSchema = z.object({
+  data: z.object({
+    /** Shown once; MorrowList keeps only what it needs to verify it. */
+    token: z.string(),
+  }),
+});
+export type ApiTokenDto = z.infer<typeof apiTokenResponseSchema>["data"];

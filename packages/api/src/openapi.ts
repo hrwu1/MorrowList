@@ -43,7 +43,9 @@ import {
   meResponseSchema,
   calendarViewQuerySchema,
   calendarViewResponseSchema,
+  apiTokenResponseSchema,
   calendarFeedResponseSchema,
+  createApiTokenRequestSchema,
   calendarFeedStatusResponseSchema,
   notificationListResponseSchema,
   notificationPreferencesResponseSchema,
@@ -154,6 +156,8 @@ const registry = {
   TodayView: todayViewResponseSchema,
   BoardView: boardViewResponseSchema,
   CalendarView: calendarViewResponseSchema,
+  ApiToken: apiTokenResponseSchema,
+  CreateApiTokenRequest: createApiTokenRequestSchema,
   CalendarFeed: calendarFeedResponseSchema,
   CalendarFeedStatus: calendarFeedStatusResponseSchema,
   UpcomingView: upcomingViewResponseSchema,
@@ -461,6 +465,24 @@ export function buildOpenApiDocument(version = "1.0.0"): Record<string, unknown>
             "200": {
               description: "The updated preferences",
               ...jsonContent(ref("NotificationPreferences")),
+            },
+            ...commonErrors,
+          },
+        },
+      },
+      "/me/tokens": {
+        post: {
+          summary: "Mint a personal API token after re-checking the account password",
+          description:
+            "The token is a bearer credential for the CLI and the password of a CalDAV account. It is returned once, is independent of the browser session, and expires after 30 days without use.",
+          requestBody: {
+            required: true,
+            ...jsonContent(ref("CreateApiTokenRequest")),
+          },
+          responses: {
+            "201": {
+              description: "The token; store it now",
+              ...jsonContent(ref("ApiToken")),
             },
             ...commonErrors,
           },

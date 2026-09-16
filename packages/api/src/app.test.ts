@@ -93,6 +93,10 @@ beforeEach(async () => {
   };
   const auth: AuthPort = {
     resolveUser: async () => currentUser,
+    issueToken: async (email, password) =>
+      currentUser && email === currentUser.email && password === "correct-horse"
+        ? { token: "minted-token" }
+        : null,
     handleRequest: async () => new Response("not used", { status: 404 }),
   };
 
@@ -2311,5 +2315,24 @@ describe("replay scope exceptions", () => {
     expect((await send()).status).toBe(200);
     expect(webhookSender.sent).toHaveLength(2);
     expect(unitOfWork.data.idempotency.size).toBe(0);
+  });
+});
+
+describe("POST /me/tokens", () => {
+  it("mints a token only for the account password, and never without a session", async () => {
+    const minted = await jsonRequest("/api/v1/me/tokens", "POST", {
+      password: "correct-horse",
+    });
+    expect(minted.status).toBe(201);
+    expect(minted.headers.get("Cache-Control")).toBe("no-store");
+    expect(await minted.json()).toEqual({ data: { token: "minted-token" } });
+    const wrong = await jsonRequest("/api/v1/me/tokens", "POST", { password: "nope" });
+    expect(wrong.status).toBe(403);
+    expect((await jsonRequest("/api/v1/me/tokens", "POST", {})).status).toBe(422);
+    currentUser = null;
+    expect(
+      (await jsonRequest("/api/v1/me/tokens", "POST", { password: "correct-horse" }))
+        .status,
+    ).toBe(401);
   });
 });

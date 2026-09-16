@@ -19,6 +19,12 @@ export interface AuthenticatedUser {
 export interface AuthPort {
   /** Resolve the caller from request headers, or null when unauthenticated. */
   resolveUser(headers: Headers): Promise<AuthenticatedUser | null>;
+  /**
+   * Mint a bearer token for `email` after re-checking `password`; null when they do not
+   * match. The token is an independent session: signing the browser out leaves it alone,
+   * and it expires after 30 days without use (GAP-25).
+   */
+  issueToken(email: string, password: string): Promise<{ token: string } | null>;
   /** Handle a Better Auth endpoint request under `/api/auth/*`. */
   handleRequest(request: Request): Promise<Response>;
 }
@@ -33,6 +39,14 @@ export function createAuthPort(auth: AuthInstance): AuthPort {
         email: session.user.email,
         name: session.user.name || null,
       };
+    },
+    async issueToken(email, password) {
+      try {
+        const result = await auth.api.signInEmail({ body: { email, password } });
+        return result.token ? { token: result.token } : null;
+      } catch {
+        return null;
+      }
     },
     handleRequest: (request) => auth.handler(request),
   };
