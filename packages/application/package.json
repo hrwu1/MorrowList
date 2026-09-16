@@ -27,11 +27,11 @@
   "dependencies": {
     "@morrowlist/contracts": "workspace:*",
     "@morrowlist/domain": "workspace:*",
-    "@morrowlist/observability": "workspace:*"
+    "@morrowlist/observability": "workspace:*",
+    "ical.js": "2.2.1"
   },
   "devDependencies": {
     "@morrowlist/config": "workspace:*",
-    "ical.js": "2.2.1",
     "typescript": "5.9.2",
     "vitest": "3.2.4"
   }

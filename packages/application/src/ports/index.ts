@@ -13,6 +13,7 @@ export {
   type TaskCounterRepository,
   type TaskFilter,
   type TaskRepository,
+  type TaskSyncStamp,
   type TaskSearchQuery,
   type TodayTaskQuery,
   type UpcomingTaskQuery,

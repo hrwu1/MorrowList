@@ -34,6 +34,7 @@ export {
   type CalendarFeedServiceOptions,
 } from "./calendar/service.js";
 export { renderCalendar } from "./calendar/ics.js";
+export * from "./caldav/index.js";
 export * from "./rules/index.js";
 
 export { IdempotencyService, IDEMPOTENCY_RETENTION_MS } from "./idempotency/service.js";

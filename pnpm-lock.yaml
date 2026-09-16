@@ -253,13 +253,13 @@ importers:
       '@morrowlist/observability':
         specifier: workspace:*
         version: link:../observability
+      ical.js:
+        specifier: 2.2.1
+        version: 2.2.1
     devDependencies:
       '@morrowlist/config':
         specifier: workspace:*
         version: link:../config
-      ical.js:
-        specifier: 2.2.1
-        version: 2.2.1
       typescript:
         specifier: 5.9.2
         version: 5.9.2
