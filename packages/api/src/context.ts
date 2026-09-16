@@ -1,5 +1,6 @@
 import type {
   IdempotencyService,
+  CalDavService,
   CalendarFeedService,
   InboundEmailService,
   ActivityService,
@@ -33,6 +34,7 @@ export interface ApiDependencies {
   /** Encrypts replay envelopes; composition uses the configured application secret. */
   readonly idempotencySecret: string;
   readonly calendarFeedService: CalendarFeedService;
+  readonly calDavService: CalDavService;
   readonly inboundEmailService: InboundEmailService;
   readonly auth: AuthPort;
   readonly unitOfWork: UnitOfWork;

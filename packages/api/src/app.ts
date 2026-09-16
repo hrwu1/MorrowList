@@ -35,7 +35,8 @@ const MAX_BODY_BYTES = 1_000_000;
 const MAX_IMPORT_BODY_BYTES = 10_000_000;
 
 export function createApiApp(deps: ApiDependencies) {
-  const app = new Hono<ApiEnv>().basePath(API_BASE_PATH);
+  // Next no longer redirects trailing slashes (CalDAV needs them), so match both forms.
+  const app = new Hono<ApiEnv>({ strict: false }).basePath(API_BASE_PATH);
 
   app.use("*", requestContext(deps.logger));
   app.use(

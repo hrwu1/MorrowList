@@ -21,6 +21,8 @@ const config: NextConfig = {
     ? { output: "standalone" as const, outputFileTracingRoot: workspaceRoot }
     : {}),
   reactStrictMode: true,
+  // CalDAV collections end in a slash; Next must not redirect them away (GAP-25).
+  skipTrailingSlashRedirect: true,
   // Feed paths contain bearer credentials; Hono logs a redacted path instead.
   logging: { incomingRequests: { ignore: [/\/api\/v1\/feeds\//] } },
   // Workspace packages ship TypeScript sources compiled to ESM; Next must transpile them

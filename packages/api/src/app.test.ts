@@ -1,5 +1,6 @@
 import {
   IdempotencyService,
+  CalDavService,
   CalendarFeedService,
   InboundEmailService,
   ActivityService,
@@ -95,6 +96,11 @@ beforeEach(async () => {
     handleRequest: async () => new Response("not used", { status: 404 }),
   };
 
+  const taskService = new TaskService({
+    unitOfWork,
+    clock: fixedClock(NOW),
+    cursorSecret: "test-secret",
+  });
   deps = {
     idempotencyService: new IdempotencyService({ unitOfWork }),
     idempotencySecret: "test-only-replay-encryption-secret",
@@ -117,10 +123,12 @@ beforeEach(async () => {
     workspaceService: new WorkspaceService({ unitOfWork, clock: fixedClock(NOW) }),
     projectService: new ProjectService({ unitOfWork, clock: fixedClock(NOW) }),
     workflowService: new WorkflowService({ unitOfWork, clock: fixedClock(NOW) }),
-    taskService: new TaskService({
+    taskService,
+    calDavService: new CalDavService({
       unitOfWork,
+      taskService,
+      appUrl: "http://localhost",
       clock: fixedClock(NOW),
-      cursorSecret: "test-secret",
     }),
     activityService: new ActivityService({ unitOfWork, cursorSecret: "test-secret" }),
     flowService: new FlowService({ unitOfWork, clock: fixedClock(NOW) }),

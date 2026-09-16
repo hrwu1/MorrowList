@@ -1,8 +1,9 @@
 import "server-only";
 
-import { createApiApp, type ApiDependencies } from "@morrowlist/api";
+import { createApiApp, createDavApp, type ApiDependencies } from "@morrowlist/api";
 import {
   IdempotencyService,
+  CalDavService,
   CalendarFeedService,
   InboundEmailService,
   ActivityService,
@@ -56,6 +57,8 @@ export interface Container {
   readonly logger: Logger;
   readonly auth: AuthPort;
   readonly api: ReturnType<typeof createApiApp>;
+  /** The CalDAV app, mounted at `/dav` by `middleware.ts` (GAP-25). */
+  readonly dav: ReturnType<typeof createDavApp>;
   readonly handleAuthRequest: (request: Request) => Promise<Response>;
   /** The embedded reminder worker, when `WORKER_MODE=embedded` (GAP-13). */
   readonly worker: BackgroundWorker | null;
@@ -134,6 +137,7 @@ export function getContainer(): Container {
     cursorSecret,
   });
 
+  const taskService = new TaskService({ unitOfWork, cursorSecret });
   const dependencies: ApiDependencies = {
     idempotencyService: new IdempotencyService({
       unitOfWork,
@@ -157,7 +161,8 @@ export function getContainer(): Container {
     workspaceService: new WorkspaceService({ unitOfWork }),
     projectService: new ProjectService({ unitOfWork }),
     workflowService: new WorkflowService({ unitOfWork }),
-    taskService: new TaskService({ unitOfWork, cursorSecret }),
+    taskService,
+    calDavService: new CalDavService({ unitOfWork, taskService, appUrl: env.APP_URL }),
     activityService: new ActivityService({ unitOfWork, cursorSecret }),
     flowService: new FlowService({ unitOfWork }),
     exportService: new ExportService({ unitOfWork }),
@@ -193,6 +198,7 @@ export function getContainer(): Container {
     logger,
     auth,
     api: createApiApp(dependencies),
+    dav: createDavApp(dependencies),
     handleAuthRequest: (request) => authInstance.handler(request),
     worker,
   };
