@@ -29,6 +29,7 @@ it costs, so a future change is a deliberate reversal rather than an accident.
 | [ADR-021](021-calendar-feed.md)                      | Calendar projection and revocable ICS subscriptions | Accepted |
 | [ADR-022](022-inbound-capture.md)                    | External capture uses canonical tasks               | Accepted |
 | [ADR-023](023-automation-rules.md)                   | Transactional automation rules                      | Accepted |
+| [ADR-024](024-caldav-sync.md)                        | CalDAV server for two-way calendar sync             | Accepted |
 
 ## Adding a record
 
