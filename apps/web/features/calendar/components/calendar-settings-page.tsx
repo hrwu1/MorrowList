@@ -1,5 +1,5 @@
 "use client";
-import { Alert, Button, Spinner, TextInput } from "@morrowlist/ui";
+import { Alert, Button, Field, Spinner, TextInput } from "@morrowlist/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
@@ -130,16 +130,16 @@ export function CalendarSettingsPage() {
           <dt>Password</dt>
           <dd>An API token, created below.</dd>
         </dl>
-        <form className="calendar-controls" onSubmit={submitToken}>
-          <label className="stack">
-            Account password
+        <form className="calendar-token-form" onSubmit={submitToken}>
+          <Field label="Account password" htmlFor="calendar-account-password">
             <TextInput
+              id="calendar-account-password"
               type="password"
               autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
-          </label>
+          </Field>
           <Button type="submit" disabled={mint.isPending || !password}>
             {mint.isPending ? "Creating…" : "Create API token"}
           </Button>
