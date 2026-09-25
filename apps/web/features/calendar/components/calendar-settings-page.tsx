@@ -1,5 +1,5 @@
 "use client";
-import { Alert, Button, Spinner } from "@morrowlist/ui";
+import { Alert, Button, Spinner, TextInput } from "@morrowlist/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
@@ -133,7 +133,7 @@ export function CalendarSettingsPage() {
         <form className="calendar-controls" onSubmit={submitToken}>
           <label className="stack">
             Account password
-            <input
+            <TextInput
               type="password"
               autoComplete="current-password"
               value={password}
