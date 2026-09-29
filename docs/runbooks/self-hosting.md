@@ -36,8 +36,8 @@ last occurrence in the file wins, which is easy to misread.
 Then wait for the application to report ready and open it:
 
 ```bash
-curl -fsS http://localhost:3000/api/v1/ready
-open http://localhost:3000/sign-up
+curl -fsS http://localhost:3200/api/v1/ready
+open http://localhost:3200/sign-up
 ```
 
 Create the first account on that page. It is an ordinary sign-up: the account gets its own
@@ -78,9 +78,9 @@ that matter most.
 | ---------------------- | ----------------------- | ----------------------------------------------------- |
 | `AUTH_SECRET`          | —                       | required; at least 32 characters                      |
 | `POSTGRES_PASSWORD`    | —                       | required                                              |
-| `APP_URL`              | `http://localhost:3000` | the origin the browser uses                           |
-| `AUTH_TRUSTED_ORIGINS` | `http://localhost:3000` | must include `APP_URL`                                |
-| `MORROWLIST_PORT`      | `3000`                  | host port; the container always listens on 3000       |
+| `APP_URL`              | `http://localhost:3200` | the origin the browser uses                           |
+| `AUTH_TRUSTED_ORIGINS` | `http://localhost:3200` | must include `APP_URL`                                |
+| `MORROWLIST_PORT`      | `3200`                  | host port; the container always listens on 3000       |
 | `DATABASE_POOL_MAX`    | `10`                    | lower it on a 1 GB box before raising it              |
 | `WORKER_MODE`          | `embedded`              | reminders run in the web process; `off` disables them |
 | `RUN_MIGRATIONS`       | `true`                  | see below                                             |
@@ -106,6 +106,11 @@ the server makes an outbound POST to each browser's push service.
 
 Without the keys nothing breaks: `GET /me/push-config` reports push off and the
 notification settings page says so rather than offering a control that cannot work.
+
+The host listener binds to `127.0.0.1` by default. Set `MORROWLIST_BIND_HOST=0.0.0.0`
+only when a remote proxy or LAN access requires it. Docker and the normal local
+app both use host port 3200; stop one before starting the other, or register a
+separate port in 3200–3299 and update the host port and origin settings together.
 
 ### Behind a reverse proxy
 
@@ -180,8 +185,8 @@ docker compose -f infra/compose/docker-compose.prod.yml exec -T postgres \
 | Task                            | Command                                                                                               |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | Logs                            | `docker compose -f infra/compose/docker-compose.prod.yml logs -f app`                                 |
-| Health                          | `curl -fsS http://localhost:3000/api/v1/health`                                                       |
-| Readiness (checks the database) | `curl -fsS http://localhost:3000/api/v1/ready`                                                        |
+| Health                          | `curl -fsS http://localhost:3200/api/v1/health`                                                       |
+| Readiness (checks the database) | `curl -fsS http://localhost:3200/api/v1/ready`                                                        |
 | Restart                         | `docker compose -f infra/compose/docker-compose.prod.yml restart app`                                 |
 | Stop, keeping data              | `docker compose -f infra/compose/docker-compose.prod.yml down`                                        |
 | Stop and **delete** data        | `... down -v`                                                                                         |

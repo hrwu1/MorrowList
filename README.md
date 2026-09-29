@@ -92,3 +92,7 @@ not _forbidden_, so a response never confirms that something exists.
 - [Architecture decision records](docs/adr/README.md)
 - [OpenAPI document](docs/api/openapi.json)
 - [Product specification](MorrowList_v1.0_Product_Specification_and_Agent_Implementation_Plan.md)
+
+Local listeners follow the [workspace port registry](docs/contributing/README.md):
+UI/API 3200, E2E 3250, and benchmark 3299. Local dev/start commands bind to
+`127.0.0.1`; pass `--hostname 0.0.0.0` explicitly only for intentional LAN access.

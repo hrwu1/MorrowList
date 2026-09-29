@@ -121,21 +121,21 @@ jobs:
             docker exec smoke-db pg_isready -U morrowlist -d morrowlist && break
             sleep 2
           done
-          docker run -d --name smoke-app --network morrowlist-smoke -p 3000:3000 \
+          docker run -d --name smoke-app --network morrowlist-smoke -p 127.0.0.1:3200:3000 \
             -e DATABASE_URL=postgresql://morrowlist:smoke@smoke-db:5432/morrowlist \
             -e AUTH_SECRET=smoke-test-secret-value-at-least-32-chars \
-            -e APP_URL=http://127.0.0.1:3000 \
-            -e AUTH_TRUSTED_ORIGINS=http://127.0.0.1:3000 \
+            -e APP_URL=http://127.0.0.1:3200 \
+            -e AUTH_TRUSTED_ORIGINS=http://127.0.0.1:3200 \
             --platform linux/${{ matrix.arch }} \
             "${image}@${{ steps.build.outputs.digest }}"
           for _ in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:3000/api/v1/ready >/dev/null; then ready=1; break; fi
+            if curl -fsS http://127.0.0.1:3200/api/v1/ready >/dev/null; then ready=1; break; fi
             sleep 2
           done
           if [ "${ready:-0}" != "1" ]; then docker logs smoke-app; exit 1; fi
-          curl -fsS -X POST http://127.0.0.1:3000/api/auth/sign-up/email \
+          curl -fsS -X POST http://127.0.0.1:3200/api/auth/sign-up/email \
             -H 'content-type: application/json' \
-            -H 'origin: http://127.0.0.1:3000' \
+            -H 'origin: http://127.0.0.1:3200' \
             -d '{"name":"Smoke","email":"smoke@example.com","password":"correct-horse-battery-staple"}'
           docker rm -f smoke-app smoke-db
           docker network rm morrowlist-smoke

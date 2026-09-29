@@ -55,7 +55,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/morrowlist
       BENCH_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/morrowlist_bench
       AUTH_SECRET: ci-only-secret-value-not-used-in-production
-      BENCH_PORT: "3400"
+      BENCH_PORT: "3299"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

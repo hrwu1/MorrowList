@@ -13,13 +13,13 @@
  * workers pulling from one queue of iterations, which is what autocannon does too.
  *
  *   BENCH_DATABASE_URL=postgresql://... node scripts/bench.mjs
- *   node scripts/bench.mjs --base-url http://127.0.0.1:3000 --skip-seed   # existing server
+ *   node scripts/bench.mjs --base-url http://127.0.0.1:3200 --skip-seed   # existing server
  *   node scripts/bench.mjs --check previous-run.json                      # nightly CI
  *
  * Options:
  *   --database-url URL   throwaway database (default BENCH_DATABASE_URL); never DATABASE_URL
  *   --base-url URL       drive a server that is already running instead of starting one
- *   --port N             port to start the server on (default BENCH_PORT, then 3400)
+ *   --port N             port to start the server on (default BENCH_PORT, then 3299)
  *   --scale NAME         seed scale, `reference` (default) or `small`
  *   --concurrency N      concurrent requests per scenario (default 4)
  *   --iterations N       measured iterations per read scenario (default 200)
@@ -84,7 +84,7 @@ if (databaseUrl && databaseUrl === process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-const PORT = Number(values.port ?? process.env.BENCH_PORT ?? 3400);
+const PORT = Number(values.port ?? process.env.BENCH_PORT ?? 3299);
 const baseUrl = externalServer ?? `http://127.0.0.1:${PORT}`;
 const PASSWORD = "correct-horse-battery-staple";
 const email = `bench-${Date.now()}@example.com`;

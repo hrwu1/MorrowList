@@ -49,9 +49,9 @@ services:
       PORT: "3000"
       # Must be the URL the browser uses; auth rejects a sign-in posted from any other
       # origin, so a reverse proxy in front of this needs its own URL here.
-      APP_URL: ${APP_URL:-http://localhost:3000}
+      APP_URL: ${APP_URL:-http://localhost:3200}
       # Set this to the same origin as APP_URL (comma-separated if there are several).
-      AUTH_TRUSTED_ORIGINS: ${AUTH_TRUSTED_ORIGINS:-http://localhost:3000}
+      AUTH_TRUSTED_ORIGINS: ${AUTH_TRUSTED_ORIGINS:-http://localhost:3200}
       AUTH_SECRET: ${AUTH_SECRET:?generate one with `openssl rand -base64 32`}
       DATABASE_URL: postgresql://${POSTGRES_USER:-morrowlist}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-morrowlist}
       DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-10}
@@ -76,7 +76,7 @@ services:
       # (spec 31.2); see the runbook.
       RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
     ports:
-      - "${MORROWLIST_PORT:-3000}:3000"
+      - "${MORROWLIST_BIND_HOST:-127.0.0.1}:${MORROWLIST_PORT:-3200}:3000"
 
 volumes:
   morrowlist-pgdata:
