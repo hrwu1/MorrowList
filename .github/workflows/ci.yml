@@ -17,7 +17,7 @@ jobs:
   # formatting slip does not wait behind a PostgreSQL container.
   static:
     name: Lint, types, and contracts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -36,7 +36,7 @@ jobs:
 
   unit:
     name: Unit tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -50,7 +50,7 @@ jobs:
 
   integration:
     name: Integration tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         # Must match the production target so collation and constraint behaviour are
@@ -97,7 +97,7 @@ jobs:
 
   e2e:
     name: Browser end-to-end
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:18-alpine
