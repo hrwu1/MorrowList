@@ -6,3 +6,4 @@ docs/api/openapi.json
 packages/database/drizzle
 packages/config/boundary-fixtures
 MorrowList_v1.0_Product_Specification_and_Agent_Implementation_Plan.md
+THIRD_PARTY_NOTICES.md

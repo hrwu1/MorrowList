@@ -2,6 +2,7 @@
   "name": "@morrowlist/web",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "node scripts/build-sw.mjs && next dev --hostname 127.0.0.1 --port ${PORT:-3200}",

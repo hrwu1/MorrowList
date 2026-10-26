@@ -84,6 +84,8 @@ COPY --from=build --chown=morrow:morrow /app/apps/web/public ./apps/web/public
 COPY --from=build --chown=morrow:morrow /app/packages/database/dist/migrate-bundle.mjs ./packages/database/dist/migrate-bundle.mjs
 COPY --from=build --chown=morrow:morrow /app/packages/database/drizzle ./packages/database/drizzle
 COPY --chown=morrow:morrow scripts/entrypoint.sh ./scripts/
+# The image redistributes its dependencies, so their notices travel with it.
+COPY --chown=morrow:morrow LICENSE THIRD_PARTY_NOTICES.md ./
 
 USER morrow
 EXPOSE 3000

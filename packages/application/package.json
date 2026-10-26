@@ -2,6 +2,7 @@
   "name": "@morrowlist/application",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
