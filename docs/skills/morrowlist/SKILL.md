@@ -10,17 +10,17 @@ records aligned with the user's intent and the actual outcome of work.
 
 ## Connect and discover
 
-Use an installed `morrow` if available. On this machine the source checkout is
-`.`. If the executable is absent, use:
+Use an installed `morrow` if available. If the executable is absent, locate the
+MorrowList source checkout and run the built CLI from its root:
 
 ```sh
 node apps/cli/dist/index.js --json usage
 ```
 
-If the build is missing or stale, build from the checkout with
-`pnpm exec turbo run build --filter=@morrowlist/cli...`. On another machine, locate
-the checkout rather than assuming this path exists. In examples below, replace
-`morrow` with the verified executable invocation when needed.
+If the build is missing or stale, build from the checkout root with
+`pnpm exec turbo run build --filter=@morrowlist/cli...`. Never assume a checkout path;
+verify it first. In examples below, replace `morrow` with the verified executable
+invocation when needed.
 
 Start with `morrow --json usage` and `morrow --json auth status`. Use subcommand
 `--help` for unfamiliar flags; the current CLI takes precedence over these examples.
