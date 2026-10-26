@@ -24,19 +24,6 @@ integration failure and an end-to-end failure are distinguishable at a glance.
 
 ## What the other workflows do
 
-`Publish image` builds the self-hosting image on native AMD64 and ARM64 runners.
-Each platform is smoke-tested against PostgreSQL before the shared image tags move.
-Pull requests only build; pushes to `main` publish `edge`, and version tags publish releases.
-It is separate from the four CI checks above.
-
-BuildKit provenance (`mode=max`) and SBOMs are always attached to the platform images.
-GitHub-signed attestations additionally run for public repositories. Private repositories
-require GitHub Enterprise Cloud; eligible owners can set the repository variable
-`GITHUB_ATTESTATIONS_ENABLED=true`. A user-owned private repository cannot use that
-API, so it publishes with BuildKit metadata but without GitHub-signed attestations.
-This preserves repository privacy and does not suppress build or smoke-test failures.
-See the [official action's availability policy](https://github.com/actions/attest-build-provenance#readme).
-
 `Benchmark` runs nightly or manually. It samples latency after warm-up, enforces the
 spec's single-task read/mutation budgets, and compares p95 to its previous runner result.
 Maximum-size 200-task batches use that regression comparison rather than treating 200
@@ -55,14 +42,14 @@ Rate limiting remains enabled and has its own browser regression test. Keep task
 activity assertions aligned with the documented display format when changing that format.
 
 Local passing checks do not update GitHub: the repair must be pushed and the resulting
-workflows verified before claiming remote CI or image publication succeeded.
+workflows verified before claiming remote CI succeeded.
 
 Benchmark regression baselines are partitioned by CPU model/core count, OS/architecture,
 exact Node version, selected dataset scale, and the benchmark/workflow source hash.
 A different environment starts a new baseline while retaining all absolute budgets;
 unchanged code is no longer compared across unrelated GitHub runner CPUs.
 
-The reference performance job uses `ubuntu-24.04-arm`, matching the standard native
-ARM64 image runner. Its report records the actual CPU and core count. The x86 CI
-integration budgets remain enabled; the 100,000-task HTTP benchmark, concurrency
-four, 300 ms read budget and 20% comparable-run regression threshold are unchanged.
+The reference performance job uses `ubuntu-24.04-arm`. Its report records the actual
+CPU and core count. The x86 CI integration budgets remain enabled; the 100,000-task HTTP
+benchmark, concurrency four, 300 ms read budget and 20% comparable-run regression
+threshold are unchanged.

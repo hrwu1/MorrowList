@@ -3,23 +3,24 @@
 Two containers — PostgreSQL and the application — on one small box. The reminder worker
 runs inside the application process, so there is no third thing to keep alive.
 
-> **Verification status.** Everything on this page was written and reviewed statically.
-> The container images have **not** been built or run: the machine the work was done on
-> has no Docker installed. The two placeholders below (image size, resident memory at
-> idle) are unmeasured on purpose and must be filled in by the first person who runs
-> `docker compose up` for real, along with any correction this page needs.
+> **Verification status.** The image was built and smoke-tested against PostgreSQL in CI
+> on AMD64 and ARM64 until 2026-10; that workflow has since been removed and no image is
+> published, so you build it from this checkout. The footprint placeholders below are
+> unmeasured on purpose and should be filled in by the first person who measures a real
+> run, along with any correction this page needs.
 
 ## Requirements
 
 - Docker Engine 24+ with the Compose plugin (`docker compose version`).
-- 1 vCPU and 1 GB of RAM is the intended floor; 2 GB is comfortable.
+- 1 vCPU and 1 GB of RAM is the intended floor for running it; building the image
+  needs about 2 GB, so build with swap or on a larger machine if the box is smaller.
 - A domain and a TLS-terminating reverse proxy if you expose it beyond localhost.
 
 ## First run
 
 ```bash
-git clone https://github.com/morrowlist/morrowlist.git
-cd morrowlist
+git clone https://github.com/hrwu1/MorrowList.git
+cd MorrowList
 cp infra/compose/.env.prod.example infra/compose/.env
 
 # The two secrets the stack refuses to start without.
@@ -27,7 +28,7 @@ printf 'AUTH_SECRET=%s\n' "$(openssl rand -base64 32)" >> infra/compose/.env
 printf 'POSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> infra/compose/.env
 
 docker compose -f infra/compose/docker-compose.prod.yml \
-  --env-file infra/compose/.env up -d
+  --env-file infra/compose/.env up -d --build
 ```
 
 Later edits to those values must replace the lines rather than append duplicates; the
@@ -57,7 +58,8 @@ To close the instance to further sign-ups afterwards, put the reverse proxy in f
 3. The Next.js standalone server starts on port 3000 and the container health check
    begins polling `GET /api/v1/health`.
 
-The whole sequence is a pull plus a few seconds of migration on an empty database.
+After the first build, the whole sequence is a few seconds of migration on an empty
+database.
 
 ### If the first run fails
 
@@ -135,19 +137,17 @@ and single events; the 1 MB body limit is enough. Tokens are sessions: they expi
 ## Upgrading
 
 ```bash
-cd morrowlist
-git pull                       # only for the compose file; the image comes from the registry
+cd MorrowList
+git pull
 docker compose -f infra/compose/docker-compose.prod.yml \
-  --env-file infra/compose/.env pull
-docker compose -f infra/compose/docker-compose.prod.yml \
-  --env-file infra/compose/.env up -d
+  --env-file infra/compose/.env up -d --build
 ```
 
 Take a backup first (below). Migrations are forward-only and expand/migrate/contract
 (spec 32); the application tolerates the previous schema during a rolling deploy, but a
 single-container upgrade is a short restart either way.
 
-Pin `MORROWLIST_IMAGE` to a released tag rather than `latest` once the instance matters.
+To stay on a known version, check out a specific commit or tag before building.
 
 ### More than one application container
 
@@ -197,17 +197,16 @@ Next closes its listener and finishes in-flight requests before exiting.
 
 ## Footprint
 
-| Measurement                         | Value                                                         |
-| ----------------------------------- | ------------------------------------------------------------- |
-| Compressed image size (linux/amd64) | **unmeasured** — no Docker on the machine this was written on |
-| Compressed image size (linux/arm64) | **unmeasured**                                                |
-| Application container RSS at idle   | **unmeasured**                                                |
-| PostgreSQL container RSS at idle    | **unmeasured**                                                |
+| Measurement                       | Value          |
+| --------------------------------- | -------------- |
+| Image size                        | **unmeasured** |
+| Application container RSS at idle | **unmeasured** |
+| PostgreSQL container RSS at idle  | **unmeasured** |
 
 Fill these in from a real run:
 
 ```bash
-docker image ls ghcr.io/hrwu1/morrowlist --format '{{.Size}}'
+docker image ls --filter reference='*-app' --format '{{.Repository}} {{.Size}}'
 docker stats --no-stream --format '{{.Name}} {{.MemUsage}}'
 ```
 

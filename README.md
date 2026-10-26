@@ -38,13 +38,14 @@ openssl rand -base64 32   # paste as AUTH_SECRET
 openssl rand -hex 24      # paste as POSTGRES_PASSWORD
 ```
 
-Then start it:
+Then build and start it:
 
 ```bash
-docker compose -f infra/compose/docker-compose.prod.yml --env-file infra/compose/.env up -d
+docker compose -f infra/compose/docker-compose.prod.yml --env-file infra/compose/.env up -d --build
 ```
 
-Open <http://localhost:3200> and create an account. This runs two
+The first build takes a few minutes and about 2 GB of memory; no prebuilt image is
+published. Open <http://localhost:3200> and create an account. This runs two
 containers (the app and PostgreSQL); migrations run on start. To reach it from other
 devices, put it behind HTTPS and set `APP_URL` and `AUTH_TRUSTED_ORIGINS` to the public
 URL. [`docs/runbooks/self-hosting.md`](docs/runbooks/self-hosting.md) covers reverse

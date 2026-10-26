@@ -34,9 +34,7 @@ services:
       - "5432"
 
   app:
-    # Published from CI for linux/amd64 and linux/arm64; `docker compose build app`
-    # builds it locally instead.
-    image: ${MORROWLIST_IMAGE:-ghcr.io/hrwu1/morrowlist:latest}
+    # Built locally from this checkout; `up -d --build` rebuilds it after a `git pull`.
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile
