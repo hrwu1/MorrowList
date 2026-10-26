@@ -207,7 +207,7 @@ Next closes its listener and finishes in-flight requests before exiting.
 Fill these in from a real run:
 
 ```bash
-docker image ls ghcr.io/morrowlist/morrowlist --format '{{.Size}}'
+docker image ls ghcr.io/hrwu1/morrowlist --format '{{.Size}}'
 docker stats --no-stream --format '{{.Name}} {{.MemUsage}}'
 ```
 

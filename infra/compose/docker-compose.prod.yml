@@ -36,7 +36,7 @@ services:
   app:
     # Published from CI for linux/amd64 and linux/arm64; `docker compose build app`
     # builds it locally instead.
-    image: ${MORROWLIST_IMAGE:-ghcr.io/morrowlist/morrowlist:latest}
+    image: ${MORROWLIST_IMAGE:-ghcr.io/hrwu1/morrowlist:latest}
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile

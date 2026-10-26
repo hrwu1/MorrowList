@@ -27,22 +27,16 @@ them and prompt only for the four that write.
 
 ## Setup
 
-You need an API key. Create one in MorrowList, then note your base URL — it ends in
-`/api/v1`.
+You need an API key: in MorrowList open **Settings → Calendar** and choose
+**Create API token** (it is shown once). Then note your base URL — it ends in `/api/v1`.
+
+`@morrowlist/mcp` is not published to npm; build it from a checkout of this repository
+first (`pnpm --filter @morrowlist/mcp... build`) and point your client at the absolute
+path of `apps/mcp/dist/index.js` in that checkout.
 
 ### Claude Code
 
 ```bash
-claude mcp add morrowlist \
-  --env MORROW_BASE_URL=https://morrow.example.com/api/v1 \
-  --env MORROW_API_KEY=your-key \
-  -- npx -y @morrowlist/mcp
-```
-
-Or, from a checkout of this repository:
-
-```bash
-pnpm --filter @morrowlist/mcp build
 claude mcp add morrowlist \
   --env MORROW_BASE_URL=http://localhost:3200/api/v1 \
   --env MORROW_API_KEY=your-key \
